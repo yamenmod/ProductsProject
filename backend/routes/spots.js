@@ -11,7 +11,7 @@ const db = require("../db/connection");
 // ===== GET USER'S SURF SPOTS ROUTE =====
 // When frontend sends GET request to /spots/:user_id
 // This retrieves all surf spots created by a specific user
-router.get("/:user_id", (req, res) => {
+router.get("/:user_id", async (req, res) => {
   // Extract user_id from URL parameters (/spots/123 -> user_id = 123)
   const { user_id } = req.params;
 
@@ -34,21 +34,21 @@ router.get("/:user_id", (req, res) => {
 // ===== ADD NEW SURF SPOT ROUTE =====
 // When frontend sends POST request to /spots
 // This creates a new surf spot and saves it to database
-router.post("/", (req, res) => {
+router.post("/",async (req, res) => {
   // Extract spot data from request body (sent from frontend form)
-  const { spot_name, difficulty, type, location, user_id } = req.body;
+  const { spot_name, difficulty, type, location, user_id, wave_height } = req.body;
 
   // SQL query to INSERT a new row into surfspots table
   // The ? symbols are placeholders for values
   const sql = `
-    INSERT INTO surfspots (spot_name, difficulty, type, location, user_id)
-    VALUES (?,?,?,?,?)
+    INSERT INTO surfspots (spot_name, difficulty, type, location, user_id, wave_height)
+    VALUES (?,?,?,?,?,?)
   `;
 
   // Execute the INSERT query
   db.query(
     sql,
-    [spot_name, difficulty, type, location, user_id], // Values to insert
+    [spot_name, difficulty, type, location, user_id, wave_height], // Values to insert
     (err, result) => {
       // If database error occurs, send error response
       if (err) return res.status(500).send(err);
@@ -64,7 +64,7 @@ router.post("/", (req, res) => {
 // When frontend sends PUT request to /spots/:id/:user_id
 // This updates an existing surf spot
 // Security: Only the spot owner (user_id match) can update their own spot
-router.put("/:id/:user_id", (req, res) => {
+router.put("/:id/:user_id", async (req, res) => {
   // Extract spot ID and user ID from URL parameters
   const { id, user_id } = req.params;
 
@@ -93,7 +93,7 @@ router.put("/:id/:user_id", (req, res) => {
 // When frontend sends DELETE request to /spots/:id/:user_id
 // This deletes a surf spot
 // Security: Only the spot owner (user_id match) can delete their own spot
-router.delete("/:id/:user_id", (req, res) => {
+router.delete("/:id/:user_id", async (req, res) => {
   // Extract spot ID and user ID from URL parameters
   const { id, user_id } = req.params;
 

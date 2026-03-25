@@ -12,7 +12,7 @@ const db = require("../db/connection");
 // ===== LOGIN ROUTE =====
 // When frontend sends POST request to /auth/login
 // This handles user login logic
-router.post("/login", (req, res) => {
+router.post("/login", async (req, res) => {
   // Extract username and password from request body (data sent from frontend)
   const { username, password } = req.body;
   console.log("LOGIN REQ:", username);
@@ -51,22 +51,20 @@ router.post("/login", (req, res) => {
 });
 
 // ===== REGISTER ROUTE =====
-// When frontend sends POST request to /auth/register
-// This handles new user registration
-router.post("/register", (req, res) => {
-  // Extract username and password from request body
-  const { username, password } = req.body;
+router.post("/register", async (req, res) => {
+  // Extract username, email and password from request body
+  const { username, email, password } = req.body;
 
   // SQL query to INSERT a new user into the users table
-  // The ? are placeholders for values (username, password)
-  const sql = "INSERT INTO users (username, password) VALUES (?,?)";
+  const sql = "INSERT INTO users (username, email, password) VALUES (?,?,?)";
 
   // Execute the INSERT query
-  db.query(sql, [username, password], (err) => {
-    // If error occurs (like duplicate username), send error response
-    if (err) return res.status(400).json({ message: "User exists" });
+  db.query(sql, [username, email, password], (err) => {
+    if (err) {
+      console.error("REGISTER ERROR:", err);
+      return res.status(400).json({ message: "Username exists" });
+    }
 
-    // If successful, send confirmation
     res.json({ message: "registered" });
   });
 });
@@ -74,7 +72,7 @@ router.post("/register", (req, res) => {
 // ===== SESSION CHECK ROUTE =====
 // When frontend sends GET request to /auth/session
 // This checks if user is still logged in (used on page refresh)
-router.get("/session", (req, res) => {
+router.get("/session", async (req, res) => {
   // Check if session has a user stored (meaning user is logged in)
   if (req.session.user) {
     // User is logged in, send back user data
@@ -88,7 +86,7 @@ router.get("/session", (req, res) => {
 // ===== LOGOUT ROUTE =====
 // When frontend sends POST request to /auth/logout
 // This destroys the user's session (logs them out)
-router.post("/logout", (req, res) => {
+router.post("/logout", async (req, res) => {
   // Destroy the session, which deletes all stored session data
   // This effectively logs out the user
   req.session.destroy();

@@ -39,23 +39,21 @@ function Login({ onLoginSuccess }) {
     }
 
     try {
-      const url = isRegister
-        ? "http://localhost:5000/auth/register"
-        : "http://localhost:5000/auth/login";
+      const url = isRegister ? "/api/auth/register" : "/api/auth/login";
 
       const body = isRegister
         ? { username, password, email }
         : { username, password };
 
-      const res = await axios.post(url, body);
+      const res = await axios.post(url, body); //Connects to backend using POST request, sending user data
 
       if (res.data.message === "success") {
-        onLoginSuccess(res.data.user); // App will save to storage
+        onLoginSuccess({ token: res.data.token, user: res.data.user });
       } else {
-        setMessage(res.data.message);
+        setMessage(res.data.message); // Backend returned error message (like Server Error)
       }
     } catch (err) {
-      setMessage(err.response?.data?.message || "Server Error");
+      setMessage(err.response?.data?.message || "Server Error"); //Backend connection failed (network error, server down, or invalid response)
     }
   };
 

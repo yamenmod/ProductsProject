@@ -14,7 +14,7 @@ function Footer() {
       }}
     >
       <p style={{ margin: "0", fontSize: "14px", opacity: "0.9" }}>
-        🌊 Surf Spots made by Wasseem & Yamen
+        🛍️ Product Management App
       </p>
     </footer>
   );

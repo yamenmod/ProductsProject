@@ -1,30 +1,13 @@
-// db setup
-// mysql2 - connects to db
-const mysql = require("mysql2");
+const mysql = require("mysql2/promise");
 
-// create connection
-// connection pool to mysql
-// setup connection detials
-const db = mysql.createConnection({
-  host: "localhost", // Where database is running (localhost = this computer)
-  user: "root", // MySQL username (usually "root" by default)
-  password: "", // MySQL password (empty string = no password)
-  database: "surf_tracker", // Name of our database
+const db = mysql.createPool({
+  host: process.env.DB_HOST || "localhost",
+  user: process.env.DB_USER || "root",
+  password: process.env.DB_PASSWORD || "",
+  database: process.env.DB_NAME || "surf_products",
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0,
 });
 
-// connect to db
-// try to connect & handle errors
-db.connect((err) => {
-  if (err) {
-    // connection failed
-    // log full error object so we can see code/details
-    console.log("DB ERROR:", err);
-  } else {
-    // nice we're connected
-    console.log("MySQL connected!");
-  }
-});
-
-// export the db
-// make it available for routes
 module.exports = db;
