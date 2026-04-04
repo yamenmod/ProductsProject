@@ -1,18 +1,45 @@
 import React, { useEffect, useState } from "react";
 import Login from "./pages/Login";
+import Home from "./pages/Home";
+import Shop from "./pages/Shop";
+import Contact from "./pages/Contact";
 import Products from "./pages/SurfSpots";
 
 function App() {
   const [session, setSession] = useState(null);
-  const [showProducts, setShowProducts] = useState(false);
+  const [currentPage, setCurrentPage] = useState("home");
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const [cartItems, setCartItems] = useState([]);
 
   useEffect(() => {
     const savedSession = localStorage.getItem("session");
     if (savedSession) {
       setSession(JSON.parse(savedSession));
-      setShowProducts(false);
+      setCurrentPage("home");
     }
   }, []);
+
+  const handleNavigate = (page, category = "") => {
+    setCurrentPage(page);
+    if (category) {
+      setSelectedCategory(category);
+    }
+  };
+
+  const handleAddToCart = (product) => {
+    const existingItem = cartItems.find((item) => item.id === product.id);
+    if (existingItem) {
+      setCartItems(
+        cartItems.map((item) =>
+          item.id === product.id
+            ? { ...item, quantity: item.quantity + 1 }
+            : item,
+        ),
+      );
+    } else {
+      setCartItems([...cartItems, { ...product, quantity: 1 }]);
+    }
+  };
 
   if (!session) {
     return (
@@ -20,71 +47,74 @@ function App() {
         onLoginSuccess={(authSession) => {
           localStorage.setItem("session", JSON.stringify(authSession));
           setSession(authSession);
-          setShowProducts(false);
+          setCurrentPage("home");
         }}
       />
     );
   }
 
-  if (!showProducts) {
+  if (currentPage === "home") {
     return (
-      <div
-        style={{
-          minHeight: "100vh",
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          background: "linear-gradient(135deg, #e3f2fd 0%, #b3e5fc 100%)",
-          fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+      <Home
+        user={session.user}
+        currentPage={currentPage}
+        onNavigate={handleNavigate}
+        onLogout={() => {
+          localStorage.removeItem("session");
+          setSession(null);
         }}
-      >
-        <div
-          style={{
-            background: "#fff",
-            borderRadius: "12px",
-            padding: "32px",
-            width: "360px",
-            textAlign: "center",
-            boxShadow: "0 12px 40px rgba(10, 61, 98, 0.15)",
-          }}
-        >
-          <h2 style={{ marginTop: 0, color: "#0a3d62" }}>
-            Welcome, {session.user.username}
-          </h2>
-          <p style={{ color: "#1e3a5a", marginBottom: "22px" }}>
-            Role: {session.user.role}
-          </p>
-          <button
-            className="primary"
-            style={{ width: "100%", marginBottom: "10px" }}
-            onClick={() => setShowProducts(true)}
-          >
-            Products
-          </button>
-          <button
-            style={{ width: "100%" }}
-            onClick={() => {
-              localStorage.removeItem("session");
-              setSession(null);
-            }}
-          >
-            Logout
-          </button>
-        </div>
-      </div>
+        cartCount={cartItems.length}
+      />
     );
   }
 
-  return (
-    <Products
-      session={session}
-      onBack={() => setShowProducts(false)}
-      onLogout={() => {
-        localStorage.removeItem("session");
-        setSession(null);
-      }}
-    />
-  );
+  if (currentPage === "shop") {
+    return (
+      <Shop
+        user={session.user}
+        currentPage={currentPage}
+        onNavigate={handleNavigate}
+        onLogout={() => {
+          localStorage.removeItem("session");
+          setSession(null);
+        }}
+        cartCount={cartItems.length}
+      />
+    );
+  }
+
+  if (currentPage === "contact") {
+    return (
+      <Contact
+        user={session.user}
+        currentPage={currentPage}
+        onNavigate={handleNavigate}
+        onLogout={() => {
+          localStorage.removeItem("session");
+          setSession(null);
+        }}
+        cartCount={cartItems.length}
+      />
+    );
+  }
+
+  if (currentPage === "products") {
+    return (
+      <Products
+        session={session}
+        currentPage={currentPage}
+        selectedCategory={selectedCategory}
+        cartItems={cartItems}
+        onAddToCart={handleAddToCart}
+        onNavigate={handleNavigate}
+        onLogout={() => {
+          localStorage.removeItem("session");
+          setSession(null);
+        }}
+        cartCount={cartItems.length}
+      />
+    );
+  }
 }
 
 export default App;

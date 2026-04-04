@@ -1,11 +1,22 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
+import Header from "../components/Header";
 import Footer from "../components/Footer";
 
-function Products({ session, onLogout, onBack }) {
+function Products({
+  session,
+  currentPage,
+  selectedCategory,
+  cartItems,
+  onAddToCart,
+  onNavigate,
+  onLogout,
+  cartCount = 0,
+}) {
   const [products, setProducts] = useState([]);
-  const [cart, setCart] = useState([]);
-  const [activeCategory, setActiveCategory] = useState("All");
+  const [activeCategory, setActiveCategory] = useState(
+    selectedCategory || "All",
+  );
   const [form, setForm] = useState({
     name: "",
     description: "",
@@ -18,6 +29,9 @@ function Products({ session, onLogout, onBack }) {
   const [imageFile, setImageFile] = useState(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [showForm, setShowForm] = useState(false);
+  const [cart, setCart] = useState(cartItems || []);
+  const fileInputRef = React.useRef(null);
 
   const isAdmin = session.user.role === "admin";
 
@@ -55,6 +69,10 @@ function Products({ session, onLogout, onBack }) {
     });
     setImageFile(null);
     setEditId(null);
+    setShowForm(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   };
 
   const handleSubmit = async (event) => {
@@ -101,6 +119,7 @@ function Products({ session, onLogout, onBack }) {
 
       resetForm();
       loadProducts();
+      setError("");
     } catch (requestError) {
       setError(requestError.response?.data?.message || "Request failed");
     }
@@ -117,6 +136,10 @@ function Products({ session, onLogout, onBack }) {
     });
     setImageFile(null);
     setEditId(product._id);
+    setShowForm(true);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   };
 
   const handleDelete = async (id) => {
@@ -155,44 +178,6 @@ function Products({ session, onLogout, onBack }) {
     }
   };
 
-  const handleRemoveFromCart = async (productId) => {
-    setError("");
-    setSuccess("");
-
-    try {
-      const res = await axios.delete(`/api/cart/${productId}`, {
-        headers: {
-          Authorization: `Bearer ${session.token}`,
-        },
-      });
-      setCart(res.data);
-    } catch (requestError) {
-      setError(requestError.response?.data?.message || "Remove failed");
-    }
-  };
-
-  const handleCheckout = async () => {
-    setError("");
-    setSuccess("");
-
-    try {
-      const res = await axios.post(
-        "/api/cart/checkout",
-        {},
-        {
-          headers: {
-            Authorization: `Bearer ${session.token}`,
-          },
-        },
-      );
-      setSuccess(`${res.data.message}. Total: $${res.data.order.total}`);
-      setCart([]);
-      loadProducts();
-    } catch (requestError) {
-      setError(requestError.response?.data?.message || "Checkout failed");
-    }
-  };
-
   const categories = [
     "All",
     ...new Set(
@@ -206,11 +191,6 @@ function Products({ session, onLogout, onBack }) {
     activeCategory === "All"
       ? products
       : products.filter((product) => product.category === activeCategory);
-
-  const cartTotal = cart.reduce(
-    (sum, item) => sum + (item.product?.price || 0) * item.quantity,
-    0,
-  );
 
   const resolveImageSrc = (imagePath) => {
     if (!imagePath) {
@@ -234,127 +214,352 @@ function Products({ session, onLogout, onBack }) {
         minHeight: "100vh",
         display: "flex",
         flexDirection: "column",
-        background: "linear-gradient(135deg, #e3f2fd 0%, #b3e5fc 100%)",
+        background: "#ffffff",
       }}
     >
-      <div style={{ flex: 1, padding: "20px" }}>
+      <Header
+        user={session.user}
+        currentPage={currentPage}
+        onNavigate={onNavigate}
+        onLogout={onLogout}
+        cartCount={cartItems?.length || 0}
+      />
+
+      <div style={{ flex: 1, padding: "40px 20px" }}>
         <div
           style={{
             maxWidth: "1100px",
-            margin: "30px auto",
-            padding: "35px",
-            background: "white",
-            borderRadius: "12px",
-            boxShadow: "0 12px 40px rgba(10, 61, 98, 0.15)",
+            margin: "0 auto",
+            padding: "40px",
+            background: "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)",
+            borderRadius: "16px",
             fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
           }}
         >
-          <h2 style={{ color: "#0a3d62", fontSize: "28px", marginTop: 0 }}>
-            🛍️ Product Shop
-          </h2>
-          <p style={{ marginTop: "0", color: "#1e3a5a", marginBottom: "18px" }}>
-            Logged in as <strong>{session.user.username}</strong> (
-            {session.user.role})
-          </p>
-
-          <div style={{ marginBottom: "12px", display: "flex", gap: "10px" }}>
-            <button onClick={onBack}>Back</button>
-            <button onClick={onLogout}>Logout</button>
+          <div
+            style={{
+              marginBottom: "32px",
+              borderBottom: "1px solid #e2e8f0",
+              paddingBottom: "20px",
+            }}
+          >
+            <h2
+              style={{
+                color: "#0f172a",
+                fontSize: "32px",
+                margin: "0 0 8px 0",
+                fontWeight: "800",
+                letterSpacing: "-0.5px",
+              }}
+            >
+              Product Shop
+            </h2>
+            <p
+              style={{
+                margin: "0",
+                color: "#64748b",
+                fontSize: "13px",
+                fontWeight: "500",
+              }}
+            >
+              Browse our collection of premium products
+            </p>
           </div>
 
           {error && (
             <div
               style={{
-                marginBottom: "18px",
-                padding: "12px",
-                borderRadius: "6px",
-                border: "1px solid #d32f2f",
-                color: "#d32f2f",
-                background: "#ffebee",
+                marginBottom: "20px",
+                padding: "14px 16px",
+                borderRadius: "8px",
+                border: "1px solid #fecaca",
+                color: "#991b1b",
+                background: "#fef2f2",
+                fontSize: "13px",
+                fontWeight: "500",
               }}
             >
-              {error}
+              ⚠️ {error}
             </div>
           )}
 
           {success && (
             <div
               style={{
-                marginBottom: "18px",
-                padding: "12px",
-                borderRadius: "6px",
-                border: "1px solid #2e7d32",
-                color: "#2e7d32",
-                background: "#e8f5e9",
+                marginBottom: "20px",
+                padding: "14px 16px",
+                borderRadius: "8px",
+                border: "1px solid #86efac",
+                color: "#15803d",
+                background: "#f0fdf4",
+                fontSize: "13px",
+                fontWeight: "500",
               }}
             >
-              {success}
+              ✓ {success}
             </div>
           )}
 
           {isAdmin && (
-            <form
-              onSubmit={handleSubmit}
+            <button
+              onClick={() => {
+                setShowForm(!showForm);
+                if (showForm) {
+                  resetForm();
+                }
+              }}
               style={{
-                marginBottom: "30px",
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-                gap: "12px",
+                marginBottom: "24px",
+                padding: "12px 20px",
+                background: "linear-gradient(135deg, #0084b4 0%, #0066a1 100%)",
+                color: "white",
+                border: "none",
+                borderRadius: "8px",
+                cursor: "pointer",
+                fontWeight: "700",
+                fontSize: "14px",
+                transition: "all 0.2s ease",
+                boxShadow: "0 4px 12px rgba(0, 132, 180, 0.15)",
+              }}
+              onMouseOver={(e) => {
+                e.target.style.boxShadow = "0 8px 20px rgba(0, 132, 180, 0.25)";
+                e.target.style.transform = "translateY(-2px)";
+              }}
+              onMouseOut={(e) => {
+                e.target.style.boxShadow = "0 4px 12px rgba(0, 132, 180, 0.15)";
+                e.target.style.transform = "translateY(0)";
               }}
             >
-              <input
-                placeholder="Product name *"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-              />
-              <input
-                placeholder="Description"
-                value={form.description}
-                onChange={(e) =>
-                  setForm({ ...form, description: e.target.value })
-                }
-              />
-              <input
-                type="number"
-                min="0"
-                placeholder="Price (number) *"
-                value={form.price}
-                onChange={(e) => setForm({ ...form, price: e.target.value })}
-              />
-              <input
-                placeholder="Category"
-                value={form.category}
-                onChange={(e) => setForm({ ...form, category: e.target.value })}
-              />
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => setImageFile(e.target.files?.[0] || null)}
-              />
-              <input
-                type="number"
-                min="0"
-                placeholder="Stock"
-                value={form.stock}
-                onChange={(e) => setForm({ ...form, stock: e.target.value })}
-              />
-              <button className="primary" type="submit">
-                {editId ? "Update Product" : "Add Product"}
-              </button>
-              {editId && (
-                <button type="button" onClick={resetForm}>
-                  Cancel Edit
+              {showForm ? "✕ Cancel" : "+ Add New Product"}
+            </button>
+          )}
+
+          {isAdmin && showForm && (
+            <div
+              style={{
+                marginBottom: "30px",
+                padding: "24px",
+                background: "#f8fafc",
+                borderRadius: "12px",
+                border: "1px solid #e2e8f0",
+              }}
+            >
+              <form
+                onSubmit={handleSubmit}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                  gap: "14px",
+                }}
+              >
+                <input
+                  placeholder="Product name *"
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  style={{
+                    padding: "10px 12px",
+                    border: "1px solid #cbd5e1",
+                    borderRadius: "8px",
+                    fontSize: "14px",
+                    fontFamily: "inherit",
+                    transition: "all 0.2s ease",
+                    background: "white",
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = "#0084b4";
+                    e.target.style.boxShadow =
+                      "0 0 0 3px rgba(0, 132, 180, 0.1)";
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = "#cbd5e1";
+                    e.target.style.boxShadow = "none";
+                  }}
+                />
+                <input
+                  placeholder="Description"
+                  value={form.description}
+                  onChange={(e) =>
+                    setForm({ ...form, description: e.target.value })
+                  }
+                  style={{
+                    padding: "10px 12px",
+                    border: "1px solid #cbd5e1",
+                    borderRadius: "8px",
+                    fontSize: "14px",
+                    fontFamily: "inherit",
+                    transition: "all 0.2s ease",
+                    background: "white",
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = "#0084b4";
+                    e.target.style.boxShadow =
+                      "0 0 0 3px rgba(0, 132, 180, 0.1)";
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = "#cbd5e1";
+                    e.target.style.boxShadow = "none";
+                  }}
+                />
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="Price (number) *"
+                  value={form.price}
+                  onChange={(e) => setForm({ ...form, price: e.target.value })}
+                  style={{
+                    padding: "10px 12px",
+                    border: "1px solid #cbd5e1",
+                    borderRadius: "8px",
+                    fontSize: "14px",
+                    fontFamily: "inherit",
+                    transition: "all 0.2s ease",
+                    background: "white",
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = "#0084b4";
+                    e.target.style.boxShadow =
+                      "0 0 0 3px rgba(0, 132, 180, 0.1)";
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = "#cbd5e1";
+                    e.target.style.boxShadow = "none";
+                  }}
+                />
+                <select
+                  value={form.category}
+                  onChange={(e) =>
+                    setForm({ ...form, category: e.target.value })
+                  }
+                  style={{
+                    padding: "10px 12px",
+                    border: "1px solid #cbd5e1",
+                    borderRadius: "8px",
+                    fontSize: "14px",
+                    fontFamily: "inherit",
+                    cursor: "pointer",
+                    transition: "all 0.2s ease",
+                    background: "white",
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = "#0084b4";
+                    e.target.style.boxShadow =
+                      "0 0 0 3px rgba(0, 132, 180, 0.1)";
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = "#cbd5e1";
+                    e.target.style.boxShadow = "none";
+                  }}
+                >
+                  <option value="">Select a category</option>
+                  <option value="Surfboards">Surfboards</option>
+                  <option value="Clothing">Clothing</option>
+                  <option value="Wetsuits">Wetsuits</option>
+                </select>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+                  style={{
+                    padding: "10px 12px",
+                    border: "1px solid #cbd5e1",
+                    borderRadius: "8px",
+                    fontSize: "13px",
+                    fontFamily: "inherit",
+                    transition: "all 0.2s ease",
+                    background: "white",
+                    cursor: "pointer",
+                  }}
+                />
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="Stock"
+                  value={form.stock}
+                  onChange={(e) => setForm({ ...form, stock: e.target.value })}
+                  style={{
+                    padding: "10px 12px",
+                    border: "1px solid #cbd5e1",
+                    borderRadius: "8px",
+                    fontSize: "14px",
+                    fontFamily: "inherit",
+                    transition: "all 0.2s ease",
+                    background: "white",
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = "#0084b4";
+                    e.target.style.boxShadow =
+                      "0 0 0 3px rgba(0, 132, 180, 0.1)";
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = "#cbd5e1";
+                    e.target.style.boxShadow = "none";
+                  }}
+                />
+                <button
+                  className="primary"
+                  type="submit"
+                  style={{
+                    padding: "11px 16px",
+                    background:
+                      "linear-gradient(135deg, #0084b4 0%, #0066a1 100%)",
+                    color: "white",
+                    border: "none",
+                    borderRadius: "8px",
+                    fontWeight: "700",
+                    fontSize: "14px",
+                    cursor: "pointer",
+                    transition: "all 0.2s ease",
+                    boxShadow: "0 4px 12px rgba(0, 132, 180, 0.15)",
+                  }}
+                  onMouseOver={(e) => {
+                    e.target.style.boxShadow =
+                      "0 8px 20px rgba(0, 132, 180, 0.25)";
+                    e.target.style.transform = "translateY(-2px)";
+                  }}
+                  onMouseOut={(e) => {
+                    e.target.style.boxShadow =
+                      "0 4px 12px rgba(0, 132, 180, 0.15)";
+                    e.target.style.transform = "translateY(0)";
+                  }}
+                >
+                  {editId ? "Update Product" : "Add Product"}
                 </button>
-              )}
-            </form>
+                {editId && (
+                  <button
+                    type="button"
+                    onClick={resetForm}
+                    style={{
+                      padding: "11px 16px",
+                      background: "#f1f5f9",
+                      color: "#475569",
+                      border: "1px solid #cbd5e1",
+                      borderRadius: "8px",
+                      fontWeight: "700",
+                      fontSize: "14px",
+                      cursor: "pointer",
+                      transition: "all 0.2s ease",
+                    }}
+                    onMouseOver={(e) => {
+                      e.target.style.background = "#e2e8f0";
+                    }}
+                    onMouseOut={(e) => {
+                      e.target.style.background = "#f1f5f9";
+                    }}
+                  >
+                    Cancel Edit
+                  </button>
+                )}
+              </form>
+            </div>
           )}
 
           <div
             style={{
               display: "flex",
               flexWrap: "wrap",
-              gap: "8px",
-              marginBottom: "20px",
+              gap: "10px",
+              marginBottom: "28px",
             }}
           >
             {categories.map((category) => (
@@ -362,77 +567,41 @@ function Products({ session, onLogout, onBack }) {
                 key={category}
                 onClick={() => setActiveCategory(category)}
                 style={{
+                  padding: "8px 16px",
                   background:
-                    activeCategory === category ? "#0084b4" : "#f0f0f0",
-                  color: activeCategory === category ? "#fff" : "#1e3a5a",
+                    activeCategory === category
+                      ? "linear-gradient(135deg, #0084b4 0%, #0066a1 100%)"
+                      : "#f1f5f9",
+                  color: activeCategory === category ? "white" : "#475569",
+                  border:
+                    activeCategory === category ? "none" : "1px solid #cbd5e1",
+                  borderRadius: "8px",
+                  fontWeight: "600",
+                  fontSize: "13px",
+                  cursor: "pointer",
+                  transition: "all 0.2s ease",
+                  boxShadow:
+                    activeCategory === category
+                      ? "0 4px 12px rgba(0, 132, 180, 0.15)"
+                      : "none",
+                }}
+                onMouseOver={(e) => {
+                  if (activeCategory !== category) {
+                    e.target.style.background = "#e2e8f0";
+                    e.target.style.borderColor = "#94a3b8";
+                  }
+                }}
+                onMouseOut={(e) => {
+                  if (activeCategory !== category) {
+                    e.target.style.background = "#f1f5f9";
+                    e.target.style.borderColor = "#cbd5e1";
+                  }
                 }}
               >
                 {category}
               </button>
             ))}
           </div>
-
-          {!isAdmin && (
-            <div
-              style={{
-                marginBottom: "22px",
-                padding: "14px",
-                borderRadius: "8px",
-                border: "1px solid #e0e0e0",
-                background: "#fafafa",
-              }}
-            >
-              <h3 style={{ marginTop: 0 }}>Cart</h3>
-              {cart.length === 0 ? (
-                <p style={{ marginBottom: "10px" }}>Your cart is empty.</p>
-              ) : (
-                <>
-                  {cart.map((item, index) => (
-                    <div
-                      key={item.product?._id || index}
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        marginBottom: "8px",
-                      }}
-                    >
-                      <span>
-                        {item.product?.name} x {item.quantity}
-                      </span>
-                      <div
-                        style={{
-                          display: "flex",
-                          gap: "8px",
-                          alignItems: "center",
-                        }}
-                      >
-                        <span>
-                          $
-                          {((item.product?.price || 0) * item.quantity).toFixed(
-                            2,
-                          )}
-                        </span>
-                        <button
-                          onClick={() =>
-                            handleRemoveFromCart(item.product?._id)
-                          }
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                  <p style={{ fontWeight: "700", marginBottom: "10px" }}>
-                    Total: ${cartTotal.toFixed(2)}
-                  </p>
-                  <button className="primary" onClick={handleCheckout}>
-                    Buy Now
-                  </button>
-                </>
-              )}
-            </div>
-          )}
 
           <div
             style={{
@@ -489,15 +658,25 @@ function Products({ session, onLogout, onBack }) {
                           </button>
                         </>
                       ) : (
-                        <button
-                          className="primary"
-                          onClick={() => handleAddToCart(product._id)}
-                          disabled={(product.stock ?? 0) < 1}
-                        >
-                          {(product.stock ?? 0) < 1
-                            ? "Out of Stock"
-                            : "Add to Cart"}
-                        </button>
+                        (() => {
+                          const isInCart = cart.some(
+                            (item) => item.product?._id === product._id,
+                          );
+
+                          return (
+                            <button
+                              className="primary"
+                              onClick={() => handleAddToCart(product._id)}
+                              disabled={(product.stock ?? 0) < 1 || isInCart}
+                            >
+                              {(product.stock ?? 0) < 1
+                                ? "Out of Stock"
+                                : isInCart
+                                  ? "In Cart"
+                                  : "Add to Cart"}
+                            </button>
+                          );
+                        })()
                       )}
                     </div>
                   </div>
