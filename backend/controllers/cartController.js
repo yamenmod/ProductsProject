@@ -1,5 +1,72 @@
 const db = require("../db/connection");
 
+const resolvePrimaryImage = (value) => {
+  if (!value) {
+    return "";
+  }
+
+  if (Array.isArray(value)) {
+    return value.find(Boolean) || "";
+  }
+
+  if (typeof value !== "string") {
+    return "";
+  }
+
+  const trimmedValue = value.trim();
+
+  if (!trimmedValue) {
+    return "";
+  }
+
+  if (trimmedValue.startsWith("[")) {
+    try {
+      const parsedValue = JSON.parse(trimmedValue);
+      const imageValue = Array.isArray(parsedValue)
+        ? parsedValue.find(Boolean) || ""
+        : trimmedValue;
+
+      if (!imageValue) {
+        return "";
+      }
+
+      if (
+        imageValue.startsWith("http://") ||
+        imageValue.startsWith("https://")
+      ) {
+        return imageValue;
+      }
+
+      if (imageValue.startsWith("/uploads/")) {
+        return imageValue;
+      }
+
+      return `/uploads/${imageValue.replace(/^\/+/, "")}`;
+    } catch (error) {
+      return trimmedValue;
+    }
+  }
+
+  if (trimmedValue.startsWith("data:") || trimmedValue.startsWith("blob:")) {
+    return trimmedValue;
+  }
+
+  if (
+    trimmedValue.startsWith("http://") ||
+    trimmedValue.startsWith("https://")
+  ) {
+    return trimmedValue;
+  }
+
+  if (trimmedValue.startsWith("/uploads/")) {
+    return trimmedValue;
+  }
+
+  return `/uploads/${trimmedValue.replace(/^\/+/, "")}`;
+};
+
+// Converts raw cart rows into the shape the frontend already expects.
+// This keeps the API response consistent across cart actions.
 const mapCartRows = (rows) =>
   rows.map((row) => ({
     product: {
@@ -9,11 +76,13 @@ const mapCartRows = (rows) =>
       price: Number(row.price),
       stock: Number(row.stock),
       category: row.category || "",
-      image: row.image_url || "",
+      image: resolvePrimaryImage(row.image_url),
     },
     quantity: Number(row.quantity),
   }));
 
+// Reads the signed-in user's cart and returns the current items and totals.
+// The query joins products and categories so the frontend can render details.
 const getCart = async (req, res) => {
   try {
     const [rows] = await db.query(
@@ -41,6 +110,8 @@ const getCart = async (req, res) => {
   }
 };
 
+// Adds or updates a cart item for the current user.
+// It validates the product first, then returns the refreshed cart state.
 const addToCart = async (req, res) => {
   try {
     const { productId, quantity } = req.body;
@@ -109,6 +180,8 @@ const addToCart = async (req, res) => {
   }
 };
 
+// Removes one product from the current user's cart.
+// The response again returns the updated cart so the UI stays in sync.
 const removeFromCart = async (req, res) => {
   try {
     const { productId } = req.params;
@@ -143,6 +216,8 @@ const removeFromCart = async (req, res) => {
   }
 };
 
+// Converts the user's cart into a paid order and clears the cart afterward.
+// This is the checkout flow that creates the order records seen by admin.
 const checkout = async (req, res) => {
   try {
     const [users] = await db.query(
@@ -249,9 +324,50 @@ const checkout = async (req, res) => {
   }
 };
 
+// Returns every order for the admin dashboard.
+// The admin page uses this list to show customer, amount, and payment status.
+const getAdminOrders = async (req, res) => {
+  try {
+    const [rows] = await db.query(
+      `
+        SELECT
+          o.id,
+          o.user_id,
+          u.username,
+          u.email,
+          o.total,
+          o.status,
+          o.created_at,
+          COUNT(oi.id) AS item_count
+        FROM orders o
+        JOIN users u ON u.id = o.user_id
+        LEFT JOIN order_items oi ON oi.order_id = o.id
+        GROUP BY o.id, o.user_id, u.username, u.email, o.total, o.status, o.created_at
+        ORDER BY o.created_at DESC, o.id DESC
+      `,
+    );
+
+    return res.status(200).json(
+      rows.map((row) => ({
+        id: row.id,
+        userId: row.user_id,
+        username: row.username,
+        email: row.email,
+        total: Number(row.total),
+        status: row.status,
+        itemCount: Number(row.item_count),
+        createdAt: row.created_at,
+      })),
+    );
+  } catch (error) {
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
 module.exports = {
   getCart,
   addToCart,
   removeFromCart,
   checkout,
+  getAdminOrders,
 };

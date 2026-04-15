@@ -1,5 +1,100 @@
 const db = require("../db/connection");
 
+const parseStoredImages = (value) => {
+  if (!value) {
+    return [];
+  }
+
+  if (Array.isArray(value)) {
+    return value.filter(Boolean);
+  }
+
+  if (typeof value !== "string") {
+    return [];
+  }
+
+  const trimmedValue = value.trim();
+
+  if (!trimmedValue) {
+    return [];
+  }
+
+  if (trimmedValue.startsWith('"[') && trimmedValue.endsWith(']"')) {
+    try {
+      const unwrappedValue = JSON.parse(trimmedValue);
+      const parsedValue = JSON.parse(unwrappedValue);
+      return Array.isArray(parsedValue)
+        ? parsedValue.filter(Boolean)
+        : [unwrappedValue];
+    } catch (error) {
+      return [trimmedValue];
+    }
+  }
+
+  if (trimmedValue.startsWith("[")) {
+    try {
+      const parsedValue = JSON.parse(trimmedValue);
+      return Array.isArray(parsedValue)
+        ? parsedValue.filter(Boolean)
+        : [trimmedValue];
+    } catch (error) {
+      const dataUrlMatches = [...trimmedValue.matchAll(/"(data:[^"]+)"/g)].map(
+        (match) => match[1],
+      );
+
+      if (dataUrlMatches.length) {
+        return dataUrlMatches;
+      }
+
+      return [trimmedValue];
+    }
+  }
+
+  return [trimmedValue];
+};
+
+const normalizeImageValue = (value) => {
+  if (!value) {
+    return "";
+  }
+
+  if (value.startsWith("[")) {
+    try {
+      const parsedValue = JSON.parse(value);
+      if (Array.isArray(parsedValue) && parsedValue.length) {
+        return normalizeImageValue(parsedValue[0]);
+      }
+    } catch (error) {
+      const dataUrlMatch = value.match(/"(data:[^"]+)"/);
+      if (dataUrlMatch?.[1]) {
+        return dataUrlMatch[1];
+      }
+    }
+  }
+
+  if (value.startsWith("data:") || value.startsWith("blob:")) {
+    return value;
+  }
+
+  if (value.startsWith("http://") || value.startsWith("https://")) {
+    return value;
+  }
+
+  if (value.startsWith("/uploads/")) {
+    return value;
+  }
+
+  return `/uploads/${value.replace(/^\/+/, "")}`;
+};
+
+const resolveImagePayload = (value) => {
+  const images = parseStoredImages(value).map(normalizeImageValue);
+  return {
+    imageUrls: images,
+    imageUrl: images[0] || "",
+  };
+};
+
 const normalizeProduct = (row) => ({
   _id: row.id,
   id: row.id,
@@ -9,8 +104,9 @@ const normalizeProduct = (row) => ({
   stock: Number(row.stock),
   category_id: row.category_id,
   category: row.category || "",
-  image: row.image_url || "",
-  image_url: row.image_url || "",
+  image: resolveImagePayload(row.image_url).imageUrl,
+  image_url: resolveImagePayload(row.image_url).imageUrl,
+  image_urls: resolveImagePayload(row.image_url).imageUrls,
   created_at: row.created_at,
   updated_at: row.updated_at,
 });
@@ -101,8 +197,25 @@ const getProductById = async (req, res) => {
 
 const createProduct = async (req, res) => {
   try {
-    const { name, description, price, category, image, stock } = req.body;
-    const uploadedImagePath = req.file ? `/uploads/${req.file.filename}` : null;
+    const { name, description, price, category, image, images, stock } =
+      req.body;
+    const uploadedImagePaths = Array.isArray(req.files)
+      ? req.files
+          .filter(
+            (file) =>
+              file && file.mimetype && file.mimetype.startsWith("image/"),
+          )
+          .map((file) => file.filename)
+      : req.file
+        ? [req.file.filename]
+        : [];
+
+    const fallbackImages = parseStoredImages(images || image);
+    const nextImages = uploadedImagePaths.length
+      ? uploadedImagePaths
+      : fallbackImages;
+    const storedImageValue =
+      nextImages.length > 1 ? JSON.stringify(nextImages) : nextImages[0] || "";
 
     if (!name || price === undefined) {
       return res.status(400).json({ message: "Name and price are required" });
@@ -129,7 +242,7 @@ const createProduct = async (req, res) => {
         Number(price),
         stock === undefined ? 0 : Number(stock),
         categoryId,
-        uploadedImagePath || image || "",
+        storedImageValue,
       ],
     );
 
@@ -156,7 +269,8 @@ const createProduct = async (req, res) => {
 
     return res.status(201).json(normalizeProduct(createdRows[0]));
   } catch (error) {
-    return res.status(500).json({ message: "Server error" });
+    console.error("Create product error:", error);
+    return res.status(500).json({ message: error.message || "Server error" });
   }
 };
 
@@ -172,8 +286,27 @@ const updateProduct = async (req, res) => {
     }
 
     const existingProduct = existingRows[0];
-    const { name, description, price, category, image, stock } = req.body;
-    const uploadedImagePath = req.file ? `/uploads/${req.file.filename}` : null;
+    const { name, description, price, category, image, images, stock } =
+      req.body;
+    const uploadedImagePaths = Array.isArray(req.files)
+      ? req.files
+          .filter(
+            (file) =>
+              file && file.mimetype && file.mimetype.startsWith("image/"),
+          )
+          .map((file) => file.filename)
+      : req.file
+        ? [req.file.filename]
+        : [];
+    const fallbackImages = parseStoredImages(images || image);
+    const existingImages = parseStoredImages(existingProduct.image_url);
+    const nextImages = uploadedImagePaths.length
+      ? uploadedImagePaths
+      : fallbackImages.length
+        ? fallbackImages
+        : existingImages;
+    const storedImageValue =
+      nextImages.length > 1 ? JSON.stringify(nextImages) : nextImages[0] || "";
 
     const nextName = name !== undefined ? name.trim() : existingProduct.name;
     const nextPrice =
@@ -207,8 +340,7 @@ const updateProduct = async (req, res) => {
         nextPrice,
         stock !== undefined ? Number(stock) : Number(existingProduct.stock),
         nextCategoryId,
-        uploadedImagePath ||
-          (image !== undefined ? image : existingProduct.image_url),
+        storedImageValue,
         req.params.id,
       ],
     );
@@ -236,7 +368,8 @@ const updateProduct = async (req, res) => {
 
     return res.status(200).json(normalizeProduct(updatedRows[0]));
   } catch (error) {
-    return res.status(500).json({ message: "Server error" });
+    console.error("Update product error:", error);
+    return res.status(500).json({ message: error.message || "Server error" });
   }
 };
 

@@ -18,6 +18,14 @@ const storage = multer.diskStorage({
   },
 });
 
-const upload = multer({ storage });
+const upload = multer({
+  storage,
+  limits: {
+    fileSize: 20 * 1024 * 1024, // 20MB per file
+    files: 8, // Max 8 files
+    fieldSize: 50 * 1024 * 1024, // Allow large text fields (data URL images JSON)
+    fields: 50,
+  },
+});
 
 module.exports = upload;

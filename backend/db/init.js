@@ -48,6 +48,22 @@ const initDatabase = async () => {
       FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE RESTRICT
     )
   `);
+
+  const [productTableRows] = await db.query(
+    `
+      SELECT COUNT(*) AS total
+      FROM information_schema.tables
+      WHERE table_schema = DATABASE()
+        AND table_name = 'products'
+    `,
+  );
+
+  if (productTableRows[0]?.total > 0) {
+    await db.query(`
+      ALTER TABLE products
+      MODIFY COLUMN image_url MEDIUMTEXT NULL
+    `);
+  }
 };
 
 module.exports = initDatabase;

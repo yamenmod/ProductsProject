@@ -1,6 +1,8 @@
 const jwt = require("jsonwebtoken");
 const db = require("../db/connection");
 
+// Creates the JWT payload that the frontend stores after login or register.
+// This keeps the user id, username, and role available for later checks.
 const getToken = (user) =>
   jwt.sign(
     {
@@ -12,6 +14,8 @@ const getToken = (user) =>
     { expiresIn: "7d" },
   );
 
+// Creates a normal user account and returns the session token for the app.
+// The response includes the user role so the frontend can show admin-only UI.
 const register = async (req, res) => {
   try {
     const { username, email, password } = req.body;
@@ -61,6 +65,8 @@ const register = async (req, res) => {
   }
 };
 
+// Validates username and password, then returns the signed login session.
+// If the credentials do not match, the request is rejected with a login error.
 const login = async (req, res) => {
   try {
     const { username, password } = req.body;
