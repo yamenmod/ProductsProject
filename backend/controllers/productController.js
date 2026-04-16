@@ -95,6 +95,32 @@ const resolveImagePayload = (value) => {
   };
 };
 
+const normalizeGenderInput = (value) => {
+  const normalized = (value || "")
+    .toString()
+    .trim()
+    .toLowerCase()
+    .replace(/['"]/g, "");
+
+  if (
+    normalized === "female" ||
+    normalized === "women" ||
+    normalized === "womens"
+  ) {
+    return "female";
+  }
+
+  if (normalized === "male" || normalized === "men" || normalized === "mens") {
+    return "male";
+  }
+
+  if (normalized === "unisex") {
+    return "unisex";
+  }
+
+  return "unisex";
+};
+
 const normalizeProduct = (row) => ({
   _id: row.id,
   id: row.id,
@@ -104,6 +130,7 @@ const normalizeProduct = (row) => ({
   stock: Number(row.stock),
   category_id: row.category_id,
   category: row.category || "",
+  gender: normalizeGenderInput(row.gender),
   image: resolveImagePayload(row.image_url).imageUrl,
   image_url: resolveImagePayload(row.image_url).imageUrl,
   image_urls: resolveImagePayload(row.image_url).imageUrls,
@@ -145,6 +172,7 @@ const getProducts = async (req, res) => {
           p.price,
           p.stock,
           p.category_id,
+          p.gender,
           p.image_url,
           p.created_at,
           p.updated_at,
@@ -173,6 +201,7 @@ const getProductById = async (req, res) => {
           p.price,
           p.stock,
           p.category_id,
+          p.gender,
           p.image_url,
           p.created_at,
           p.updated_at,
@@ -197,7 +226,7 @@ const getProductById = async (req, res) => {
 
 const createProduct = async (req, res) => {
   try {
-    const { name, description, price, category, image, images, stock } =
+    const { name, description, price, category, gender, image, images, stock } =
       req.body;
     const uploadedImagePaths = Array.isArray(req.files)
       ? req.files
@@ -211,6 +240,7 @@ const createProduct = async (req, res) => {
         : [];
 
     const fallbackImages = parseStoredImages(images || image);
+    const nextGender = normalizeGenderInput(gender);
     const nextImages = uploadedImagePaths.length
       ? uploadedImagePaths
       : fallbackImages;
@@ -231,10 +261,11 @@ const createProduct = async (req, res) => {
           price,
           stock,
           category_id,
+          gender,
           image_url,
           created_at,
           updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
       `,
       [
         name.trim(),
@@ -242,6 +273,7 @@ const createProduct = async (req, res) => {
         Number(price),
         stock === undefined ? 0 : Number(stock),
         categoryId,
+        nextGender,
         storedImageValue,
       ],
     );
@@ -255,6 +287,7 @@ const createProduct = async (req, res) => {
           p.price,
           p.stock,
           p.category_id,
+          p.gender,
           p.image_url,
           p.created_at,
           p.updated_at,
@@ -277,7 +310,7 @@ const createProduct = async (req, res) => {
 const updateProduct = async (req, res) => {
   try {
     const [existingRows] = await db.query(
-      "SELECT id, name, price, stock, category_id, description, image_url FROM products WHERE id = ? LIMIT 1",
+      "SELECT id, name, price, stock, category_id, description, gender, image_url FROM products WHERE id = ? LIMIT 1",
       [req.params.id],
     );
 
@@ -286,7 +319,7 @@ const updateProduct = async (req, res) => {
     }
 
     const existingProduct = existingRows[0];
-    const { name, description, price, category, image, images, stock } =
+    const { name, description, price, category, gender, image, images, stock } =
       req.body;
     const uploadedImagePaths = Array.isArray(req.files)
       ? req.files
@@ -300,8 +333,12 @@ const updateProduct = async (req, res) => {
         : [];
     const fallbackImages = parseStoredImages(images || image);
     const existingImages = parseStoredImages(existingProduct.image_url);
+    const nextGender =
+      gender !== undefined
+        ? normalizeGenderInput(gender)
+        : normalizeGenderInput(existingProduct.gender);
     const nextImages = uploadedImagePaths.length
-      ? uploadedImagePaths
+      ? [...existingImages, ...uploadedImagePaths]
       : fallbackImages.length
         ? fallbackImages
         : existingImages;
@@ -330,6 +367,7 @@ const updateProduct = async (req, res) => {
           price = ?,
           stock = ?,
           category_id = ?,
+          gender = ?,
           image_url = ?,
           updated_at = NOW()
         WHERE id = ?
@@ -340,6 +378,7 @@ const updateProduct = async (req, res) => {
         nextPrice,
         stock !== undefined ? Number(stock) : Number(existingProduct.stock),
         nextCategoryId,
+        nextGender,
         storedImageValue,
         req.params.id,
       ],
@@ -354,6 +393,7 @@ const updateProduct = async (req, res) => {
           p.price,
           p.stock,
           p.category_id,
+          p.gender,
           p.image_url,
           p.created_at,
           p.updated_at,

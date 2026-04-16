@@ -1,28 +1,61 @@
 import React, { useState } from "react";
 
-function Header({ user, currentPage, onNavigate, onLogout, cartCount = 0 }) {
+function Header({
+  user,
+  preferredGender,
+  onPreferredGenderChange,
+  currentPage,
+  onNavigate,
+  onLogout,
+  cartCount = 0,
+}) {
   const [shopMenuOpen, setShopMenuOpen] = useState(false);
   // Shop is active for both the category landing page and the product list.
   // Admin users get one extra navigation item for the order management page.
-  const shopActive = currentPage === "shop" || currentPage === "products";
+  const shopActive =
+    currentPage === "shop" ||
+    currentPage === "products" ||
+    currentPage === "size-charts";
   const isAdmin = user.role === "admin";
 
   return (
     <header className="ps-header">
       <div className="ps-header-inner">
-        <button
-          type="button"
-          className="ps-brand"
-          onClick={() => onNavigate("home")}
-        >
-          <img src="/PlageSurf_LOGO.png" alt="Plage Surf" />
-          <div>
-            <p className="ps-brand-title">Plage Surf</p>
-            <p className="ps-brand-sub">
-              Welcome back {user?.username || "user"}!
-            </p>
+        <div className="ps-brand-cluster">
+          <button
+            type="button"
+            className="ps-brand"
+            onClick={() => onNavigate("home")}
+          >
+            <img src="/PlageSurf_LOGO.png" alt="Plage Surf" />
+            <div>
+              <p className="ps-brand-title">Plage Surf</p>
+              <p className="ps-brand-sub">
+                Welcome back {user?.username || "user"}!
+              </p>
+            </div>
+          </button>
+
+          <div className="ps-header-genderToggle" aria-label="Shop by gender">
+            {[
+              { label: "Women's", value: "female" },
+              { label: "Men's", value: "male" },
+            ].map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={
+                  preferredGender === option.value
+                    ? "ps-header-genderButton is-active"
+                    : "ps-header-genderButton"
+                }
+                onClick={() => onPreferredGenderChange?.(option.value)}
+              >
+                {option.label}
+              </button>
+            ))}
           </div>
-        </button>
+        </div>
 
         <nav className="ps-nav">
           <button
@@ -74,6 +107,14 @@ function Header({ user, currentPage, onNavigate, onLogout, cartCount = 0 }) {
               </div>
             )}
           </div>
+
+          <button
+            type="button"
+            className={`ps-nav-link ${currentPage === "size-charts" ? "active" : ""}`}
+            onClick={() => onNavigate("size-charts")}
+          >
+            Size Chart
+          </button>
 
           <button
             type="button"

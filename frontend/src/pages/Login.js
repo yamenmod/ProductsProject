@@ -61,16 +61,6 @@ function Login({ onLoginSuccess }) {
     <div className="ps-login">
       <div className="ps-login-card ps-surface">
         <div style={{ textAlign: "center", marginBottom: "28px" }}>
-          <img
-            src="/PlageSurf_LOGO.png"
-            alt="Plage Surf"
-            style={{
-              width: "86px",
-              height: "86px",
-              borderRadius: "14px",
-              objectFit: "cover",
-            }}
-          />
           <h1
             style={{
               margin: "12px 0 8px",

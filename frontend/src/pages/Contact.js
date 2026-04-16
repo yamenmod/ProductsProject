@@ -2,11 +2,21 @@ import React from "react";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 
-function Contact({ user, currentPage, onNavigate, onLogout, cartCount = 0 }) {
+function Contact({
+  user,
+  preferredGender,
+  onPreferredGenderChange,
+  currentPage,
+  onNavigate,
+  onLogout,
+  cartCount = 0,
+}) {
   return (
     <div className="ps-page">
       <Header
         user={user}
+        preferredGender={preferredGender}
+        onPreferredGenderChange={onPreferredGenderChange}
         currentPage={currentPage}
         onNavigate={onNavigate}
         onLogout={onLogout}

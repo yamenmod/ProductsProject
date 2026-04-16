@@ -5,6 +5,8 @@ import Footer from "../components/Footer";
 
 function ManageProducts({
   session,
+  preferredGender,
+  onPreferredGenderChange,
   currentPage,
   onNavigate,
   onLogout,
@@ -16,6 +18,7 @@ function ManageProducts({
     description: "",
     price: "",
     category: "",
+    gender: "unisex",
     image: "",
     stock: "",
   });
@@ -26,6 +29,32 @@ function ManageProducts({
   const [showForm, setShowForm] = useState(false);
   const [productToDelete, setProductToDelete] = useState(null);
   const fileInputRef = React.useRef(null);
+
+  const normalizeGenderValue = (value) => {
+    const normalized = (value || "")
+      .toString()
+      .trim()
+      .toLowerCase()
+      .replace(/['"]/g, "");
+
+    if (
+      normalized === "female" ||
+      normalized === "women" ||
+      normalized === "womens"
+    ) {
+      return "female";
+    }
+
+    if (
+      normalized === "male" ||
+      normalized === "men" ||
+      normalized === "mens"
+    ) {
+      return "male";
+    }
+
+    return "unisex";
+  };
 
   const loadProducts = async () => {
     try {
@@ -46,6 +75,7 @@ function ManageProducts({
       description: "",
       price: "",
       category: "",
+      gender: "unisex",
       image: "",
       stock: "",
     });
@@ -81,6 +111,7 @@ function ManageProducts({
     payload.append("description", form.description.trim());
     payload.append("price", Number(form.price));
     payload.append("category", form.category.trim());
+    payload.append("gender", normalizeGenderValue(form.gender));
     payload.append("stock", form.stock === "" ? 0 : Number(form.stock));
 
     if (imageFiles.length > 0) {
@@ -130,6 +161,7 @@ function ManageProducts({
       description: product.description || "",
       price: product.price ?? "",
       category: product.category || "",
+      gender: normalizeGenderValue(product.gender),
       image: product.image || "",
       stock: product.stock ?? 0,
     });
@@ -186,6 +218,8 @@ function ManageProducts({
     <div className="ps-page">
       <Header
         user={session.user}
+        preferredGender={preferredGender}
+        onPreferredGenderChange={onPreferredGenderChange}
         currentPage={currentPage}
         onNavigate={onNavigate}
         onLogout={onLogout}
@@ -397,6 +431,26 @@ function ManageProducts({
                     ))}
                   </select>
 
+                  <select
+                    value={form.gender}
+                    onChange={(e) =>
+                      setForm({ ...form, gender: e.target.value })
+                    }
+                    style={{
+                      padding: "10px 12px",
+                      border: "1px solid #d9c3ad",
+                      borderRadius: "8px",
+                      fontSize: "14px",
+                      fontFamily: "inherit",
+                      background: "#fffdf8",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <option value="unisex">Unisex</option>
+                    <option value="female">Female</option>
+                    <option value="male">Male</option>
+                  </select>
+
                   <input
                     type="number"
                     min="0"
@@ -485,7 +539,7 @@ function ManageProducts({
                     {imageFiles.length > 0
                       ? `${imageFiles.length} image${imageFiles.length === 1 ? "" : "s"} selected`
                       : form.image
-                        ? "Existing image will stay unless you choose new files"
+                        ? "Existing images stay and new files are added when you save"
                         : "Choose one or more images"}
                   </div>
                 </div>
@@ -586,6 +640,9 @@ function ManageProducts({
                   </p>
                   <p style={{ margin: "0 0 6px 0", color: "#5f5550" }}>
                     Category: {product.category || "-"}
+                  </p>
+                  <p style={{ margin: "0 0 6px 0", color: "#5f5550" }}>
+                    Gender: {normalizeGenderValue(product.gender)}
                   </p>
                   <p style={{ margin: "0 0 12px 0", color: "#5f5550" }}>
                     Stock: {product.stock ?? 0}

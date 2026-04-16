@@ -63,6 +63,38 @@ const initDatabase = async () => {
       ALTER TABLE products
       MODIFY COLUMN image_url MEDIUMTEXT NULL
     `);
+
+    const [genderColumnRows] = await db.query(
+      `
+        SELECT COUNT(*) AS total
+        FROM information_schema.columns
+        WHERE table_schema = DATABASE()
+          AND table_name = 'products'
+          AND column_name = 'gender'
+      `,
+    );
+
+    if (genderColumnRows[0]?.total === 0) {
+      await db.query(`
+        ALTER TABLE products
+        ADD COLUMN gender VARCHAR(20) NOT NULL DEFAULT 'unisex'
+      `);
+    }
+
+    await db.query(`
+      UPDATE products
+      SET gender = CASE
+        WHEN LOWER(TRIM(gender)) IN ('female', 'women', 'womens') THEN 'female'
+        WHEN LOWER(TRIM(gender)) IN ('male', 'men', 'mens') THEN 'male'
+        WHEN LOWER(TRIM(gender)) = 'unisex' THEN 'unisex'
+        ELSE 'unisex'
+      END
+    `);
+
+    await db.query(`
+      ALTER TABLE products
+      MODIFY COLUMN gender ENUM('male', 'female', 'unisex') NOT NULL DEFAULT 'unisex'
+    `);
   }
 };
 

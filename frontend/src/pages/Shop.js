@@ -1,12 +1,24 @@
-import React from "react";
+import React, { useState } from "react";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 
-function Shop({ user, currentPage, onNavigate, onLogout, cartCount = 0 }) {
+function Shop({
+  user,
+  preferredGender,
+  onPreferredGenderChange,
+  currentPage,
+  onNavigate,
+  onLogout,
+  cartCount = 0,
+}) {
+  const [hoveredCardId, setHoveredCardId] = useState(null);
+
   return (
     <div className="ps-page">
       <Header
         user={user}
+        preferredGender={preferredGender}
+        onPreferredGenderChange={onPreferredGenderChange}
         currentPage={currentPage}
         onNavigate={onNavigate}
         onLogout={onLogout}
@@ -71,6 +83,8 @@ function Shop({ user, currentPage, onNavigate, onLogout, cartCount = 0 }) {
             ].map((item) => (
               <div
                 key={item.id}
+                onMouseEnter={() => setHoveredCardId(item.id)}
+                onMouseLeave={() => setHoveredCardId(null)}
                 className="ps-surface"
                 style={{
                   padding: "30px 24px",
@@ -78,6 +92,8 @@ function Shop({ user, currentPage, onNavigate, onLogout, cartCount = 0 }) {
                   textAlign: "center",
                   cursor: "pointer",
                   transition: "transform 0.25s ease, box-shadow 0.25s ease",
+                  position: "relative",
+                  overflow: "hidden",
                 }}
                 onMouseOver={(e) => {
                   e.currentTarget.style.transform = "translateY(-8px)";
@@ -124,6 +140,54 @@ function Shop({ user, currentPage, onNavigate, onLogout, cartCount = 0 }) {
                 >
                   {item.desc}
                 </p>
+
+                {item.id === "wetsuits" && hoveredCardId === item.id && (
+                  <div
+                    style={{
+                      display: "grid",
+                      gap: "10px",
+                      marginBottom: "16px",
+                      padding: "14px",
+                      borderRadius: "14px",
+                      background: "rgba(255, 250, 242, 0.92)",
+                      border: "1px solid rgba(31, 24, 19, 0.08)",
+                      boxShadow: "0 14px 28px rgba(67, 48, 33, 0.12)",
+                    }}
+                  >
+                    <p
+                      style={{
+                        margin: 0,
+                        color: "#245860",
+                        fontSize: "11px",
+                        fontWeight: "800",
+                        letterSpacing: "1.2px",
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      Rip Curl Size Charts
+                    </p>
+                    <button
+                      type="button"
+                      style={{
+                        padding: "10px 16px",
+                        background: "#ffffff",
+                        color: "#245860",
+                        border: "1px solid #245860",
+                        borderRadius: "10px",
+                        cursor: "pointer",
+                        fontWeight: "800",
+                        fontSize: "13px",
+                      }}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onNavigate("size-charts", "wetsuits");
+                      }}
+                    >
+                      View Size Charts
+                    </button>
+                  </div>
+                )}
+
                 <button
                   style={{
                     padding: "10px 24px",

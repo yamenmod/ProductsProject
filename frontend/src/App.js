@@ -4,6 +4,7 @@ import Home from "./pages/Home";
 import Shop from "./pages/Shop";
 import Contact from "./pages/Contact";
 import Products from "./pages/SurfSpots";
+import SizeCharts from "./pages/SizeCharts";
 import ManageOrders from "./pages/ManageOrders";
 import ManageProducts from "./pages/ManageProducts";
 
@@ -18,7 +19,13 @@ function App() {
   useEffect(() => {
     const savedSession = localStorage.getItem("session");
     if (savedSession) {
-      setSession(JSON.parse(savedSession));
+      const parsedSession = JSON.parse(savedSession);
+      const normalizedGender =
+        parsedSession.preferredGender === "female" ? "female" : "male";
+      setSession({
+        ...parsedSession,
+        preferredGender: normalizedGender,
+      });
       setCurrentPage("home");
     }
   }, []);
@@ -43,19 +50,49 @@ function App() {
   // Local cart state is kept in the app shell so every page shares it.
   // This avoids losing the cart when switching between pages.
   const handleAddToCart = (product) => {
-    const existingItem = cartItems.find((item) => item.id === product.id);
+    const productId = product?.id || product?._id;
+
+    if (!productId) {
+      return;
+    }
+
+    const existingItem = cartItems.find((item) => item.id === productId);
     if (existingItem) {
       setCartItems(
         cartItems.map((item) =>
-          item.id === product.id
+          item.id === productId
             ? { ...item, quantity: item.quantity + 1 }
             : item,
         ),
       );
     } else {
-      setCartItems([...cartItems, { ...product, quantity: 1 }]);
+      setCartItems([
+        ...cartItems,
+        { ...product, id: productId, _id: productId, quantity: 1 },
+      ]);
     }
   };
+
+  const handlePreferredGenderChange = (nextGender) => {
+    const normalizedGender = nextGender === "female" ? "female" : "male";
+
+    setSession((previousSession) => {
+      if (!previousSession) {
+        return previousSession;
+      }
+
+      const updatedSession = {
+        ...previousSession,
+        preferredGender: normalizedGender,
+      };
+
+      localStorage.setItem("session", JSON.stringify(updatedSession));
+      return updatedSession;
+    });
+  };
+
+  const preferredGender =
+    session?.preferredGender === "female" ? "female" : "male";
 
   const cartCount = cartItems.reduce(
     (total, item) => total + (Number(item.quantity) || 0),
@@ -66,8 +103,13 @@ function App() {
     return (
       <Login
         onLoginSuccess={(authSession) => {
-          localStorage.setItem("session", JSON.stringify(authSession));
-          setSession(authSession);
+          const nextSession = {
+            ...authSession,
+            preferredGender: "male",
+          };
+
+          localStorage.setItem("session", JSON.stringify(nextSession));
+          setSession(nextSession);
           setCurrentPage("home");
         }}
       />
@@ -80,8 +122,12 @@ function App() {
     return (
       <Home
         user={session.user}
+        session={session}
+        preferredGender={preferredGender}
         currentPage={currentPage}
         onNavigate={handleNavigate}
+        onAddToCart={handleAddToCart}
+        onPreferredGenderChange={handlePreferredGenderChange}
         onLogout={() => {
           localStorage.removeItem("session");
           setSession(null);
@@ -95,8 +141,10 @@ function App() {
     return (
       <Shop
         user={session.user}
+        preferredGender={preferredGender}
         currentPage={currentPage}
         onNavigate={handleNavigate}
+        onPreferredGenderChange={handlePreferredGenderChange}
         onLogout={() => {
           localStorage.removeItem("session");
           setSession(null);
@@ -110,8 +158,29 @@ function App() {
     return (
       <Contact
         user={session.user}
+        preferredGender={preferredGender}
         currentPage={currentPage}
         onNavigate={handleNavigate}
+        onPreferredGenderChange={handlePreferredGenderChange}
+        onLogout={() => {
+          localStorage.removeItem("session");
+          setSession(null);
+        }}
+        cartCount={cartCount}
+      />
+    );
+  }
+
+  if (currentPage === "size-charts") {
+    return (
+      <SizeCharts
+        user={session.user}
+        session={session}
+        preferredGender={preferredGender}
+        currentPage={currentPage}
+        onNavigate={handleNavigate}
+        onAddToCart={handleAddToCart}
+        onPreferredGenderChange={handlePreferredGenderChange}
         onLogout={() => {
           localStorage.removeItem("session");
           setSession(null);
@@ -125,11 +194,13 @@ function App() {
     return (
       <Products
         session={session}
+        preferredGender={preferredGender}
         currentPage={currentPage}
         selectedCategory={selectedCategory}
         cartItems={cartItems}
         onAddToCart={handleAddToCart}
         onNavigate={handleNavigate}
+        onPreferredGenderChange={handlePreferredGenderChange}
         onLogout={() => {
           localStorage.removeItem("session");
           setSession(null);
@@ -145,6 +216,8 @@ function App() {
         session={session}
         currentPage={currentPage}
         onNavigate={handleNavigate}
+        preferredGender={preferredGender}
+        onPreferredGenderChange={handlePreferredGenderChange}
         onLogout={() => {
           localStorage.removeItem("session");
           setSession(null);
@@ -160,6 +233,8 @@ function App() {
         session={session}
         currentPage={currentPage}
         onNavigate={handleNavigate}
+        preferredGender={preferredGender}
+        onPreferredGenderChange={handlePreferredGenderChange}
         onLogout={() => {
           localStorage.removeItem("session");
           setSession(null);

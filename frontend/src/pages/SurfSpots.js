@@ -1,10 +1,12 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 
 function Products({
   session,
+  preferredGender,
+  onPreferredGenderChange,
   currentPage,
   selectedCategory,
   cartItems,
@@ -91,6 +93,25 @@ function Products({
     return normalized;
   };
 
+  const normalizeGenderValue = (value) =>
+    (value || "")
+      .toString()
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
+
+  const canViewProduct = (product) => {
+    const gender = normalizeGenderValue(product?.gender || "unisex");
+    const shopperGender = normalizeGenderValue(preferredGender || "all");
+
+    if (!shopperGender || shopperGender === "all") {
+      return true;
+    }
+
+    return gender === "unisex" || gender === shopperGender;
+  };
+
   const [products, setProducts] = useState([]);
   const [activeCategory, setActiveCategory] = useState(
     selectedCategory || "All",
@@ -98,6 +119,9 @@ function Products({
   const [cart, setCart] = useState(cartItems || []);
   const [accessoryFilter, setAccessoryFilter] = useState("All");
   const [searchTerm, setSearchTerm] = useState("");
+  const [previewProduct, setPreviewProduct] = useState(null);
+  const [previewImageIndex, setPreviewImageIndex] = useState(0);
+  const swipeStartXRef = useRef(null);
 
   const loadProducts = async () => {
     const res = await axios.get("/api/products");
@@ -150,6 +174,14 @@ function Products({
     }
   };
 
+  const handlePreviewAddToCart = async () => {
+    if (!previewProduct?._id) {
+      return;
+    }
+
+    await handleAddToCart(previewProduct._id);
+  };
+
   const categories = [
     "All",
     "Surfboards",
@@ -160,11 +192,11 @@ function Products({
 
   const filteredProducts =
     activeCategory === "All"
-      ? products
+      ? products.filter((product) => canViewProduct(product))
       : products.filter(
           (product) =>
             normalizeCategoryValue(product.category) ===
-            normalizeCategoryValue(activeCategory),
+              normalizeCategoryValue(activeCategory) && canViewProduct(product),
         );
 
   const isAccessoriesCategory =
@@ -229,10 +261,76 @@ function Products({
     return imagePath;
   };
 
+  const getProductImages = (product) => {
+    const rawImages = Array.isArray(product?.image_urls)
+      ? product.image_urls
+      : Array.isArray(product?.imageUrls)
+        ? product.imageUrls
+        : product?.image
+          ? [product.image]
+          : [];
+
+    const uniqueImages = [...new Set(rawImages.filter(Boolean))];
+
+    return uniqueImages.length
+      ? uniqueImages.map((imagePath) => resolveImageSrc(imagePath))
+      : [resolveImageSrc("")];
+  };
+
+  const previewImages = useMemo(
+    () => getProductImages(previewProduct),
+    [previewProduct],
+  );
+
+  const openPreview = (product) => {
+    setPreviewProduct(product);
+    setPreviewImageIndex(0);
+  };
+
+  const closePreview = () => {
+    setPreviewProduct(null);
+    setPreviewImageIndex(0);
+  };
+
+  const goToPreviewImage = (nextIndex) => {
+    if (!previewImages.length) {
+      return;
+    }
+
+    const safeIndex = (nextIndex + previewImages.length) % previewImages.length;
+    setPreviewImageIndex(safeIndex);
+  };
+
+  const handlePreviewTouchStart = (event) => {
+    swipeStartXRef.current = event.touches[0]?.clientX ?? null;
+  };
+
+  const handlePreviewTouchEnd = (event) => {
+    const startX = swipeStartXRef.current;
+    const endX = event.changedTouches[0]?.clientX;
+
+    if (startX === null || endX === undefined) {
+      return;
+    }
+
+    const swipeDistance = startX - endX;
+    const swipeThreshold = 40;
+
+    if (swipeDistance > swipeThreshold) {
+      goToPreviewImage(previewImageIndex + 1);
+    } else if (swipeDistance < -swipeThreshold) {
+      goToPreviewImage(previewImageIndex - 1);
+    }
+
+    swipeStartXRef.current = null;
+  };
+
   return (
     <div className="ps-page">
       <Header
         user={session.user}
+        preferredGender={preferredGender}
+        onPreferredGenderChange={onPreferredGenderChange}
         currentPage={currentPage}
         onNavigate={onNavigate}
         onLogout={onLogout}
@@ -413,15 +511,31 @@ function Products({
                     boxShadow: "0 12px 30px rgba(76, 56, 38, 0.1)",
                   }}
                 >
-                  <img
-                    src={resolveImageSrc(product.image)}
-                    alt={product.name}
+                  <button
+                    type="button"
+                    onClick={() => openPreview(product)}
                     style={{
+                      display: "block",
                       width: "100%",
-                      height: "160px",
-                      objectFit: "cover",
+                      padding: 0,
+                      border: 0,
+                      background: "transparent",
+                      cursor: "pointer",
                     }}
-                  />
+                  >
+                    <img
+                      src={resolveImageSrc(
+                        product.image_urls?.[0] || product.image,
+                      )}
+                      alt={product.name}
+                      style={{
+                        width: "100%",
+                        height: "160px",
+                        objectFit: "cover",
+                        display: "block",
+                      }}
+                    />
+                  </button>
                   <div style={{ padding: "14px" }}>
                     <h3 style={{ marginBottom: "8px", color: "#1f1813" }}>
                       {product.name}
@@ -472,6 +586,123 @@ function Products({
           </div>
         </div>
       </div>
+
+      {previewProduct && (
+        <div className="ps-previewBackdrop" onClick={closePreview}>
+          <div
+            className="ps-previewCard"
+            role="dialog"
+            aria-modal="true"
+            aria-label={previewProduct.name || "Product preview"}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="ps-previewClose"
+              onClick={closePreview}
+              aria-label="Close image preview"
+            >
+              ×
+            </button>
+
+            <div className="ps-previewMedia">
+              <div
+                className="ps-previewStage"
+                onTouchStart={handlePreviewTouchStart}
+                onTouchEnd={handlePreviewTouchEnd}
+              >
+                <img
+                  className="ps-previewImage"
+                  src={previewImages[previewImageIndex]}
+                  alt={previewProduct.name || "Product preview"}
+                />
+
+                {previewImages.length > 1 && (
+                  <>
+                    <button
+                      type="button"
+                      className="ps-previewArrow ps-previewArrowLeft"
+                      onClick={() => goToPreviewImage(previewImageIndex - 1)}
+                      aria-label="Previous product image"
+                    >
+                      ‹
+                    </button>
+                    <button
+                      type="button"
+                      className="ps-previewArrow ps-previewArrowRight"
+                      onClick={() => goToPreviewImage(previewImageIndex + 1)}
+                      aria-label="Next product image"
+                    >
+                      ›
+                    </button>
+                    <div className="ps-previewCounter">
+                      {previewImageIndex + 1} / {previewImages.length}
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {previewImages.length > 1 && (
+                <div
+                  className="ps-previewDots"
+                  aria-label="Product image selector"
+                >
+                  {previewImages.map((image, index) => (
+                    <button
+                      key={`${image}-${index}`}
+                      type="button"
+                      className={
+                        index === previewImageIndex
+                          ? "ps-previewDot is-active"
+                          : "ps-previewDot"
+                      }
+                      onClick={() => setPreviewImageIndex(index)}
+                      aria-label={`Show image ${index + 1} of ${previewImages.length}`}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="ps-previewMeta">
+              <span className="ps-previewBadge">NEW</span>
+              <h3 className="ps-previewName">
+                {previewProduct.name || "New product"}
+              </h3>
+              <p className="ps-previewCategory">
+                {previewProduct.category || "Product"}
+              </p>
+              <p className="ps-previewDescription">
+                {previewProduct.description || "No description available yet."}
+              </p>
+
+              <div className="ps-previewPurchaseRow">
+                <div>
+                  <p className="ps-previewPrice">
+                    {Number.isFinite(Number(previewProduct.price))
+                      ? `$${Number(previewProduct.price).toFixed(2)}`
+                      : "View price"}
+                  </p>
+                  <p className="ps-previewStock">
+                    Stock: {previewProduct.stock ?? 0}
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  className="ps-btn ps-btn-primary"
+                  onClick={handlePreviewAddToCart}
+                  disabled={(previewProduct.stock ?? 0) < 1}
+                >
+                  {(previewProduct.stock ?? 0) < 1
+                    ? "Out of Stock"
+                    : "Add to Cart"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <Footer />
     </div>

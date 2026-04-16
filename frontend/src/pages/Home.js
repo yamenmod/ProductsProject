@@ -3,38 +3,51 @@ import axios from "axios";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 
-function Home({ user, currentPage, onNavigate, onLogout, cartCount = 0 }) {
+function Home({
+  user,
+  session,
+  preferredGender,
+  onPreferredGenderChange,
+  currentPage,
+  onNavigate,
+  onAddToCart,
+  onLogout,
+  cartCount = 0,
+}) {
   const [recentProducts, setRecentProducts] = useState([]);
   const [loadError, setLoadError] = useState("");
   const [previewProduct, setPreviewProduct] = useState(null);
-  const railRef = useRef(null);
+  const [previewImageIndex, setPreviewImageIndex] = useState(0);
+  const surfboardRailRef = useRef(null);
+  const wetsuitRailRef = useRef(null);
+  const swipeStartXRef = useRef(null);
 
-  useEffect(() => {
-    const loadRecentProducts = async () => {
-      try {
-        const response = await axios.get("/api/products");
-        const sortedProducts = [...(response.data || [])].sort(
-          (left, right) => {
-            const leftDate = new Date(left.createdAt || 0).getTime();
-            const rightDate = new Date(right.createdAt || 0).getTime();
+  const normalizeCategoryValue = (value) =>
+    (value || "")
+      .toString()
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
 
-            return rightDate - leftDate;
-          },
-        );
+  const normalizeGenderValue = (value) =>
+    (value || "")
+      .toString()
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
 
-        setRecentProducts(sortedProducts.slice(0, 5));
-      } catch (error) {
-        setLoadError("Unable to load recent products.");
-      }
-    };
+  const canViewProduct = (product) => {
+    const gender = normalizeGenderValue(product?.gender || "unisex");
+    const shopperGender = normalizeGenderValue(preferredGender || "all");
 
-    loadRecentProducts();
-  }, []);
+    if (!shopperGender || shopperGender === "all") {
+      return true;
+    }
 
-  const featuredProducts = useMemo(
-    () => recentProducts.slice(0, 5),
-    [recentProducts],
-  );
+    return gender === "unisex" || gender === shopperGender;
+  };
 
   const resolveImageSrc = (imagePath) => {
     if (!imagePath) {
@@ -52,25 +65,247 @@ function Home({ user, currentPage, onNavigate, onLogout, cartCount = 0 }) {
     return imagePath;
   };
 
-  const scrollRail = (direction) => {
-    if (!railRef.current) {
+  const getProductImages = (product) => {
+    const rawImages = Array.isArray(product?.image_urls)
+      ? product.image_urls
+      : Array.isArray(product?.imageUrls)
+        ? product.imageUrls
+        : product?.image
+          ? [product.image]
+          : [];
+
+    const uniqueImages = [...new Set(rawImages.filter(Boolean))];
+
+    return uniqueImages.length
+      ? uniqueImages.map((imagePath) => resolveImageSrc(imagePath))
+      : [resolveImageSrc("")];
+  };
+
+  const previewImages = useMemo(
+    () => getProductImages(previewProduct),
+    [previewProduct],
+  );
+
+  useEffect(() => {
+    const loadRecentProducts = async () => {
+      try {
+        const response = await axios.get("/api/products");
+        const sortedProducts = [...(response.data || [])].sort(
+          (left, right) => {
+            const leftDate = new Date(
+              left.createdAt || left.created_at || 0,
+            ).getTime();
+            const rightDate = new Date(
+              right.createdAt || right.created_at || 0,
+            ).getTime();
+
+            return rightDate - leftDate;
+          },
+        );
+
+        setRecentProducts(sortedProducts.slice(0, 12));
+      } catch (error) {
+        setLoadError("Unable to load recent surfboards.");
+      }
+    };
+
+    loadRecentProducts();
+  }, []);
+
+  const surfboardProducts = useMemo(
+    () =>
+      recentProducts.filter(
+        (product) =>
+          normalizeCategoryValue(product.category) === "surfboards" &&
+          canViewProduct(product),
+      ),
+    [recentProducts, preferredGender],
+  );
+
+  const wetsuitProducts = useMemo(
+    () =>
+      recentProducts.filter(
+        (product) =>
+          normalizeCategoryValue(product.category) === "wetsuits" &&
+          canViewProduct(product),
+      ),
+    [recentProducts, preferredGender],
+  );
+
+  const scrollRail = (railElement, direction) => {
+    if (!railElement?.current) {
       return;
     }
 
-    railRef.current.scrollBy({
+    railElement.current.scrollBy({
       left: direction * 320,
       behavior: "smooth",
     });
   };
 
+  const openPreview = (product) => {
+    setPreviewProduct(product);
+    setPreviewImageIndex(0);
+  };
+
   const closePreview = () => {
     setPreviewProduct(null);
+    setPreviewImageIndex(0);
   };
+
+  const goToPreviewImage = (nextIndex) => {
+    if (!previewImages.length) {
+      return;
+    }
+
+    const safeIndex = (nextIndex + previewImages.length) % previewImages.length;
+    setPreviewImageIndex(safeIndex);
+  };
+
+  const handlePreviewTouchStart = (event) => {
+    swipeStartXRef.current = event.touches[0]?.clientX ?? null;
+  };
+
+  const handlePreviewTouchEnd = (event) => {
+    const startX = swipeStartXRef.current;
+    const endX = event.changedTouches[0]?.clientX;
+
+    if (startX === null || endX === undefined) {
+      return;
+    }
+
+    const swipeDistance = startX - endX;
+    const swipeThreshold = 40;
+
+    if (swipeDistance > swipeThreshold) {
+      goToPreviewImage(previewImageIndex + 1);
+    } else if (swipeDistance < -swipeThreshold) {
+      goToPreviewImage(previewImageIndex - 1);
+    }
+
+    swipeStartXRef.current = null;
+  };
+
+  const handlePreviewAddToCart = async () => {
+    if (!previewProduct || !session?.token) {
+      return;
+    }
+
+    try {
+      await axios.post(
+        "/api/cart",
+        { productId: previewProduct._id || previewProduct.id, quantity: 1 },
+        {
+          headers: {
+            Authorization: `Bearer ${session.token}`,
+          },
+        },
+      );
+
+      if (typeof onAddToCart === "function") {
+        onAddToCart(previewProduct);
+      }
+    } catch (error) {
+      console.error("Add to cart from home failed:", error.message);
+    }
+  };
+
+  const renderRecentSection = ({
+    title,
+    pill,
+    description,
+    products,
+    categorySlug,
+    railRef,
+  }) => (
+    <section className="ps-dropsSection">
+      <div className="ps-shell ps-dropsLayout">
+        <div className="ps-dropsIntro">
+          <span className="ps-pill">{pill}</span>
+          <h2 className="ps-dropsTitle">{title}</h2>
+          <p className="ps-dropsText">{description}</p>
+          <button
+            type="button"
+            className="ps-dropsLink"
+            onClick={() => onNavigate("products", categorySlug)}
+          >
+            Shop now &gt;
+          </button>
+        </div>
+
+        <div className="ps-dropsRailWrap">
+          <button
+            type="button"
+            className="ps-dropsArrow"
+            onClick={() => scrollRail(railRef, -1)}
+            aria-label={`Scroll ${categorySlug} products left`}
+          >
+            <span aria-hidden="true">‹</span>
+          </button>
+
+          <div className="ps-dropsRail" ref={railRef}>
+            {products.length > 0 ? (
+              products.map((product) => (
+                <article
+                  className="ps-dropCard"
+                  key={product._id || product.id}
+                >
+                  <button
+                    type="button"
+                    className="ps-dropImageWrap"
+                    onClick={() => openPreview(product)}
+                  >
+                    <span className="ps-dropBadge">NEW</span>
+                    <img
+                      className="ps-dropImage"
+                      src={resolveImageSrc(
+                        product.image_urls?.[0] || product.image,
+                      )}
+                      alt={product.name || "Recent product"}
+                    />
+                  </button>
+
+                  <div className="ps-dropMetaRow">
+                    <span className="ps-dropSwatch" />
+                    <span className="ps-dropCategory">
+                      {product.category || pill}
+                    </span>
+                  </div>
+
+                  <h3 className="ps-dropName">
+                    {product.name || "New product"}
+                  </h3>
+                  <p className="ps-dropPrice">
+                    {Number.isFinite(Number(product.price))
+                      ? `$${Number(product.price).toFixed(2)}`
+                      : "View price"}
+                  </p>
+                </article>
+              ))
+            ) : (
+              <div className="ps-dropsEmpty">No {pill.toLowerCase()} yet.</div>
+            )}
+          </div>
+
+          <button
+            type="button"
+            className="ps-dropsArrow"
+            onClick={() => scrollRail(railRef, 1)}
+            aria-label={`Scroll ${categorySlug} products right`}
+          >
+            <span aria-hidden="true">›</span>
+          </button>
+        </div>
+      </div>
+    </section>
+  );
 
   return (
     <div className="ps-page">
       <Header
         user={user}
+        preferredGender={preferredGender}
+        onPreferredGenderChange={onPreferredGenderChange}
         currentPage={currentPage}
         onNavigate={onNavigate}
         onLogout={onLogout}
@@ -100,86 +335,14 @@ function Home({ user, currentPage, onNavigate, onLogout, cartCount = 0 }) {
           </div>
         </section>
 
-        <section className="ps-dropsSection">
-          <div className="ps-shell ps-dropsLayout">
-            <div className="ps-dropsIntro">
-              <span className="ps-pill">New arrivals</span>
-              <h2 className="ps-dropsTitle">Just Dropped</h2>
-              <p className="ps-dropsText">Check the latest.</p>
-              <button
-                type="button"
-                className="ps-dropsLink"
-                onClick={() => onNavigate("products", "")}
-              >
-                Shop now &gt;
-              </button>
-            </div>
-
-            <div className="ps-dropsRailWrap">
-              <button
-                type="button"
-                className="ps-dropsArrow"
-                onClick={() => scrollRail(-1)}
-                aria-label="Scroll recent products left"
-              >
-                <span aria-hidden="true">‹</span>
-              </button>
-
-              <div className="ps-dropsRail" ref={railRef}>
-                {featuredProducts.length > 0 ? (
-                  featuredProducts.map((product) => (
-                    <article
-                      className="ps-dropCard"
-                      key={product._id || product.id}
-                    >
-                      <button
-                        type="button"
-                        className="ps-dropImageWrap"
-                        onClick={() => setPreviewProduct(product)}
-                      >
-                        <span className="ps-dropBadge">NEW</span>
-                        <img
-                          className="ps-dropImage"
-                          src={resolveImageSrc(product.image)}
-                          alt={product.name || "Recent product"}
-                        />
-                      </button>
-
-                      <div className="ps-dropMetaRow">
-                        <span className="ps-dropSwatch" />
-                        <span className="ps-dropCategory">
-                          {product.category || "Recent drop"}
-                        </span>
-                      </div>
-
-                      <h3 className="ps-dropName">
-                        {product.name || "New product"}
-                      </h3>
-                      <p className="ps-dropPrice">
-                        {Number.isFinite(Number(product.price))
-                          ? `$${Number(product.price).toFixed(2)}`
-                          : "View price"}
-                      </p>
-                    </article>
-                  ))
-                ) : loadError ? (
-                  <div className="ps-dropsEmpty">{loadError}</div>
-                ) : (
-                  <div className="ps-dropsEmpty">Loading new drops...</div>
-                )}
-              </div>
-
-              <button
-                type="button"
-                className="ps-dropsArrow"
-                onClick={() => scrollRail(1)}
-                aria-label="Scroll recent products right"
-              >
-                <span aria-hidden="true">›</span>
-              </button>
-            </div>
-          </div>
-        </section>
+        {renderRecentSection({
+          title: "Just Dropped",
+          pill: "New arrivals",
+          description: "Check the latest.",
+          products: surfboardProducts,
+          categorySlug: "surfboards",
+          railRef: surfboardRailRef,
+        })}
 
         <section className="ps-home-wetsuitPromo">
           <img
@@ -200,6 +363,15 @@ function Home({ user, currentPage, onNavigate, onLogout, cartCount = 0 }) {
             </button>
           </div>
         </section>
+
+        {renderRecentSection({
+          title: "Just Dropped",
+          pill: "Wetsuits",
+          description: "Fresh wetsuits ready for colder sessions.",
+          products: wetsuitProducts,
+          categorySlug: "wetsuits",
+          railRef: wetsuitRailRef,
+        })}
       </main>
 
       {previewProduct && (
@@ -220,11 +392,64 @@ function Home({ user, currentPage, onNavigate, onLogout, cartCount = 0 }) {
               ×
             </button>
 
-            <img
-              className="ps-previewImage"
-              src={resolveImageSrc(previewProduct.image)}
-              alt={previewProduct.name || "Product preview"}
-            />
+            <div className="ps-previewMedia">
+              <div
+                className="ps-previewStage"
+                onTouchStart={handlePreviewTouchStart}
+                onTouchEnd={handlePreviewTouchEnd}
+              >
+                <img
+                  className="ps-previewImage"
+                  src={previewImages[previewImageIndex]}
+                  alt={previewProduct.name || "Product preview"}
+                />
+
+                {previewImages.length > 1 && (
+                  <>
+                    <button
+                      type="button"
+                      className="ps-previewArrow ps-previewArrowLeft"
+                      onClick={() => goToPreviewImage(previewImageIndex - 1)}
+                      aria-label="Previous product image"
+                    >
+                      ‹
+                    </button>
+                    <button
+                      type="button"
+                      className="ps-previewArrow ps-previewArrowRight"
+                      onClick={() => goToPreviewImage(previewImageIndex + 1)}
+                      aria-label="Next product image"
+                    >
+                      ›
+                    </button>
+                    <div className="ps-previewCounter">
+                      {previewImageIndex + 1} / {previewImages.length}
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {previewImages.length > 1 && (
+                <div
+                  className="ps-previewDots"
+                  aria-label="Product image selector"
+                >
+                  {previewImages.map((image, index) => (
+                    <button
+                      key={`${image}-${index}`}
+                      type="button"
+                      className={
+                        index === previewImageIndex
+                          ? "ps-previewDot is-active"
+                          : "ps-previewDot"
+                      }
+                      onClick={() => setPreviewImageIndex(index)}
+                      aria-label={`Show image ${index + 1} of ${previewImages.length}`}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
 
             <div className="ps-previewMeta">
               <span className="ps-previewBadge">NEW</span>
@@ -232,8 +457,35 @@ function Home({ user, currentPage, onNavigate, onLogout, cartCount = 0 }) {
                 {previewProduct.name || "New product"}
               </h3>
               <p className="ps-previewCategory">
-                {previewProduct.category || "Recent drop"}
+                {previewProduct.category || "Recent surfboard"}
               </p>
+              <p className="ps-previewDescription">
+                {previewProduct.description || "No description available yet."}
+              </p>
+
+              <div className="ps-previewPurchaseRow">
+                <div>
+                  <p className="ps-previewPrice">
+                    {Number.isFinite(Number(previewProduct.price))
+                      ? `$${Number(previewProduct.price).toFixed(2)}`
+                      : "View price"}
+                  </p>
+                  <p className="ps-previewStock">
+                    Stock: {previewProduct.stock ?? 0}
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  className="ps-btn ps-btn-primary"
+                  onClick={handlePreviewAddToCart}
+                  disabled={(previewProduct.stock ?? 0) < 1}
+                >
+                  {(previewProduct.stock ?? 0) < 1
+                    ? "Out of Stock"
+                    : "Add to Cart"}
+                </button>
+              </div>
             </div>
           </div>
         </div>

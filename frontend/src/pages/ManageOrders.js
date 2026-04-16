@@ -30,6 +30,8 @@ const normalizeStatus = (value) => {
 
 function ManageOrders({
   session,
+  preferredGender,
+  onPreferredGenderChange,
   currentPage,
   onNavigate,
   onLogout,
@@ -122,6 +124,8 @@ function ManageOrders({
       <div className="ps-page">
         <Header
           user={session.user}
+          preferredGender={preferredGender}
+          onPreferredGenderChange={onPreferredGenderChange}
           currentPage={currentPage}
           onNavigate={onNavigate}
           onLogout={onLogout}
@@ -150,6 +154,8 @@ function ManageOrders({
     <div className="ps-page">
       <Header
         user={session.user}
+        preferredGender={preferredGender}
+        onPreferredGenderChange={onPreferredGenderChange}
         currentPage={currentPage}
         onNavigate={onNavigate}
         onLogout={onLogout}
