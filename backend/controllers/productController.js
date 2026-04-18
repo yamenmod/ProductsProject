@@ -1,5 +1,109 @@
 const db = require("../db/connection");
 
+const PRODUCT_IMAGE_DIR = "/public/assets/img/products";
+
+const isDataOrBlobUrl = (value) => {
+  const normalized = (value || "").toString().trim().toLowerCase();
+  return normalized.startsWith("data:") || normalized.startsWith("blob:");
+};
+
+const normalizeStoredImagePath = (value) => {
+  if (!value) {
+    return "";
+  }
+
+  let normalized = value.toString().trim();
+
+  if (!normalized) {
+    return "";
+  }
+
+  normalized = normalized.replace(/^['\"]+|['\"]+$/g, "");
+  normalized = normalized.replace(/\\/g, "/");
+
+  if (normalized.toLowerCase().startsWith("data:image/")) {
+    return normalized;
+  }
+
+  if (isDataOrBlobUrl(normalized)) {
+    return "";
+  }
+
+  const compactValue = normalized.replace(/\s+/g, "");
+
+  if (compactValue.includes("base64,")) {
+    return "";
+  }
+
+  if (/^[A-Za-z0-9+/=]+$/.test(compactValue) && compactValue.length > 120) {
+    return "";
+  }
+
+  if (!compactValue.includes("/") && compactValue.length > 500) {
+    return "";
+  }
+
+  if (normalized.startsWith("http://") || normalized.startsWith("https://")) {
+    try {
+      const parsed = new URL(normalized);
+      normalized = parsed.pathname || normalized;
+    } catch (error) {
+      return normalized;
+    }
+  }
+
+  if (normalized.startsWith("/public/") || normalized.startsWith("/uploads/")) {
+    return normalized;
+  }
+
+  if (normalized.startsWith("public/") || normalized.startsWith("uploads/")) {
+    return `/${normalized}`;
+  }
+
+  if (normalized.startsWith("assets/img/products/")) {
+    return `/public/${normalized}`;
+  }
+
+  if (normalized.startsWith("/assets/img/products/")) {
+    return `/public${normalized}`;
+  }
+
+  return `${PRODUCT_IMAGE_DIR}/${normalized.replace(/^\/+/, "")}`;
+};
+
+const parseLooseArrayString = (value) => {
+  const trimmed = (value || "").trim();
+
+  if (!trimmed) {
+    return [];
+  }
+
+  if (!trimmed.startsWith("[") || !trimmed.endsWith("]")) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(trimmed);
+    return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+  } catch (error) {
+    // Continue with loose parsing fallbacks.
+  }
+
+  try {
+    const normalizedQuotes = trimmed.replace(/'/g, '"');
+    const parsed = JSON.parse(normalizedQuotes);
+    return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+  } catch (error) {
+    // Continue with comma split fallback.
+  }
+
+  return trimmed
+    .slice(1, -1)
+    .split(",")
+    .map((part) => part.trim().replace(/^['\"]+|['\"]+$/g, ""))
+    .filter(Boolean);
+};
+
 const parseStoredImages = (value) => {
   if (!value) {
     return [];
@@ -22,22 +126,25 @@ const parseStoredImages = (value) => {
   if (trimmedValue.startsWith('"[') && trimmedValue.endsWith(']"')) {
     try {
       const unwrappedValue = JSON.parse(trimmedValue);
-      const parsedValue = JSON.parse(unwrappedValue);
-      return Array.isArray(parsedValue)
-        ? parsedValue.filter(Boolean)
-        : [unwrappedValue];
+      const parsedValue = parseLooseArrayString(unwrappedValue);
+      return parsedValue.length ? parsedValue : [unwrappedValue];
     } catch (error) {
       return [trimmedValue];
     }
   }
 
   if (trimmedValue.startsWith("[")) {
-    try {
-      const parsedValue = JSON.parse(trimmedValue);
-      return Array.isArray(parsedValue)
-        ? parsedValue.filter(Boolean)
-        : [trimmedValue];
-    } catch (error) {
+    const parsedValue = parseLooseArrayString(trimmedValue);
+
+    if (parsedValue.length) {
+      return parsedValue;
+    }
+
+    if (/^\[\s*\]$/.test(trimmedValue)) {
+      return [];
+    }
+
+    {
       const dataUrlMatches = [...trimmedValue.matchAll(/"(data:[^"]+)"/g)].map(
         (match) => match[1],
       );
@@ -54,44 +161,37 @@ const parseStoredImages = (value) => {
 };
 
 const normalizeImageValue = (value) => {
-  if (!value) {
+  const safeValue = (value || "").toString().trim();
+
+  if (!safeValue) {
     return "";
   }
 
-  if (value.startsWith("[")) {
+  if (safeValue.startsWith("[")) {
     try {
-      const parsedValue = JSON.parse(value);
+      const parsedValue = JSON.parse(safeValue);
       if (Array.isArray(parsedValue) && parsedValue.length) {
         return normalizeImageValue(parsedValue[0]);
       }
     } catch (error) {
-      const dataUrlMatch = value.match(/"(data:[^"]+)"/);
+      const dataUrlMatch = safeValue.match(/"(data:[^"]+)"/);
       if (dataUrlMatch?.[1]) {
         return dataUrlMatch[1];
       }
     }
   }
 
-  if (value.startsWith("data:") || value.startsWith("blob:")) {
-    return value;
-  }
-
-  if (value.startsWith("http://") || value.startsWith("https://")) {
-    return value;
-  }
-
-  if (value.startsWith("/uploads/")) {
-    return value;
-  }
-
-  return `/uploads/${value.replace(/^\/+/, "")}`;
+  return normalizeStoredImagePath(safeValue);
 };
 
 const resolveImagePayload = (value) => {
-  const images = parseStoredImages(value).map(normalizeImageValue);
+  const images = parseStoredImages(value)
+    .map(normalizeImageValue)
+    .filter(Boolean);
+  const uniqueImages = [...new Set(images)];
   return {
-    imageUrls: images,
-    imageUrl: images[0] || "",
+    imageUrls: uniqueImages,
+    imageUrl: uniqueImages[0] || "",
   };
 };
 
@@ -234,9 +334,9 @@ const createProduct = async (req, res) => {
             (file) =>
               file && file.mimetype && file.mimetype.startsWith("image/"),
           )
-          .map((file) => file.filename)
+          .map((file) => `${PRODUCT_IMAGE_DIR}/${file.filename}`)
       : req.file
-        ? [req.file.filename]
+        ? [`${PRODUCT_IMAGE_DIR}/${req.file.filename}`]
         : [];
 
     const fallbackImages = parseStoredImages(images || image);
@@ -327,21 +427,24 @@ const updateProduct = async (req, res) => {
             (file) =>
               file && file.mimetype && file.mimetype.startsWith("image/"),
           )
-          .map((file) => file.filename)
+          .map((file) => `${PRODUCT_IMAGE_DIR}/${file.filename}`)
       : req.file
-        ? [req.file.filename]
+        ? [`${PRODUCT_IMAGE_DIR}/${req.file.filename}`]
         : [];
+    const hasImagesField = Object.prototype.hasOwnProperty.call(
+      req.body,
+      "images",
+    );
     const fallbackImages = parseStoredImages(images || image);
     const existingImages = parseStoredImages(existingProduct.image_url);
+    const keptImages = hasImagesField ? fallbackImages : existingImages;
     const nextGender =
       gender !== undefined
         ? normalizeGenderInput(gender)
         : normalizeGenderInput(existingProduct.gender);
     const nextImages = uploadedImagePaths.length
-      ? [...existingImages, ...uploadedImagePaths]
-      : fallbackImages.length
-        ? fallbackImages
-        : existingImages;
+      ? [...keptImages, ...uploadedImagePaths]
+      : keptImages;
     const storedImageValue =
       nextImages.length > 1 ? JSON.stringify(nextImages) : nextImages[0] || "";
 

@@ -20,6 +20,7 @@ function ManageProducts({
     category: "",
     gender: "unisex",
     image: "",
+    image_urls: [],
     stock: "",
   });
   const [editId, setEditId] = useState(null);
@@ -28,6 +29,11 @@ function ManageProducts({
   const [success, setSuccess] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [productToDelete, setProductToDelete] = useState(null);
+  const [previewProduct, setPreviewProduct] = useState(null);
+  const [previewImageIndex, setPreviewImageIndex] = useState(0);
+  const [swipeStartX, setSwipeStartX] = useState(null);
+  const [cardImageIndices, setCardImageIndices] = useState({});
+  const [selectedImagePreviewUrls, setSelectedImagePreviewUrls] = useState([]);
   const fileInputRef = React.useRef(null);
 
   const normalizeGenderValue = (value) => {
@@ -56,6 +62,87 @@ function ManageProducts({
     return "unisex";
   };
 
+  const parseImageValue = (value) => {
+    if (!value) {
+      return [];
+    }
+
+    if (Array.isArray(value)) {
+      return value.flatMap((item) => parseImageValue(item));
+    }
+
+    if (typeof value !== "string") {
+      return [];
+    }
+
+    const trimmed = value.trim();
+
+    if (!trimmed) {
+      return [];
+    }
+
+    if (trimmed.startsWith("[")) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          return parsed.flatMap((item) => parseImageValue(item));
+        }
+      } catch (error) {
+        // Continue with loose parsing fallback.
+      }
+
+      return trimmed
+        .slice(1, -1)
+        .split(",")
+        .map((part) => part.trim().replace(/^['"]+|['"]+$/g, ""))
+        .filter(Boolean);
+    }
+
+    const values = trimmed.includes(",")
+      ? trimmed
+          .split(",")
+          .map((part) => part.trim().replace(/^['"]+|['"]+$/g, ""))
+      : [trimmed];
+
+    return values
+      .map((part) => part.replace(/\\/g, "/").trim())
+      .map((part) => {
+        if (!part) {
+          return "";
+        }
+
+        if (part === "[]" || part.endsWith("/[]")) {
+          return "";
+        }
+
+        if (part.toLowerCase().startsWith("data:image/")) {
+          return part;
+        }
+
+        if (part.toLowerCase().startsWith("data:")) {
+          return "";
+        }
+
+        if (part.toLowerCase().startsWith("blob:")) {
+          return "";
+        }
+
+        if (
+          (part.startsWith("http://") || part.startsWith("https://")) &&
+          part.includes("localhost:5000")
+        ) {
+          try {
+            return new URL(part).pathname || "";
+          } catch (error) {
+            return part;
+          }
+        }
+
+        return part;
+      })
+      .filter(Boolean);
+  };
+
   const loadProducts = async () => {
     try {
       const res = await axios.get("/api/products");
@@ -69,6 +156,15 @@ function ManageProducts({
     loadProducts();
   }, []);
 
+  useEffect(() => {
+    const nextUrls = imageFiles.map((file) => URL.createObjectURL(file));
+    setSelectedImagePreviewUrls(nextUrls);
+
+    return () => {
+      nextUrls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [imageFiles]);
+
   const resetForm = () => {
     setForm({
       name: "",
@@ -77,6 +173,7 @@ function ManageProducts({
       category: "",
       gender: "unisex",
       image: "",
+      image_urls: [],
       stock: "",
     });
     setImageFiles([]);
@@ -86,15 +183,6 @@ function ManageProducts({
       fileInputRef.current.value = "";
     }
   };
-
-  const readFileAsDataUrl = (file) =>
-    new Promise((resolve, reject) => {
-      const reader = new FileReader();
-
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = () => reject(new Error("Unable to read image file"));
-      reader.readAsDataURL(file);
-    });
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -114,13 +202,21 @@ function ManageProducts({
     payload.append("gender", normalizeGenderValue(form.gender));
     payload.append("stock", form.stock === "" ? 0 : Number(form.stock));
 
-    if (imageFiles.length > 0) {
-      const imageDataUrls = await Promise.all(
-        imageFiles.map((file) => readFileAsDataUrl(file)),
-      );
+    if (editId) {
+      payload.append("images", JSON.stringify(form.image_urls || []));
+    }
 
-      payload.append("image", JSON.stringify(imageDataUrls));
-    } else if (form.image) {
+    if (imageFiles.length > 0) {
+      imageFiles.forEach((file) => {
+        payload.append("image", file);
+      });
+    } else if (
+      !editId &&
+      Array.isArray(form.image_urls) &&
+      form.image_urls.length > 0
+    ) {
+      payload.append("images", JSON.stringify(form.image_urls));
+    } else if (!editId && form.image) {
       payload.append("image", form.image.trim());
     }
 
@@ -156,6 +252,15 @@ function ManageProducts({
   };
 
   const handleEdit = (product) => {
+    const existingImages = [
+      ...parseImageValue(product.image_urls),
+      ...parseImageValue(product.imageUrls),
+      ...parseImageValue(product.image_url),
+      ...parseImageValue(product.image),
+    ].filter(Boolean);
+
+    const uniqueExistingImages = [...new Set(existingImages)];
+
     setForm({
       name: product.name || "",
       description: product.description || "",
@@ -163,6 +268,7 @@ function ManageProducts({
       category: product.category || "",
       gender: normalizeGenderValue(product.gender),
       image: product.image || "",
+      image_urls: uniqueExistingImages,
       stock: product.stock ?? 0,
     });
     setImageFiles([]);
@@ -190,20 +296,128 @@ function ManageProducts({
     }
   };
 
+  const handleRemoveCurrentImage = (indexToRemove) => {
+    setForm((previousForm) => ({
+      ...previousForm,
+      image_urls: (previousForm.image_urls || []).filter(
+        (_, index) => index !== indexToRemove,
+      ),
+    }));
+  };
+
+  const handleRemoveSelectedImage = (indexToRemove) => {
+    setImageFiles((previousFiles) =>
+      previousFiles.filter((_, index) => index !== indexToRemove),
+    );
+  };
+
   const resolveImageSrc = (imagePath) => {
     if (!imagePath) {
       return "https://via.placeholder.com/400x250?text=Product";
     }
 
-    if (imagePath.startsWith("http://") || imagePath.startsWith("https://")) {
-      return imagePath;
+    const normalized = imagePath.replace(/\\/g, "/").trim();
+
+    if (normalized.startsWith("http://") || normalized.startsWith("https://")) {
+      return normalized;
     }
 
-    if (imagePath.startsWith("/uploads/")) {
-      return `http://localhost:5000${imagePath}`;
+    if (
+      normalized.startsWith("/uploads/") ||
+      normalized.startsWith("/public/")
+    ) {
+      return `http://localhost:5000${normalized}`;
     }
 
-    return imagePath;
+    if (normalized.startsWith("uploads/") || normalized.startsWith("public/")) {
+      return `http://localhost:5000/${normalized}`;
+    }
+
+    if (normalized.startsWith("assets/img/products/")) {
+      return `http://localhost:5000/public/${normalized}`;
+    }
+
+    if (normalized.startsWith("/assets/img/products/")) {
+      return `http://localhost:5000/public${normalized}`;
+    }
+
+    return `http://localhost:5000/public/assets/img/products/${normalized.replace(/^\/+/, "")}`;
+  };
+
+  const getProductImages = (product) => {
+    const rawImages = [
+      ...parseImageValue(product?.image_urls),
+      ...parseImageValue(product?.imageUrls),
+      ...parseImageValue(product?.image_url),
+      ...parseImageValue(product?.image),
+    ];
+
+    const uniqueImages = [...new Set(rawImages.filter(Boolean))];
+
+    return uniqueImages.length
+      ? uniqueImages.map((imagePath) => resolveImageSrc(imagePath))
+      : [resolveImageSrc("")];
+  };
+
+  const previewImages = getProductImages(previewProduct);
+
+  const openPreview = (product) => {
+    setPreviewProduct(product);
+    setPreviewImageIndex(0);
+  };
+
+  const closePreview = () => {
+    setPreviewProduct(null);
+    setPreviewImageIndex(0);
+    setSwipeStartX(null);
+  };
+
+  const goToPreviewImage = (nextIndex) => {
+    if (!previewImages.length) {
+      return;
+    }
+
+    const safeIndex = (nextIndex + previewImages.length) % previewImages.length;
+    setPreviewImageIndex(safeIndex);
+  };
+
+  const handlePreviewTouchStart = (event) => {
+    setSwipeStartX(event.touches[0]?.clientX ?? null);
+  };
+
+  const handlePreviewTouchEnd = (event) => {
+    const endX = event.changedTouches[0]?.clientX;
+
+    if (swipeStartX === null || endX === undefined) {
+      return;
+    }
+
+    const swipeDistance = swipeStartX - endX;
+    const swipeThreshold = 40;
+
+    if (swipeDistance > swipeThreshold) {
+      goToPreviewImage(previewImageIndex + 1);
+    } else if (swipeDistance < -swipeThreshold) {
+      goToPreviewImage(previewImageIndex - 1);
+    }
+
+    setSwipeStartX(null);
+  };
+
+  const goToCardImage = (productId, imageCount, delta) => {
+    if (!productId || imageCount < 2) {
+      return;
+    }
+
+    setCardImageIndices((previous) => {
+      const currentIndex = previous[productId] || 0;
+      const nextIndex = (currentIndex + delta + imageCount) % imageCount;
+
+      return {
+        ...previous,
+        [productId]: nextIndex,
+      };
+    });
   };
 
   const categories = [
@@ -538,11 +752,157 @@ function ManageProducts({
                   >
                     {imageFiles.length > 0
                       ? `${imageFiles.length} image${imageFiles.length === 1 ? "" : "s"} selected`
-                      : form.image
+                      : (Array.isArray(form.image_urls) &&
+                            form.image_urls.length > 0) ||
+                          form.image
                         ? "Existing images stay and new files are added when you save"
                         : "Choose one or more images"}
                   </div>
                 </div>
+
+                {imageFiles.length > 0 && (
+                  <div style={{ marginBottom: "16px" }}>
+                    <p
+                      style={{
+                        margin: "0 0 8px 0",
+                        color: "#1f1813",
+                        fontSize: "12px",
+                        fontWeight: 700,
+                        letterSpacing: "0.4px",
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      New Images To Add
+                    </p>
+
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns:
+                          "repeat(auto-fill, minmax(110px, 1fr))",
+                        gap: "10px",
+                      }}
+                    >
+                      {selectedImagePreviewUrls.map((previewUrl, index) => (
+                        <div
+                          key={`${previewUrl}-${index}`}
+                          style={{
+                            border: "1px solid #d9c3ad",
+                            borderRadius: "10px",
+                            overflow: "hidden",
+                            background: "#fff",
+                          }}
+                        >
+                          <img
+                            src={previewUrl}
+                            alt={`New upload ${index + 1}`}
+                            style={{
+                              width: "100%",
+                              height: "80px",
+                              objectFit: "cover",
+                              display: "block",
+                              background: "#f0e8e0",
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveSelectedImage(index)}
+                            style={{
+                              width: "100%",
+                              border: 0,
+                              background: "#eef6ff",
+                              color: "#23558a",
+                              fontSize: "12px",
+                              fontWeight: 700,
+                              cursor: "pointer",
+                              padding: "6px 8px",
+                            }}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {editId && Array.isArray(form.image_urls) && (
+                  <div style={{ marginBottom: "16px" }}>
+                    <p
+                      style={{
+                        margin: "0 0 8px 0",
+                        color: "#1f1813",
+                        fontSize: "12px",
+                        fontWeight: 700,
+                        letterSpacing: "0.4px",
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      Current Product Images
+                    </p>
+
+                    {form.image_urls.length === 0 ? (
+                      <div
+                        style={{
+                          color: "#65574d",
+                          fontSize: "12px",
+                          fontWeight: 600,
+                        }}
+                      >
+                        No current images. Upload new images and save.
+                      </div>
+                    ) : (
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns:
+                            "repeat(auto-fill, minmax(110px, 1fr))",
+                          gap: "10px",
+                        }}
+                      >
+                        {form.image_urls.map((imagePath, index) => (
+                          <div
+                            key={`${imagePath}-${index}`}
+                            style={{
+                              border: "1px solid #d9c3ad",
+                              borderRadius: "10px",
+                              overflow: "hidden",
+                              background: "#fff",
+                            }}
+                          >
+                            <img
+                              src={resolveImageSrc(imagePath)}
+                              alt={`Current product ${index + 1}`}
+                              style={{
+                                width: "100%",
+                                height: "80px",
+                                objectFit: "cover",
+                                display: "block",
+                                background: "#f0e8e0",
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveCurrentImage(index)}
+                              style={{
+                                width: "100%",
+                                border: 0,
+                                background: "#fff3ee",
+                                color: "#9b2f1f",
+                                fontSize: "12px",
+                                fontWeight: 700,
+                                cursor: "pointer",
+                                padding: "6px 8px",
+                              }}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <button
                   type="submit"
@@ -592,113 +952,208 @@ function ManageProducts({
               gap: "20px",
             }}
           >
-            {products.map((product) => (
-              <div
-                key={product._id}
-                style={{
-                  background: "#fff",
-                  border: "1px solid #e0cec0",
-                  borderRadius: "12px",
-                  overflow: "hidden",
-                  boxShadow: "0 2px 8px rgba(31, 24, 19, 0.08)",
-                  transition: "transform 200ms ease, box-shadow 200ms ease",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = "translateY(-4px)";
-                  e.currentTarget.style.boxShadow =
-                    "0 8px 20px rgba(31, 24, 19, 0.15)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = "translateY(0)";
-                  e.currentTarget.style.boxShadow =
-                    "0 2px 8px rgba(31, 24, 19, 0.08)";
-                }}
-              >
-                <img
-                  src={resolveImageSrc(product.image)}
-                  alt={product.name}
+            {products.map((product) => {
+              const productImages = getProductImages(product);
+              const productId = product._id || product.id;
+              const activeCardImageIndex = cardImageIndices[productId] || 0;
+
+              return (
+                <div
+                  key={productId}
                   style={{
-                    width: "100%",
-                    height: "200px",
-                    objectFit: "cover",
-                    background: "#f0e8e0",
+                    background: "#fff",
+                    border: "1px solid #e0cec0",
+                    borderRadius: "12px",
+                    overflow: "hidden",
+                    boxShadow: "0 2px 8px rgba(31, 24, 19, 0.08)",
+                    transition: "transform 200ms ease, box-shadow 200ms ease",
                   }}
-                />
-                <div style={{ padding: "12px" }}>
-                  <h4 style={{ margin: "0 0 8px 0", fontSize: "14px" }}>
-                    {product.name}
-                  </h4>
-                  <p
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = "translateY(-4px)";
+                    e.currentTarget.style.boxShadow =
+                      "0 8px 20px rgba(31, 24, 19, 0.15)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = "translateY(0)";
+                    e.currentTarget.style.boxShadow =
+                      "0 2px 8px rgba(31, 24, 19, 0.08)";
+                  }}
+                >
+                  <div
                     style={{
-                      margin: "0 0 4px 0",
-                      color: "#245860",
-                      fontWeight: "700",
-                      fontSize: "14px",
+                      width: "100%",
+                      position: "relative",
                     }}
                   >
-                    ${Number(product.price).toFixed(2)}
-                  </p>
-                  <p style={{ margin: "0 0 6px 0", color: "#5f5550" }}>
-                    Category: {product.category || "-"}
-                  </p>
-                  <p style={{ margin: "0 0 6px 0", color: "#5f5550" }}>
-                    Gender: {normalizeGenderValue(product.gender)}
-                  </p>
-                  <p style={{ margin: "0 0 12px 0", color: "#5f5550" }}>
-                    Stock: {product.stock ?? 0}
-                  </p>
-                  <div style={{ display: "flex", gap: "8px" }}>
                     <button
-                      onClick={() => handleEdit(product)}
+                      type="button"
+                      onClick={() => openPreview(product)}
                       style={{
-                        flex: 1,
-                        padding: "8px 12px",
-                        background: "#245860",
-                        color: "#fff",
-                        border: "0",
-                        borderRadius: "6px",
+                        display: "block",
+                        width: "100%",
+                        padding: 0,
+                        border: 0,
+                        background: "transparent",
                         cursor: "pointer",
-                        fontSize: "12px",
-                        fontWeight: "600",
-                        transition: "background 150ms ease",
-                      }}
-                      onMouseEnter={(e) => {
-                        e.target.style.background = "#1a3f47";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.target.style.background = "#245860";
                       }}
                     >
-                      Edit
+                      <img
+                        src={productImages[activeCardImageIndex]}
+                        alt={product.name}
+                        style={{
+                          width: "100%",
+                          height: "200px",
+                          objectFit: "cover",
+                          background: "#f0e8e0",
+                        }}
+                      />
                     </button>
-                    <button
-                      className="danger"
-                      onClick={() => setProductToDelete(product)}
+
+                    {productImages.length > 1 && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            goToCardImage(productId, productImages.length, -1)
+                          }
+                          style={{
+                            position: "absolute",
+                            left: "8px",
+                            top: "50%",
+                            transform: "translateY(-50%)",
+                            width: "28px",
+                            height: "28px",
+                            borderRadius: "999px",
+                            border: 0,
+                            background: "rgba(10, 16, 20, 0.75)",
+                            color: "#fff",
+                            cursor: "pointer",
+                            fontSize: "18px",
+                            lineHeight: 1,
+                          }}
+                          aria-label="Previous product image"
+                        >
+                          ‹
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            goToCardImage(productId, productImages.length, 1)
+                          }
+                          style={{
+                            position: "absolute",
+                            right: "8px",
+                            top: "50%",
+                            transform: "translateY(-50%)",
+                            width: "28px",
+                            height: "28px",
+                            borderRadius: "999px",
+                            border: 0,
+                            background: "rgba(10, 16, 20, 0.75)",
+                            color: "#fff",
+                            cursor: "pointer",
+                            fontSize: "18px",
+                            lineHeight: 1,
+                          }}
+                          aria-label="Next product image"
+                        >
+                          ›
+                        </button>
+
+                        <span
+                          style={{
+                            position: "absolute",
+                            right: "8px",
+                            bottom: "8px",
+                            background: "rgba(10, 16, 20, 0.78)",
+                            color: "#fff",
+                            padding: "4px 8px",
+                            borderRadius: "999px",
+                            fontSize: "11px",
+                            fontWeight: "700",
+                          }}
+                        >
+                          {activeCardImageIndex + 1}/{productImages.length}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                  <div style={{ padding: "12px" }}>
+                    <h4 style={{ margin: "0 0 8px 0", fontSize: "14px" }}>
+                      {product.name}
+                    </h4>
+                    <p
                       style={{
-                        flex: 1,
-                        padding: "8px 12px",
-                        background: "#c1290f",
-                        color: "#fff",
-                        border: "0",
-                        borderRadius: "6px",
-                        cursor: "pointer",
-                        fontSize: "12px",
-                        fontWeight: "600",
-                        transition: "background 150ms ease",
-                      }}
-                      onMouseEnter={(e) => {
-                        e.target.style.background = "#8b1d0a";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.target.style.background = "#c1290f";
+                        margin: "0 0 4px 0",
+                        color: "#245860",
+                        fontWeight: "700",
+                        fontSize: "14px",
                       }}
                     >
-                      Delete
-                    </button>
+                      ${Number(product.price).toFixed(2)}
+                    </p>
+                    <p style={{ margin: "0 0 6px 0", color: "#5f5550" }}>
+                      Category: {product.category || "-"}
+                    </p>
+                    <p style={{ margin: "0 0 6px 0", color: "#5f5550" }}>
+                      Gender: {normalizeGenderValue(product.gender)}
+                    </p>
+                    <p style={{ margin: "0 0 12px 0", color: "#5f5550" }}>
+                      Stock: {product.stock ?? 0}
+                    </p>
+                    <div style={{ display: "flex", gap: "8px" }}>
+                      <button
+                        onClick={() => handleEdit(product)}
+                        style={{
+                          flex: 1,
+                          padding: "8px 12px",
+                          background: "#245860",
+                          color: "#fff",
+                          border: "0",
+                          borderRadius: "6px",
+                          cursor: "pointer",
+                          fontSize: "12px",
+                          fontWeight: "600",
+                          transition: "background 150ms ease",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.target.style.background = "#1a3f47";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.target.style.background = "#245860";
+                        }}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        className="danger"
+                        onClick={() => setProductToDelete(product)}
+                        style={{
+                          flex: 1,
+                          padding: "8px 12px",
+                          background: "#c1290f",
+                          color: "#fff",
+                          border: "0",
+                          borderRadius: "6px",
+                          cursor: "pointer",
+                          fontSize: "12px",
+                          fontWeight: "600",
+                          transition: "background 150ms ease",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.target.style.background = "#8b1d0a";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.target.style.background = "#c1290f";
+                        }}
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {productToDelete && (
@@ -805,6 +1260,117 @@ function ManageProducts({
                   >
                     Delete product
                   </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {previewProduct && (
+            <div className="ps-previewBackdrop" onClick={closePreview}>
+              <div
+                className="ps-previewCard"
+                role="dialog"
+                aria-modal="true"
+                aria-label={previewProduct.name || "Product preview"}
+                onClick={(event) => event.stopPropagation()}
+              >
+                <button
+                  type="button"
+                  className="ps-previewClose"
+                  onClick={closePreview}
+                  aria-label="Close image preview"
+                >
+                  ×
+                </button>
+
+                <div className="ps-previewMedia">
+                  <div
+                    className="ps-previewStage"
+                    onTouchStart={handlePreviewTouchStart}
+                    onTouchEnd={handlePreviewTouchEnd}
+                  >
+                    <img
+                      className="ps-previewImage"
+                      src={previewImages[previewImageIndex]}
+                      alt={previewProduct.name || "Product preview"}
+                    />
+
+                    {previewImages.length > 1 && (
+                      <>
+                        <button
+                          type="button"
+                          className="ps-previewArrow ps-previewArrowLeft"
+                          onClick={() =>
+                            goToPreviewImage(previewImageIndex - 1)
+                          }
+                          aria-label="Previous product image"
+                        >
+                          ‹
+                        </button>
+                        <button
+                          type="button"
+                          className="ps-previewArrow ps-previewArrowRight"
+                          onClick={() =>
+                            goToPreviewImage(previewImageIndex + 1)
+                          }
+                          aria-label="Next product image"
+                        >
+                          ›
+                        </button>
+                        <div className="ps-previewCounter">
+                          {previewImageIndex + 1} / {previewImages.length}
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {previewImages.length > 1 && (
+                    <div
+                      className="ps-previewDots"
+                      aria-label="Product image selector"
+                    >
+                      {previewImages.map((image, index) => (
+                        <button
+                          key={`${image}-${index}`}
+                          type="button"
+                          className={
+                            index === previewImageIndex
+                              ? "ps-previewDot is-active"
+                              : "ps-previewDot"
+                          }
+                          onClick={() => setPreviewImageIndex(index)}
+                          aria-label={`Show image ${index + 1} of ${previewImages.length}`}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="ps-previewMeta">
+                  <span className="ps-previewBadge">PRODUCT</span>
+                  <h3 className="ps-previewName">
+                    {previewProduct.name || "Product"}
+                  </h3>
+                  <p className="ps-previewCategory">
+                    {previewProduct.category || "Catalog item"}
+                  </p>
+                  <p className="ps-previewDescription">
+                    {previewProduct.description ||
+                      "No description available yet."}
+                  </p>
+
+                  <div className="ps-previewPurchaseRow">
+                    <div>
+                      <p className="ps-previewPrice">
+                        {Number.isFinite(Number(previewProduct.price))
+                          ? `$${Number(previewProduct.price).toFixed(2)}`
+                          : "View price"}
+                      </p>
+                      <p className="ps-previewStock">
+                        Stock: {previewProduct.stock ?? 0}
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

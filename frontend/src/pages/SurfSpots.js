@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
@@ -101,6 +101,87 @@ function Products({
       .replace(/[^a-z0-9]+/g, " ")
       .trim();
 
+  const parseImageValue = (value) => {
+    if (!value) {
+      return [];
+    }
+
+    if (Array.isArray(value)) {
+      return value.flatMap((item) => parseImageValue(item));
+    }
+
+    if (typeof value !== "string") {
+      return [];
+    }
+
+    const trimmed = value.trim();
+
+    if (!trimmed) {
+      return [];
+    }
+
+    if (trimmed.startsWith("[")) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          return parsed.flatMap((item) => parseImageValue(item));
+        }
+      } catch (error) {
+        // Continue with loose parsing fallback.
+      }
+
+      return trimmed
+        .slice(1, -1)
+        .split(",")
+        .map((part) => part.trim().replace(/^['"]+|['"]+$/g, ""))
+        .filter(Boolean);
+    }
+
+    const values = trimmed.includes(",")
+      ? trimmed
+          .split(",")
+          .map((part) => part.trim().replace(/^['"]+|['"]+$/g, ""))
+      : [trimmed];
+
+    return values
+      .map((part) => part.replace(/\\/g, "/").trim())
+      .map((part) => {
+        if (!part) {
+          return "";
+        }
+
+        if (part === "[]" || part.endsWith("/[]")) {
+          return "";
+        }
+
+        if (part.toLowerCase().startsWith("data:image/")) {
+          return part;
+        }
+
+        if (part.toLowerCase().startsWith("data:")) {
+          return "";
+        }
+
+        if (part.toLowerCase().startsWith("blob:")) {
+          return "";
+        }
+
+        if (
+          (part.startsWith("http://") || part.startsWith("https://")) &&
+          part.includes("localhost:5000")
+        ) {
+          try {
+            return new URL(part).pathname || "";
+          } catch (error) {
+            return part;
+          }
+        }
+
+        return part;
+      })
+      .filter(Boolean);
+  };
+
   const canViewProduct = (product) => {
     const gender = normalizeGenderValue(product?.gender || "unisex");
     const shopperGender = normalizeGenderValue(preferredGender || "all");
@@ -121,12 +202,8 @@ function Products({
   const [searchTerm, setSearchTerm] = useState("");
   const [previewProduct, setPreviewProduct] = useState(null);
   const [previewImageIndex, setPreviewImageIndex] = useState(0);
+  const [cardImageIndices, setCardImageIndices] = useState({});
   const swipeStartXRef = useRef(null);
-
-  const loadProducts = async () => {
-    const res = await axios.get("/api/products");
-    setProducts(res.data);
-  };
 
   useEffect(() => {
     const loadData = async () => {
@@ -250,25 +327,41 @@ function Products({
       return "https://via.placeholder.com/400x250?text=Product";
     }
 
-    if (imagePath.startsWith("http://") || imagePath.startsWith("https://")) {
-      return imagePath;
+    const normalized = imagePath.replace(/\\/g, "/").trim();
+
+    if (normalized.startsWith("http://") || normalized.startsWith("https://")) {
+      return normalized;
     }
 
-    if (imagePath.startsWith("/uploads/")) {
-      return `http://localhost:5000${imagePath}`;
+    if (
+      normalized.startsWith("/uploads/") ||
+      normalized.startsWith("/public/")
+    ) {
+      return `http://localhost:5000${normalized}`;
     }
 
-    return imagePath;
+    if (normalized.startsWith("uploads/") || normalized.startsWith("public/")) {
+      return `http://localhost:5000/${normalized}`;
+    }
+
+    if (normalized.startsWith("assets/img/products/")) {
+      return `http://localhost:5000/public/${normalized}`;
+    }
+
+    if (normalized.startsWith("/assets/img/products/")) {
+      return `http://localhost:5000/public${normalized}`;
+    }
+
+    return `http://localhost:5000/public/assets/img/products/${normalized.replace(/^\/+/, "")}`;
   };
 
   const getProductImages = (product) => {
-    const rawImages = Array.isArray(product?.image_urls)
-      ? product.image_urls
-      : Array.isArray(product?.imageUrls)
-        ? product.imageUrls
-        : product?.image
-          ? [product.image]
-          : [];
+    const rawImages = [
+      ...parseImageValue(product?.image_urls),
+      ...parseImageValue(product?.imageUrls),
+      ...parseImageValue(product?.image_url),
+      ...parseImageValue(product?.image),
+    ];
 
     const uniqueImages = [...new Set(rawImages.filter(Boolean))];
 
@@ -277,10 +370,7 @@ function Products({
       : [resolveImageSrc("")];
   };
 
-  const previewImages = useMemo(
-    () => getProductImages(previewProduct),
-    [previewProduct],
-  );
+  const previewImages = getProductImages(previewProduct);
 
   const openPreview = (product) => {
     setPreviewProduct(product);
@@ -323,6 +413,22 @@ function Products({
     }
 
     swipeStartXRef.current = null;
+  };
+
+  const goToCardImage = (productId, imageCount, delta) => {
+    if (!productId || imageCount < 2) {
+      return;
+    }
+
+    setCardImageIndices((previous) => {
+      const currentIndex = previous[productId] || 0;
+      const nextIndex = (currentIndex + delta + imageCount) % imageCount;
+
+      return {
+        ...previous,
+        [productId]: nextIndex,
+      };
+    });
   };
 
   return (
@@ -500,88 +606,147 @@ function Products({
                   : "No products found. Add your first product."}
               </p>
             ) : (
-              searchedProducts.map((product) => (
-                <div
-                  key={product._id}
-                  style={{
-                    border: "1px solid #e0cec0",
-                    borderRadius: "14px",
-                    overflow: "hidden",
-                    background: "#fffbf5",
-                    boxShadow: "0 12px 30px rgba(76, 56, 38, 0.1)",
-                  }}
-                >
-                  <button
-                    type="button"
-                    onClick={() => openPreview(product)}
+              searchedProducts.map((product) => {
+                const productImages = getProductImages(product);
+                const productId = product._id || product.id;
+                const activeCardImageIndex = cardImageIndices[productId] || 0;
+
+                return (
+                  <div
+                    key={productId}
                     style={{
-                      display: "block",
-                      width: "100%",
-                      padding: 0,
-                      border: 0,
-                      background: "transparent",
-                      cursor: "pointer",
+                      border: "1px solid #e0cec0",
+                      borderRadius: "14px",
+                      overflow: "hidden",
+                      background: "#fffbf5",
+                      boxShadow: "0 12px 30px rgba(76, 56, 38, 0.1)",
                     }}
                   >
-                    <img
-                      src={resolveImageSrc(
-                        product.image_urls?.[0] || product.image,
-                      )}
-                      alt={product.name}
-                      style={{
-                        width: "100%",
-                        height: "160px",
-                        objectFit: "cover",
-                        display: "block",
-                      }}
-                    />
-                  </button>
-                  <div style={{ padding: "14px" }}>
-                    <h3 style={{ marginBottom: "8px", color: "#1f1813" }}>
-                      {product.name}
-                    </h3>
-                    <p style={{ margin: "0 0 6px 0", color: "#5f5550" }}>
-                      {product.description}
-                    </p>
-                    <p
-                      style={{
-                        margin: "0 0 6px 0",
-                        fontWeight: "700",
-                        color: "#1f1813",
-                      }}
-                    >
-                      ${Number(product.price).toFixed(2)}
-                    </p>
-                    <p style={{ margin: "0 0 6px 0", color: "#5f5550" }}>
-                      Category: {product.category || "-"}
-                    </p>
-                    <p style={{ margin: "0 0 12px 0", color: "#5f5550" }}>
-                      Stock: {product.stock ?? 0}
-                    </p>
-                    <div style={{ display: "flex", gap: "8px" }}>
-                      {(() => {
-                        const isInCart = cart.some(
-                          (item) => item.product?._id === product._id,
-                        );
+                    <div style={{ position: "relative" }}>
+                      <button
+                        type="button"
+                        onClick={() => openPreview(product)}
+                        style={{
+                          display: "block",
+                          width: "100%",
+                          padding: 0,
+                          border: 0,
+                          background: "transparent",
+                          cursor: "pointer",
+                        }}
+                      >
+                        <img
+                          src={productImages[activeCardImageIndex]}
+                          alt={product.name}
+                          style={{
+                            width: "100%",
+                            height: "160px",
+                            objectFit: "cover",
+                            display: "block",
+                          }}
+                        />
+                      </button>
 
-                        return (
+                      {productImages.length > 1 && (
+                        <>
                           <button
-                            className="primary"
-                            onClick={() => handleAddToCart(product._id)}
-                            disabled={(product.stock ?? 0) < 1 || isInCart}
+                            type="button"
+                            onClick={() =>
+                              goToCardImage(productId, productImages.length, -1)
+                            }
+                            style={{
+                              position: "absolute",
+                              left: "8px",
+                              top: "50%",
+                              transform: "translateY(-50%)",
+                              width: "28px",
+                              height: "28px",
+                              borderRadius: "999px",
+                              border: 0,
+                              background: "rgba(10, 16, 20, 0.75)",
+                              color: "#fff",
+                              cursor: "pointer",
+                              fontSize: "18px",
+                              lineHeight: 1,
+                            }}
+                            aria-label="Previous product image"
                           >
-                            {(product.stock ?? 0) < 1
-                              ? "Out of Stock"
-                              : isInCart
-                                ? "In Cart"
-                                : "Add to Cart"}
+                            ‹
                           </button>
-                        );
-                      })()}
+                          <button
+                            type="button"
+                            onClick={() =>
+                              goToCardImage(productId, productImages.length, 1)
+                            }
+                            style={{
+                              position: "absolute",
+                              right: "8px",
+                              top: "50%",
+                              transform: "translateY(-50%)",
+                              width: "28px",
+                              height: "28px",
+                              borderRadius: "999px",
+                              border: 0,
+                              background: "rgba(10, 16, 20, 0.75)",
+                              color: "#fff",
+                              cursor: "pointer",
+                              fontSize: "18px",
+                              lineHeight: 1,
+                            }}
+                            aria-label="Next product image"
+                          >
+                            ›
+                          </button>
+                        </>
+                      )}
+                    </div>
+                    <div style={{ padding: "14px" }}>
+                      <h3 style={{ marginBottom: "8px", color: "#1f1813" }}>
+                        {product.name}
+                      </h3>
+                      <p style={{ margin: "0 0 6px 0", color: "#5f5550" }}>
+                        {product.description}
+                      </p>
+                      <p
+                        style={{
+                          margin: "0 0 6px 0",
+                          fontWeight: "700",
+                          color: "#1f1813",
+                        }}
+                      >
+                        ${Number(product.price).toFixed(2)}
+                      </p>
+                      <p style={{ margin: "0 0 6px 0", color: "#5f5550" }}>
+                        Category: {product.category || "-"}
+                      </p>
+                      <p style={{ margin: "0 0 12px 0", color: "#5f5550" }}>
+                        Stock: {product.stock ?? 0}
+                      </p>
+                      <div style={{ display: "flex", gap: "8px" }}>
+                        {(() => {
+                          const isInCart = cart.some(
+                            (item) => item.product?._id === product._id,
+                          );
+
+                          return (
+                            <button
+                              className="primary"
+                              onClick={() => handleAddToCart(product._id)}
+                              disabled={(product.stock ?? 0) < 1 || isInCart}
+                            >
+                              {(product.stock ?? 0) < 1
+                                ? "Out of Stock"
+                                : isInCart
+                                  ? "In Cart"
+                                  : "Add to Cart"}
+                            </button>
+                          );
+                        })()}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>

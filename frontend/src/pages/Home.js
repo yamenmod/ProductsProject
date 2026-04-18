@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
@@ -15,9 +15,9 @@ function Home({
   cartCount = 0,
 }) {
   const [recentProducts, setRecentProducts] = useState([]);
-  const [loadError, setLoadError] = useState("");
   const [previewProduct, setPreviewProduct] = useState(null);
   const [previewImageIndex, setPreviewImageIndex] = useState(0);
+  const [cardImageIndices, setCardImageIndices] = useState({});
   const surfboardRailRef = useRef(null);
   const wetsuitRailRef = useRef(null);
   const swipeStartXRef = useRef(null);
@@ -38,6 +38,87 @@ function Home({
       .replace(/[^a-z0-9]+/g, " ")
       .trim();
 
+  const parseImageValue = (value) => {
+    if (!value) {
+      return [];
+    }
+
+    if (Array.isArray(value)) {
+      return value.flatMap((item) => parseImageValue(item));
+    }
+
+    if (typeof value !== "string") {
+      return [];
+    }
+
+    const trimmed = value.trim();
+
+    if (!trimmed) {
+      return [];
+    }
+
+    if (trimmed.startsWith("[")) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          return parsed.flatMap((item) => parseImageValue(item));
+        }
+      } catch (error) {
+        // Continue with loose parsing fallback.
+      }
+
+      return trimmed
+        .slice(1, -1)
+        .split(",")
+        .map((part) => part.trim().replace(/^['"]+|['"]+$/g, ""))
+        .filter(Boolean);
+    }
+
+    const values = trimmed.includes(",")
+      ? trimmed
+          .split(",")
+          .map((part) => part.trim().replace(/^['"]+|['"]+$/g, ""))
+      : [trimmed];
+
+    return values
+      .map((part) => part.replace(/\\/g, "/").trim())
+      .map((part) => {
+        if (!part) {
+          return "";
+        }
+
+        if (part === "[]" || part.endsWith("/[]")) {
+          return "";
+        }
+
+        if (part.toLowerCase().startsWith("data:image/")) {
+          return part;
+        }
+
+        if (part.toLowerCase().startsWith("data:")) {
+          return "";
+        }
+
+        if (part.toLowerCase().startsWith("blob:")) {
+          return "";
+        }
+
+        if (
+          (part.startsWith("http://") || part.startsWith("https://")) &&
+          part.includes("localhost:5000")
+        ) {
+          try {
+            return new URL(part).pathname || "";
+          } catch (error) {
+            return part;
+          }
+        }
+
+        return part;
+      })
+      .filter(Boolean);
+  };
+
   const canViewProduct = (product) => {
     const gender = normalizeGenderValue(product?.gender || "unisex");
     const shopperGender = normalizeGenderValue(preferredGender || "all");
@@ -54,25 +135,41 @@ function Home({
       return "https://via.placeholder.com/520x640?text=New+Drop";
     }
 
-    if (imagePath.startsWith("http://") || imagePath.startsWith("https://")) {
-      return imagePath;
+    const normalized = imagePath.replace(/\\/g, "/").trim();
+
+    if (normalized.startsWith("http://") || normalized.startsWith("https://")) {
+      return normalized;
     }
 
-    if (imagePath.startsWith("/uploads/")) {
-      return `http://localhost:5000${imagePath}`;
+    if (
+      normalized.startsWith("/uploads/") ||
+      normalized.startsWith("/public/")
+    ) {
+      return `http://localhost:5000${normalized}`;
     }
 
-    return imagePath;
+    if (normalized.startsWith("uploads/") || normalized.startsWith("public/")) {
+      return `http://localhost:5000/${normalized}`;
+    }
+
+    if (normalized.startsWith("assets/img/products/")) {
+      return `http://localhost:5000/public/${normalized}`;
+    }
+
+    if (normalized.startsWith("/assets/img/products/")) {
+      return `http://localhost:5000/public${normalized}`;
+    }
+
+    return `http://localhost:5000/public/assets/img/products/${normalized.replace(/^\/+/, "")}`;
   };
 
   const getProductImages = (product) => {
-    const rawImages = Array.isArray(product?.image_urls)
-      ? product.image_urls
-      : Array.isArray(product?.imageUrls)
-        ? product.imageUrls
-        : product?.image
-          ? [product.image]
-          : [];
+    const rawImages = [
+      ...parseImageValue(product?.image_urls),
+      ...parseImageValue(product?.imageUrls),
+      ...parseImageValue(product?.image_url),
+      ...parseImageValue(product?.image),
+    ];
 
     const uniqueImages = [...new Set(rawImages.filter(Boolean))];
 
@@ -81,10 +178,7 @@ function Home({
       : [resolveImageSrc("")];
   };
 
-  const previewImages = useMemo(
-    () => getProductImages(previewProduct),
-    [previewProduct],
-  );
+  const previewImages = getProductImages(previewProduct);
 
   useEffect(() => {
     const loadRecentProducts = async () => {
@@ -105,31 +199,23 @@ function Home({
 
         setRecentProducts(sortedProducts.slice(0, 12));
       } catch (error) {
-        setLoadError("Unable to load recent surfboards.");
+        console.error("Unable to load recent products:", error.message);
       }
     };
 
     loadRecentProducts();
   }, []);
 
-  const surfboardProducts = useMemo(
-    () =>
-      recentProducts.filter(
-        (product) =>
-          normalizeCategoryValue(product.category) === "surfboards" &&
-          canViewProduct(product),
-      ),
-    [recentProducts, preferredGender],
+  const surfboardProducts = recentProducts.filter(
+    (product) =>
+      normalizeCategoryValue(product.category) === "surfboards" &&
+      canViewProduct(product),
   );
 
-  const wetsuitProducts = useMemo(
-    () =>
-      recentProducts.filter(
-        (product) =>
-          normalizeCategoryValue(product.category) === "wetsuits" &&
-          canViewProduct(product),
-      ),
-    [recentProducts, preferredGender],
+  const wetsuitProducts = recentProducts.filter(
+    (product) =>
+      normalizeCategoryValue(product.category) === "wetsuits" &&
+      canViewProduct(product),
   );
 
   const scrollRail = (railElement, direction) => {
@@ -184,6 +270,22 @@ function Home({
     }
 
     swipeStartXRef.current = null;
+  };
+
+  const goToCardImage = (productId, imageCount, delta) => {
+    if (!productId || imageCount < 2) {
+      return;
+    }
+
+    setCardImageIndices((previous) => {
+      const currentIndex = previous[productId] || 0;
+      const nextIndex = (currentIndex + delta + imageCount) % imageCount;
+
+      return {
+        ...previous,
+        [productId]: nextIndex,
+      };
+    });
   };
 
   const handlePreviewAddToCart = async () => {
@@ -245,43 +347,110 @@ function Home({
 
           <div className="ps-dropsRail" ref={railRef}>
             {products.length > 0 ? (
-              products.map((product) => (
-                <article
-                  className="ps-dropCard"
-                  key={product._id || product.id}
-                >
-                  <button
-                    type="button"
-                    className="ps-dropImageWrap"
-                    onClick={() => openPreview(product)}
-                  >
-                    <span className="ps-dropBadge">NEW</span>
-                    <img
-                      className="ps-dropImage"
-                      src={resolveImageSrc(
-                        product.image_urls?.[0] || product.image,
+              products.map((product) => {
+                const productImages = getProductImages(product);
+                const productId = product._id || product.id;
+                const activeCardImageIndex = cardImageIndices[productId] || 0;
+
+                return (
+                  <article className="ps-dropCard" key={productId}>
+                    <div
+                      className="ps-dropImageWrap"
+                      style={{ position: "relative" }}
+                    >
+                      <button
+                        type="button"
+                        style={{
+                          border: 0,
+                          padding: 0,
+                          background: "transparent",
+                          width: "100%",
+                          cursor: "pointer",
+                        }}
+                        onClick={() => openPreview(product)}
+                      >
+                        <span className="ps-dropBadge">NEW</span>
+                        <img
+                          className="ps-dropImage"
+                          src={productImages[activeCardImageIndex]}
+                          alt={product.name || "Recent product"}
+                        />
+                      </button>
+
+                      {productImages.length > 1 && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              goToCardImage(productId, productImages.length, -1)
+                            }
+                            style={{
+                              position: "absolute",
+                              left: "10px",
+                              top: "50%",
+                              transform: "translateY(-50%)",
+                              width: "28px",
+                              height: "28px",
+                              borderRadius: "999px",
+                              border: 0,
+                              background: "rgba(10, 16, 20, 0.75)",
+                              color: "#fff",
+                              cursor: "pointer",
+                              fontSize: "18px",
+                              lineHeight: 1,
+                              zIndex: 2,
+                            }}
+                            aria-label="Previous product image"
+                          >
+                            ‹
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              goToCardImage(productId, productImages.length, 1)
+                            }
+                            style={{
+                              position: "absolute",
+                              right: "10px",
+                              top: "50%",
+                              transform: "translateY(-50%)",
+                              width: "28px",
+                              height: "28px",
+                              borderRadius: "999px",
+                              border: 0,
+                              background: "rgba(10, 16, 20, 0.75)",
+                              color: "#fff",
+                              cursor: "pointer",
+                              fontSize: "18px",
+                              lineHeight: 1,
+                              zIndex: 2,
+                            }}
+                            aria-label="Next product image"
+                          >
+                            ›
+                          </button>
+                        </>
                       )}
-                      alt={product.name || "Recent product"}
-                    />
-                  </button>
+                    </div>
 
-                  <div className="ps-dropMetaRow">
-                    <span className="ps-dropSwatch" />
-                    <span className="ps-dropCategory">
-                      {product.category || pill}
-                    </span>
-                  </div>
+                    <div className="ps-dropMetaRow">
+                      <span className="ps-dropSwatch" />
+                      <span className="ps-dropCategory">
+                        {product.category || pill}
+                      </span>
+                    </div>
 
-                  <h3 className="ps-dropName">
-                    {product.name || "New product"}
-                  </h3>
-                  <p className="ps-dropPrice">
-                    {Number.isFinite(Number(product.price))
-                      ? `$${Number(product.price).toFixed(2)}`
-                      : "View price"}
-                  </p>
-                </article>
-              ))
+                    <h3 className="ps-dropName">
+                      {product.name || "New product"}
+                    </h3>
+                    <p className="ps-dropPrice">
+                      {Number.isFinite(Number(product.price))
+                        ? `$${Number(product.price).toFixed(2)}`
+                        : "View price"}
+                    </p>
+                  </article>
+                );
+              })
             ) : (
               <div className="ps-dropsEmpty">No {pill.toLowerCase()} yet.</div>
             )}
@@ -321,7 +490,7 @@ function Home({
           <div className="ps-home-heroOverlay" />
 
           <div className="ps-home-heroContent">
-            <h1 className="ps-home-heroTitle"></h1>
+            <h1 className="ps-home-heroTitle">Plage Surf</h1>
 
             <p className="ps-home-heroKicker">New Collection</p>
 
