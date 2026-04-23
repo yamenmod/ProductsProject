@@ -289,26 +289,34 @@ function Home({
   };
 
   const handlePreviewAddToCart = async () => {
-    if (!previewProduct || !session?.token) {
+    if (!previewProduct) {
       return;
     }
 
-    try {
-      await axios.post(
-        "/api/cart",
-        { productId: previewProduct._id || previewProduct.id, quantity: 1 },
-        {
-          headers: {
-            Authorization: `Bearer ${session.token}`,
-          },
-        },
-      );
+    if (typeof onAddToCart === "function") {
+      onAddToCart(previewProduct);
+    }
+  };
 
-      if (typeof onAddToCart === "function") {
-        onAddToCart(previewProduct);
-      }
-    } catch (error) {
-      console.error("Add to cart from home failed:", error.message);
+  const handlePreviewBuyNow = async () => {
+    if (!previewProduct) {
+      return;
+    }
+
+    if (typeof onAddToCart === "function") {
+      onAddToCart(previewProduct);
+    }
+    onNavigate("cart");
+    closePreview();
+  };
+
+  const handleCardAddToCart = (product) => {
+    if (!product) {
+      return;
+    }
+
+    if (typeof onAddToCart === "function") {
+      onAddToCart(product);
     }
   };
 
@@ -448,6 +456,15 @@ function Home({
                         ? `$${Number(product.price).toFixed(2)}`
                         : "View price"}
                     </p>
+                    <button
+                      type="button"
+                      className="ps-btn ps-btn-primary"
+                      style={{ width: "100%", marginTop: "12px", fontSize: "12px", padding: "8px 12px" }}
+                      onClick={() => handleCardAddToCart(product)}
+                      disabled={(product.stock ?? 0) < 1}
+                    >
+                      {(product.stock ?? 0) < 1 ? "Out of Stock" : "Add to Cart"}
+                    </button>
                   </article>
                 );
               })
@@ -632,7 +649,7 @@ function Home({
                 {previewProduct.description || "No description available yet."}
               </p>
 
-              <div className="ps-previewPurchaseRow">
+              <div className="ps-previewPurchaseRow" style={{ gap: "12px", alignItems: "flex-start", flexDirection: "column" }}>
                 <div>
                   <p className="ps-previewPrice">
                     {Number.isFinite(Number(previewProduct.price))
@@ -644,16 +661,28 @@ function Home({
                   </p>
                 </div>
 
-                <button
-                  type="button"
-                  className="ps-btn ps-btn-primary"
-                  onClick={handlePreviewAddToCart}
-                  disabled={(previewProduct.stock ?? 0) < 1}
-                >
-                  {(previewProduct.stock ?? 0) < 1
-                    ? "Out of Stock"
-                    : "Add to Cart"}
-                </button>
+                <div style={{ display: "flex", gap: "10px", width: "100%" }}>
+                  <button
+                    type="button"
+                    className="ps-btn ps-btn-primary"
+                    onClick={handlePreviewAddToCart}
+                    disabled={(previewProduct.stock ?? 0) < 1}
+                    style={{ flex: 1 }}
+                  >
+                    {(previewProduct.stock ?? 0) < 1
+                      ? "Out of Stock"
+                      : "Add to Cart"}
+                  </button>
+                  <button
+                    type="button"
+                    className="ps-btn ps-btn-secondary"
+                    onClick={handlePreviewBuyNow}
+                    disabled={(previewProduct.stock ?? 0) < 1}
+                    style={{ flex: 1 }}
+                  >
+                    Buy Now
+                  </button>
+                </div>
               </div>
             </div>
           </div>

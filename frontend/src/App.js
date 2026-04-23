@@ -5,8 +5,11 @@ import Shop from "./pages/Shop";
 import Contact from "./pages/Contact";
 import Products from "./pages/SurfSpots";
 import SizeCharts from "./pages/SizeCharts";
+import Cart from "./pages/Cart";
 import ManageOrders from "./pages/ManageOrders";
 import ManageProducts from "./pages/ManageProducts";
+
+const CART_STORAGE_KEY = "plageCartItems";
 
 function App() {
   const [session, setSession] = useState(null);
@@ -28,7 +31,20 @@ function App() {
       });
       setCurrentPage("home");
     }
+
+    const savedCart = localStorage.getItem(CART_STORAGE_KEY);
+    if (savedCart) {
+      try {
+        setCartItems(JSON.parse(savedCart));
+      } catch (error) {
+        console.error("Failed to parse saved cart items:", error.message);
+      }
+    }
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cartItems));
+  }, [cartItems]);
 
   // Central navigation handler used by the header and page buttons.
   // It also blocks non-admin users from opening the admin orders page.
@@ -71,6 +87,14 @@ function App() {
         { ...product, id: productId, _id: productId, quantity: 1 },
       ]);
     }
+  };
+
+  const handleRemoveFromCart = (productId) => {
+    if (!productId) {
+      return;
+    }
+
+    setCartItems(cartItems.filter((item) => item.id !== productId));
   };
 
   const handlePreferredGenderChange = (nextGender) => {
@@ -205,6 +229,25 @@ function App() {
           localStorage.removeItem("session");
           setSession(null);
         }}
+        cartCount={cartCount}
+      />
+    );
+  }
+
+  if (currentPage === "cart") {
+    return (
+      <Cart
+        user={session.user}
+        preferredGender={preferredGender}
+        currentPage={currentPage}
+        onNavigate={handleNavigate}
+        onPreferredGenderChange={handlePreferredGenderChange}
+        onLogout={() => {
+          localStorage.removeItem("session");
+          setSession(null);
+        }}
+        cartItems={cartItems}
+        onRemoveFromCart={handleRemoveFromCart}
         cartCount={cartCount}
       />
     );
