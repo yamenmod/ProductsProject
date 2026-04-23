@@ -189,17 +189,11 @@ function Shop({
                 )}
 
                 <button
+                  type="button"
+                  className="ps-btn ps-btn-primary"
                   style={{
-                    padding: "10px 24px",
-                    background: item.color,
-                    color: "white",
-                    border: "none",
-                    borderRadius: "10px",
-                    cursor: "pointer",
-                    fontWeight: "700",
-                    fontSize: "13px",
-                    transition: "all 0.2s ease",
-                    letterSpacing: "0.5px",
+                    width: "100%",
+                    maxWidth: "180px",
                   }}
                   onMouseOver={(e) => {
                     e.target.style.transform = "scale(1.05)";
@@ -208,7 +202,7 @@ function Shop({
                     e.target.style.transform = "scale(1)";
                   }}
                 >
-                  Browse
+                  Shop now
                 </button>
               </div>
             ))}

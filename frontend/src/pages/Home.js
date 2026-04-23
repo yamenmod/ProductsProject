@@ -288,13 +288,48 @@ function Home({
     });
   };
 
+  const addProductToCart = async (product) => {
+    if (!product || !session?.token) {
+      return false;
+    }
+
+    const productId = product.id || product._id;
+
+    if (!productId) {
+      return false;
+    }
+
+    try {
+      const response = await axios.post(
+        "/api/cart",
+        { productId, quantity: 1 },
+        {
+          headers: {
+            Authorization: `Bearer ${session.token}`,
+            "X-Source-Page": "home",
+          },
+        },
+      );
+
+      if (typeof onAddToCart === "function") {
+        await onAddToCart(response.data);
+      }
+
+      return true;
+    } catch (error) {
+      console.error("Home add to cart failed:", error.message);
+      return false;
+    }
+  };
+
   const handlePreviewAddToCart = async () => {
     if (!previewProduct) {
       return;
     }
 
-    if (typeof onAddToCart === "function") {
-      onAddToCart(previewProduct);
+    const added = await addProductToCart(previewProduct);
+    if (added) {
+      onNavigate("cart");
     }
   };
 
@@ -303,20 +338,23 @@ function Home({
       return;
     }
 
-    if (typeof onAddToCart === "function") {
-      onAddToCart(previewProduct);
+    const added = await addProductToCart(previewProduct);
+    if (!added) {
+      return;
     }
+
     onNavigate("cart");
     closePreview();
   };
 
-  const handleCardAddToCart = (product) => {
+  const handleCardAddToCart = async (product) => {
     if (!product) {
       return;
     }
 
-    if (typeof onAddToCart === "function") {
-      onAddToCart(product);
+    const added = await addProductToCart(product);
+    if (added) {
+      onNavigate("cart");
     }
   };
 
@@ -459,7 +497,12 @@ function Home({
                     <button
                       type="button"
                       className="ps-btn ps-btn-primary"
-                      style={{ width: "100%", marginTop: "12px", fontSize: "12px", padding: "8px 12px" }}
+                      style={{
+                        width: "100%",
+                        marginTop: "12px",
+                        fontSize: "12px",
+                        padding: "8px 12px",
+                      }}
                       onClick={() => handleCardAddToCart(product)}
                       disabled={(product.stock ?? 0) < 1}
                     >
@@ -675,7 +718,7 @@ function Home({
                   </button>
                   <button
                     type="button"
-                    className="ps-btn ps-btn-secondary"
+                    className="ps-btn ps-btn-dark"
                     onClick={handlePreviewBuyNow}
                     disabled={(previewProduct.stock ?? 0) < 1}
                     style={{ flex: 1 }}

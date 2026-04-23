@@ -115,6 +115,11 @@ const getCart = async (req, res) => {
 const addToCart = async (req, res) => {
   try {
     const { productId, quantity } = req.body;
+    const sourcePage = req.headers["x-source-page"] || "unknown";
+
+    console.log(
+      `[cart:add] source=${sourcePage} user=${req.user?.id} product=${productId} qty=${quantity}`,
+    );
 
     if (!productId) {
       return res.status(400).json({ message: "Product ID is required" });
@@ -148,10 +153,16 @@ const addToCart = async (req, res) => {
         "UPDATE cart_items SET quantity = quantity + ? WHERE id = ?",
         [qty, existingItems[0].id],
       );
+      console.log(
+        `[cart:add] updated existing item id=${existingItems[0].id} user=${req.user.id}`,
+      );
     } else {
       await db.query(
         "INSERT INTO cart_items (user_id, product_id, quantity) VALUES (?, ?, ?)",
         [req.user.id, productId, qty],
+      );
+      console.log(
+        `[cart:add] inserted new item user=${req.user.id} product=${productId}`,
       );
     }
 
@@ -176,6 +187,7 @@ const addToCart = async (req, res) => {
 
     return res.status(200).json(mapCartRows(rows));
   } catch (error) {
+    console.error(`[cart:add] failed: ${error.message}`);
     return res.status(500).json({ message: "Server error" });
   }
 };

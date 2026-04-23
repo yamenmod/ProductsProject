@@ -197,7 +197,6 @@ function Products({
   const [activeCategory, setActiveCategory] = useState(
     selectedCategory || "All",
   );
-  const [cart, setCart] = useState(cartItems || []);
   const [accessoryFilter, setAccessoryFilter] = useState("All");
   const [searchTerm, setSearchTerm] = useState("");
   const [previewProduct, setPreviewProduct] = useState(null);
@@ -207,21 +206,13 @@ function Products({
 
   useEffect(() => {
     const loadData = async () => {
-      const [productsRes, cartRes] = await Promise.all([
-        axios.get("/api/products"),
-        axios.get("/api/cart", {
-          headers: {
-            Authorization: `Bearer ${session.token}`,
-          },
-        }),
-      ]);
+      const productsRes = await axios.get("/api/products");
 
       setProducts(productsRes.data);
-      setCart(cartRes.data);
     };
 
     loadData();
-  }, [session.token]);
+  }, []);
 
   useEffect(() => {
     setActiveCategory(selectedCategory || "All");
@@ -234,29 +225,50 @@ function Products({
     }
   }, [activeCategory]);
 
-  const handleAddToCart = async (productId) => {
+  const handleAddToCart = async (product) => {
+    if (!product || !session?.token) {
+      return;
+    }
+
     try {
+      const productId = product._id || product.id;
+
       const res = await axios.post(
         "/api/cart",
         { productId, quantity: 1 },
         {
           headers: {
             Authorization: `Bearer ${session.token}`,
+            "X-Source-Page": "shop-products",
           },
         },
       );
-      setCart(res.data);
+
+      if (typeof onAddToCart === "function") {
+        const added = await onAddToCart(res.data);
+        if (added) {
+          onNavigate("cart");
+        }
+      }
     } catch (requestError) {
       console.error("Add to cart failed:", requestError.message);
     }
   };
 
   const handlePreviewAddToCart = async () => {
-    if (!previewProduct?._id) {
+    if (!previewProduct) {
       return;
     }
 
-    await handleAddToCart(previewProduct._id);
+    await handleAddToCart(previewProduct);
+  };
+
+  const handlePreviewBuyNow = async () => {
+    if (!previewProduct) {
+      return;
+    }
+
+    await handleAddToCart(previewProduct);
   };
 
   const categories = [
@@ -440,7 +452,7 @@ function Products({
         currentPage={currentPage}
         onNavigate={onNavigate}
         onLogout={onLogout}
-        cartCount={cartItems?.length || 0}
+        cartCount={cartCount}
       />
 
       <div className="ps-main" style={{ padding: "40px 20px" }}>
@@ -724,14 +736,19 @@ function Products({
                       </p>
                       <div style={{ display: "flex", gap: "8px" }}>
                         {(() => {
-                          const isInCart = cart.some(
-                            (item) => item.product?._id === product._id,
+                          const productId = product._id || product.id;
+                          const isInCart = (cartItems || []).some(
+                            (item) => {
+                              const itemId = item.id || item._id;
+                              return Number(itemId) === Number(productId);
+                            },
                           );
 
                           return (
                             <button
-                              className="primary"
-                              onClick={() => handleAddToCart(product._id)}
+                              className="ps-btn ps-btn-primary"
+                              style={{ width: "100%" }}
+                              onClick={() => handleAddToCart(product)}
                               disabled={(product.stock ?? 0) < 1 || isInCart}
                             >
                               {(product.stock ?? 0) < 1
@@ -841,7 +858,10 @@ function Products({
                 {previewProduct.description || "No description available yet."}
               </p>
 
-              <div className="ps-previewPurchaseRow">
+              <div
+                className="ps-previewPurchaseRow"
+                style={{ gap: "12px", alignItems: "flex-start", flexDirection: "column" }}
+              >
                 <div>
                   <p className="ps-previewPrice">
                     {Number.isFinite(Number(previewProduct.price))
@@ -853,16 +873,28 @@ function Products({
                   </p>
                 </div>
 
-                <button
-                  type="button"
-                  className="ps-btn ps-btn-primary"
-                  onClick={handlePreviewAddToCart}
-                  disabled={(previewProduct.stock ?? 0) < 1}
-                >
-                  {(previewProduct.stock ?? 0) < 1
-                    ? "Out of Stock"
-                    : "Add to Cart"}
-                </button>
+                <div style={{ display: "flex", gap: "10px", width: "100%" }}>
+                  <button
+                    type="button"
+                    className="ps-btn ps-btn-primary"
+                    onClick={handlePreviewAddToCart}
+                    disabled={(previewProduct.stock ?? 0) < 1}
+                    style={{ flex: 1 }}
+                  >
+                    {(previewProduct.stock ?? 0) < 1
+                      ? "Out of Stock"
+                      : "Add to Cart"}
+                  </button>
+                  <button
+                    type="button"
+                    className="ps-btn ps-btn-dark"
+                    onClick={handlePreviewBuyNow}
+                    disabled={(previewProduct.stock ?? 0) < 1}
+                    style={{ flex: 1 }}
+                  >
+                    Buy Now
+                  </button>
+                </div>
               </div>
             </div>
           </div>

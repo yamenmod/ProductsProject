@@ -278,24 +278,19 @@ function SizeCharts({
   };
 
   const handleAddToCart = async (product) => {
-    if (!session?.token || !product?._id) {
+    if (!product) {
       return;
     }
 
     try {
-      await axios.post(
-        "/api/cart",
-        { productId: product._id, quantity: 1 },
-        {
-          headers: {
-            Authorization: `Bearer ${session.token}`,
-          },
-        },
-      );
-
       if (typeof onAddToCart === "function") {
-        onAddToCart(product);
+        const added = await onAddToCart(product);
+        if (!added) {
+          return;
+        }
       }
+
+      onNavigate("cart");
     } catch (error) {
       console.error("Add to cart failed:", error.message);
     }

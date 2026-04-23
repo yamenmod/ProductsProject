@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import axios from "axios";
 import Login from "./pages/Login";
 import Home from "./pages/Home";
 import Shop from "./pages/Shop";
@@ -9,7 +10,45 @@ import Cart from "./pages/Cart";
 import ManageOrders from "./pages/ManageOrders";
 import ManageProducts from "./pages/ManageProducts";
 
-const CART_STORAGE_KEY = "plageCartItems";
+const normalizeCartItems = (items = []) =>
+  (Array.isArray(items) ? items : []).map((item) => {
+    if (item?.product) {
+      const product = item.product;
+      const productId = product.id || product._id;
+
+      return {
+        ...product,
+        id: productId,
+        _id: productId,
+        quantity: Number(item.quantity) || 1,
+      };
+    }
+
+    const productId = item?.id || item?._id;
+
+    return {
+      ...item,
+      id: productId,
+      _id: productId,
+      quantity: Number(item?.quantity) || 1,
+    };
+  });
+
+const extractProductId = (value) => {
+  const rawId =
+    value?.id ||
+    value?._id ||
+    value?.product?.id ||
+    value?.product?._id ||
+    value?.productId;
+
+  if (rawId === undefined || rawId === null || rawId === "") {
+    return null;
+  }
+
+  const numericId = Number(rawId);
+  return Number.isFinite(numericId) ? numericId : rawId;
+};
 
 function App() {
   const [session, setSession] = useState(null);
@@ -31,20 +70,31 @@ function App() {
       });
       setCurrentPage("home");
     }
-
-    const savedCart = localStorage.getItem(CART_STORAGE_KEY);
-    if (savedCart) {
-      try {
-        setCartItems(JSON.parse(savedCart));
-      } catch (error) {
-        console.error("Failed to parse saved cart items:", error.message);
-      }
-    }
   }, []);
 
   useEffect(() => {
-    localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cartItems));
-  }, [cartItems]);
+    const loadCart = async () => {
+      if (!session?.token) {
+        setCartItems([]);
+        return;
+      }
+
+      try {
+        const response = await axios.get("/api/cart", {
+          headers: {
+            Authorization: `Bearer ${session.token}`,
+          },
+        });
+
+        setCartItems(normalizeCartItems(response.data));
+      } catch (error) {
+        console.error("Failed to load cart:", error.message);
+        setCartItems([]);
+      }
+    };
+
+    loadCart();
+  }, [session?.token]);
 
   // Central navigation handler used by the header and page buttons.
   // It also blocks non-admin users from opening the admin orders page.
@@ -63,38 +113,65 @@ function App() {
     }
   };
 
-  // Local cart state is kept in the app shell so every page shares it.
-  // This avoids losing the cart when switching between pages.
-  const handleAddToCart = (product) => {
-    const productId = product?.id || product?._id;
-
-    if (!productId) {
-      return;
+  // Adds cart items through the backend API so every cart action is persisted.
+  // If an API cart array is passed in, we only sync state without another request.
+  const handleAddToCart = async (productOrCart) => {
+    if (Array.isArray(productOrCart)) {
+      setCartItems(normalizeCartItems(productOrCart));
+      return true;
     }
 
-    const existingItem = cartItems.find((item) => item.id === productId);
-    if (existingItem) {
-      setCartItems(
-        cartItems.map((item) =>
-          item.id === productId
-            ? { ...item, quantity: item.quantity + 1 }
-            : item,
-        ),
+    if (!session?.token) {
+      return false;
+    }
+
+    const productId = extractProductId(productOrCart);
+
+    if (productId === null) {
+      return false;
+    }
+
+    try {
+      await axios.post(
+        "/api/cart",
+        { productId, quantity: 1 },
+        {
+          headers: {
+            Authorization: `Bearer ${session.token}`,
+          },
+        },
       );
-    } else {
-      setCartItems([
-        ...cartItems,
-        { ...product, id: productId, _id: productId, quantity: 1 },
-      ]);
+
+      const refreshedCart = await axios.get("/api/cart", {
+        headers: {
+          Authorization: `Bearer ${session.token}`,
+        },
+      });
+
+      setCartItems(normalizeCartItems(refreshedCart.data));
+      return true;
+    } catch (error) {
+      console.error("Add to cart failed:", error.message);
+      return false;
     }
   };
 
-  const handleRemoveFromCart = (productId) => {
-    if (!productId) {
+  const handleRemoveFromCart = async (productId) => {
+    if (!productId || !session?.token) {
       return;
     }
 
-    setCartItems(cartItems.filter((item) => item.id !== productId));
+    try {
+      const response = await axios.delete(`/api/cart/${productId}`, {
+        headers: {
+          Authorization: `Bearer ${session.token}`,
+        },
+      });
+
+      setCartItems(normalizeCartItems(response.data));
+    } catch (error) {
+      console.error("Remove from cart failed:", error.message);
+    }
   };
 
   const handlePreferredGenderChange = (nextGender) => {
@@ -123,6 +200,12 @@ function App() {
     0,
   );
 
+  const logout = () => {
+    localStorage.removeItem("session");
+    setCartItems([]);
+    setSession(null);
+  };
+
   if (!session) {
     return (
       <Login
@@ -141,7 +224,7 @@ function App() {
   }
 
   // Each page is rendered manually because the app uses role-aware shell logic.
-  // The admin orders page is only reachable when the user role is admin.
+  // The admin pages are only reachable when the user role is admin.
   if (currentPage === "home") {
     return (
       <Home
@@ -152,10 +235,7 @@ function App() {
         onNavigate={handleNavigate}
         onAddToCart={handleAddToCart}
         onPreferredGenderChange={handlePreferredGenderChange}
-        onLogout={() => {
-          localStorage.removeItem("session");
-          setSession(null);
-        }}
+        onLogout={logout}
         cartCount={cartCount}
       />
     );
@@ -169,10 +249,7 @@ function App() {
         currentPage={currentPage}
         onNavigate={handleNavigate}
         onPreferredGenderChange={handlePreferredGenderChange}
-        onLogout={() => {
-          localStorage.removeItem("session");
-          setSession(null);
-        }}
+        onLogout={logout}
         cartCount={cartCount}
       />
     );
@@ -186,10 +263,7 @@ function App() {
         currentPage={currentPage}
         onNavigate={handleNavigate}
         onPreferredGenderChange={handlePreferredGenderChange}
-        onLogout={() => {
-          localStorage.removeItem("session");
-          setSession(null);
-        }}
+        onLogout={logout}
         cartCount={cartCount}
       />
     );
@@ -205,10 +279,7 @@ function App() {
         onNavigate={handleNavigate}
         onAddToCart={handleAddToCart}
         onPreferredGenderChange={handlePreferredGenderChange}
-        onLogout={() => {
-          localStorage.removeItem("session");
-          setSession(null);
-        }}
+        onLogout={logout}
         cartCount={cartCount}
       />
     );
@@ -225,10 +296,7 @@ function App() {
         onAddToCart={handleAddToCart}
         onNavigate={handleNavigate}
         onPreferredGenderChange={handlePreferredGenderChange}
-        onLogout={() => {
-          localStorage.removeItem("session");
-          setSession(null);
-        }}
+        onLogout={logout}
         cartCount={cartCount}
       />
     );
@@ -237,15 +305,13 @@ function App() {
   if (currentPage === "cart") {
     return (
       <Cart
+        session={session}
         user={session.user}
         preferredGender={preferredGender}
         currentPage={currentPage}
         onNavigate={handleNavigate}
         onPreferredGenderChange={handlePreferredGenderChange}
-        onLogout={() => {
-          localStorage.removeItem("session");
-          setSession(null);
-        }}
+        onLogout={logout}
         cartItems={cartItems}
         onRemoveFromCart={handleRemoveFromCart}
         cartCount={cartCount}
@@ -261,10 +327,7 @@ function App() {
         onNavigate={handleNavigate}
         preferredGender={preferredGender}
         onPreferredGenderChange={handlePreferredGenderChange}
-        onLogout={() => {
-          localStorage.removeItem("session");
-          setSession(null);
-        }}
+        onLogout={logout}
         cartCount={cartCount}
       />
     );
@@ -278,14 +341,13 @@ function App() {
         onNavigate={handleNavigate}
         preferredGender={preferredGender}
         onPreferredGenderChange={handlePreferredGenderChange}
-        onLogout={() => {
-          localStorage.removeItem("session");
-          setSession(null);
-        }}
+        onLogout={logout}
         cartCount={cartCount}
       />
     );
   }
+
+  return null;
 }
 
 export default App;
