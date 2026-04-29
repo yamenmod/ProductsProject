@@ -25,7 +25,7 @@ function Header({
           <button
             type="button"
             className="ps-brand"
-            onClick={() => onNavigate("home")}
+            onClick={() => onNavigate(isAdmin ? "admin-dashboard" : "home")}
           >
             <img src="/PlageSurf_LOGO.png" alt="Plage Surf" />
             <div>
@@ -36,98 +36,109 @@ function Header({
             </div>
           </button>
 
-          <div className="ps-header-genderToggle" aria-label="Shop by gender">
-            {[
-              { label: "Women's", value: "female" },
-              { label: "Men's", value: "male" },
-            ].map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                className={
-                  preferredGender === option.value
-                    ? "ps-header-genderButton is-active"
-                    : "ps-header-genderButton"
-                }
-                onClick={() => onPreferredGenderChange?.(option.value)}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
+          {!isAdmin && (
+            <div className="ps-header-genderToggle" aria-label="Shop by gender">
+              {[
+                { label: "Women's", value: "female" },
+                { label: "Men's", value: "male" },
+              ].map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={
+                    preferredGender === option.value
+                      ? "ps-header-genderButton is-active"
+                      : "ps-header-genderButton"
+                  }
+                  onClick={() => onPreferredGenderChange?.(option.value)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         <nav className="ps-nav">
-          <button
-            type="button"
-            className={`ps-nav-link ${currentPage === "home" ? "active" : ""}`}
-            onClick={() => onNavigate("home")}
-          >
-            Home
-          </button>
+          {!isAdmin && (
+            <>
+              <button
+                type="button"
+                className={`ps-nav-link ${currentPage === "home" ? "active" : ""}`}
+                onClick={() => onNavigate("home")}
+              >
+                Home
+              </button>
 
-          <div
-            style={{ position: "relative" }}
-            onMouseEnter={() => setShopMenuOpen(true)}
-            onMouseLeave={() => setShopMenuOpen(false)}
-          >
-            <button
-              type="button"
-              className={`ps-nav-link ${shopActive ? "active" : ""}`}
-              onClick={() => setShopMenuOpen((prev) => !prev)}
-              aria-expanded={shopMenuOpen}
-              aria-haspopup="menu"
-            >
-              Shop {shopMenuOpen ? "▲" : "▼"}
-            </button>
+              <div
+                style={{ position: "relative" }}
+                onMouseEnter={() => setShopMenuOpen(true)}
+                onMouseLeave={() => setShopMenuOpen(false)}
+              >
+                <button
+                  type="button"
+                  className={`ps-nav-link ${shopActive ? "active" : ""}`}
+                  onClick={() => setShopMenuOpen((prev) => !prev)}
+                  aria-expanded={shopMenuOpen}
+                  aria-haspopup="menu"
+                >
+                  Shop {shopMenuOpen ? "▲" : "▼"}
+                </button>
 
-            {shopMenuOpen && (
-              <div className="ps-nav-dropdown">
-                {[
-                  { name: "All Products", id: "" },
-                  { name: "Surfboards", id: "surfboards" },
-                  { name: "Wetsuits", id: "wetsuits" },
-                  { name: "Clothing", id: "clothing" },
-                  {
-                    name: "Surfboard Accessories",
-                    id: "surfboard accessories",
-                  },
-                ].map((category) => (
-                  <button
-                    key={category.id}
-                    type="button"
-                    onClick={() => {
-                      onNavigate("products", category.id);
-                      setShopMenuOpen(false);
-                    }}
-                  >
-                    {category.name}
-                  </button>
-                ))}
+                {shopMenuOpen && (
+                  <div className="ps-nav-dropdown">
+                    {[
+                      { name: "All Products", id: "" },
+                      { name: "Surfboards", id: "surfboards" },
+                      { name: "Wetsuits", id: "wetsuits" },
+                      { name: "Clothing", id: "clothing" },
+                      {
+                        name: "Surfboard Accessories",
+                        id: "surfboard accessories",
+                      },
+                    ].map((category) => (
+                      <button
+                        key={category.id}
+                        type="button"
+                        onClick={() => {
+                          onNavigate("products", category.id);
+                          setShopMenuOpen(false);
+                        }}
+                      >
+                        {category.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
 
-          <button
-            type="button"
-            className={`ps-nav-link ${currentPage === "size-charts" ? "active" : ""}`}
-            onClick={() => onNavigate("size-charts")}
-          >
-            Size Chart
-          </button>
+              <button
+                type="button"
+                className={`ps-nav-link ${currentPage === "size-charts" ? "active" : ""}`}
+                onClick={() => onNavigate("size-charts")}
+              >
+                Size Chart
+              </button>
 
-          <button
-            type="button"
-            className={`ps-nav-link ${currentPage === "contact" ? "active" : ""}`}
-            onClick={() => onNavigate("contact")}
-          >
-            Contact
-          </button>
+              <button
+                type="button"
+                className={`ps-nav-link ${currentPage === "contact" ? "active" : ""}`}
+                onClick={() => onNavigate("contact")}
+              >
+                Contact
+              </button>
+            </>
+          )}
 
-          {/* Only admins should see the order management link. */}
-          {/* This keeps the customer navigation clean while exposing the dashboard. */}
           {isAdmin && (
             <>
+              <button
+                type="button"
+                className={`ps-nav-link ${currentPage === "admin-dashboard" ? "active" : ""}`}
+                onClick={() => onNavigate("admin-dashboard")}
+              >
+                Dashboard
+              </button>
               <button
                 type="button"
                 className={`ps-nav-link ${currentPage === "manage-orders" ? "active" : ""}`}
@@ -141,6 +152,13 @@ function Header({
                 onClick={() => onNavigate("manage-products")}
               >
                 Manage products
+              </button>
+              <button
+                type="button"
+                className={`ps-nav-link ${currentPage === "manage-customers" ? "active" : ""}`}
+                onClick={() => onNavigate("manage-customers")}
+              >
+                Manage customers
               </button>
             </>
           )}

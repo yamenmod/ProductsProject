@@ -9,6 +9,8 @@ import SizeCharts from "./pages/SizeCharts";
 import Cart from "./pages/Cart";
 import ManageOrders from "./pages/ManageOrders";
 import ManageProducts from "./pages/ManageProducts";
+import ManageCustomers from "./pages/ManageCustomers";
+import AdminDashboard from "./pages/AdminDashboard";
 
 const normalizeCartItems = (items = []) =>
   (Array.isArray(items) ? items : []).map((item) => {
@@ -57,7 +59,7 @@ function App() {
   const [cartItems, setCartItems] = useState([]);
 
   // Restore the saved session so refreshes keep the user logged in.
-  // If a session exists, the app starts on the home page.
+  // If a session exists, admin users are taken to the admin dashboard.
   useEffect(() => {
     const savedSession = localStorage.getItem("session");
     if (savedSession) {
@@ -68,7 +70,9 @@ function App() {
         ...parsedSession,
         preferredGender: normalizedGender,
       });
-      setCurrentPage("home");
+      setCurrentPage(
+        parsedSession.user?.role === "admin" ? "admin-dashboard" : "home",
+      );
     }
   }, []);
 
@@ -99,11 +103,21 @@ function App() {
   // Central navigation handler used by the header and page buttons.
   // It also blocks non-admin users from opening the admin orders page.
   const handleNavigate = (page, category) => {
+    const isAdmin = session?.user?.role === "admin";
+
     if (
-      (page === "manage-orders" || page === "manage-products") &&
-      session?.user?.role !== "admin"
+      ["manage-orders", "manage-products", "manage-customers", "admin-dashboard"].includes(page) &&
+      !isAdmin
     ) {
       setCurrentPage("home");
+      return;
+    }
+
+    if (
+      isAdmin &&
+      ["home", "shop", "size-charts", "contact", "products", "cart"].includes(page)
+    ) {
+      setCurrentPage("admin-dashboard");
       return;
     }
 
@@ -217,7 +231,9 @@ function App() {
 
           localStorage.setItem("session", JSON.stringify(nextSession));
           setSession(nextSession);
-          setCurrentPage("home");
+          setCurrentPage(
+            authSession.user?.role === "admin" ? "admin-dashboard" : "home",
+          );
         }}
       />
     );
@@ -336,6 +352,34 @@ function App() {
   if (currentPage === "manage-products") {
     return (
       <ManageProducts
+        session={session}
+        currentPage={currentPage}
+        onNavigate={handleNavigate}
+        preferredGender={preferredGender}
+        onPreferredGenderChange={handlePreferredGenderChange}
+        onLogout={logout}
+        cartCount={cartCount}
+      />
+    );
+  }
+
+  if (currentPage === "manage-customers") {
+    return (
+      <ManageCustomers
+        session={session}
+        currentPage={currentPage}
+        onNavigate={handleNavigate}
+        preferredGender={preferredGender}
+        onPreferredGenderChange={handlePreferredGenderChange}
+        onLogout={logout}
+        cartCount={cartCount}
+      />
+    );
+  }
+
+  if (currentPage === "admin-dashboard") {
+    return (
+      <AdminDashboard
         session={session}
         currentPage={currentPage}
         onNavigate={handleNavigate}
