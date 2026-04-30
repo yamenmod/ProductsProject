@@ -10,6 +10,23 @@ function Header({
   cartCount = 0,
 }) {
   const [shopMenuOpen, setShopMenuOpen] = useState(false);
+  const [logoutPromptOpen, setLogoutPromptOpen] = useState(false);
+
+  const handleLogoutClick = () => {
+    setLogoutPromptOpen(true);
+  };
+
+  const handleConfirmLogout = () => {
+    setLogoutPromptOpen(false);
+    if (typeof onLogout === "function") {
+      onLogout();
+    }
+  };
+
+  const handleCancelLogout = () => {
+    setLogoutPromptOpen(false);
+  };
+
   // Shop is active for both the category landing page and the product list.
   // Admin users get one extra navigation item for the order management page.
   const shopActive =
@@ -195,12 +212,49 @@ function Header({
           <button
             type="button"
             className="ps-btn ps-btn-secondary"
-            onClick={onLogout}
+            onClick={handleLogoutClick}
           >
             Logout
           </button>
         </div>
       </div>
+
+      {logoutPromptOpen && (
+        <div className="ps-cartConfirmBackdrop" onClick={handleCancelLogout}>
+          <div
+            className="ps-cartConfirmCard"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Confirm logout"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <p className="ps-pill" style={{ margin: 0, width: "fit-content" }}>
+              Confirm sign out
+            </p>
+            <h2 className="ps-cartConfirmTitle">Sign out of your account?</h2>
+            <p className="ps-cartConfirmText">
+              You are about to end your session. If you finish any active tasks,
+              you can sign back in at any time.
+            </p>
+            <div className="ps-cartConfirmActions">
+              <button
+                type="button"
+                className="ps-btn ps-cartConfirmCancel"
+                onClick={handleCancelLogout}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="ps-btn ps-cartConfirmDelete"
+                onClick={handleConfirmLogout}
+              >
+                Sign out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </header>
   );
 }

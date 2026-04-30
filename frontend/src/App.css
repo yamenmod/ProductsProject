@@ -918,16 +918,24 @@ textarea {
 
 .ps-cartConfirmBackdrop {
   position: fixed;
-  inset: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
   z-index: 2100;
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 20px;
-  background: rgba(10, 16, 20, 0.62);
+  background: rgba(255, 255, 255, 0.35);
   backdrop-filter: blur(6px);
 }
 
 .ps-cartConfirmCard {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   width: min(460px, 100%);
   display: grid;
   gap: 14px;
@@ -936,6 +944,7 @@ textarea {
   border: 1px solid rgba(31, 24, 19, 0.1);
   background: linear-gradient(180deg, #fffaf2 0%, #fff5e8 100%);
   box-shadow: 0 22px 56px rgba(15, 20, 24, 0.32);
+  z-index: 2200;
 }
 
 .ps-cartConfirmTitle {

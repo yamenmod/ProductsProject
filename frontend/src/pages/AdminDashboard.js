@@ -49,7 +49,7 @@ function AdminDashboard({
       [...products]
         .filter((product) => {
           const stock = Number(product?.stock ?? 0);
-          return stock >= 2 && stock <= 4;
+          return stock >= 0 && stock <= 4;
         })
         .sort((left, right) => Number(left?.stock ?? 0) - Number(right?.stock ?? 0)),
     [products],
@@ -185,7 +185,7 @@ function AdminDashboard({
               <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", marginBottom: "18px" }}>
                 <div>
                   <h2 style={{ margin: "0 0 8px", fontSize: "24px" }}>Stock watchlist</h2>
-                  <p style={{ margin: 0, color: "#5e5148" }}>Products with 2 to 4 units left.</p>
+                  <p style={{ margin: 0, color: "#5e5148" }}>Out of stock products first, then products with 1 to 4 units remaining.</p>
                 </div>
                 <button type="button" className="ps-btn ps-btn-primary" onClick={() => onNavigate("manage-products")}>Open products</button>
               </div>
@@ -194,18 +194,27 @@ function AdminDashboard({
                 <p className="ps-lead">Loading inventory...</p>
               ) : lowStockProducts.length ? (
                 <div style={{ display: "grid", gap: "10px" }}>
-                  {lowStockProducts.map((product) => (
-                    <div key={product.id || product._id} style={{ padding: "12px 14px", borderRadius: "14px", background: "rgba(36, 88, 96, 0.06)", border: "1px solid rgba(36, 88, 96, 0.12)" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", gap: "10px" }}>
-                        <strong>{product.name}</strong>
-                        <span style={{ color: "#245860", fontWeight: 800 }}>Stock {Number(product.stock ?? 0)}</span>
+                  {lowStockProducts.map((product) => {
+                    const stock = Number(product.stock ?? 0);
+                    const statusLabel = stock === 0 ? "Out of stock" : "Low stock";
+                    const statusColor = stock === 0 ? "#a83f34" : "#245860";
+
+                    return (
+                      <div key={product.id || product._id} style={{ padding: "12px 14px", borderRadius: "14px", background: "rgba(36, 88, 96, 0.06)", border: "1px solid rgba(36, 88, 96, 0.12)" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", gap: "10px" }}>
+                          <strong>{product.name}</strong>
+                          <span style={{ color: statusColor, fontWeight: 800 }}>{statusLabel}</span>
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", gap: "10px", marginTop: "6px", alignItems: "center" }}>
+                          <div style={{ color: "#5e5148", fontSize: "13px" }}>{product.category || "Uncategorized"}</div>
+                          <span style={{ color: "#245860", fontWeight: 700 }}>Stock {stock}</span>
+                        </div>
                       </div>
-                      <div style={{ color: "#5e5148", fontSize: "13px", marginTop: "4px" }}>{product.category || "Uncategorized"}</div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
-                <p className="ps-lead">No products are currently in the 2 to 4 stock range.</p>
+                <p className="ps-lead">No products are currently out of stock or low on stock (1-4 units).</p>
               )}
             </div>
 
