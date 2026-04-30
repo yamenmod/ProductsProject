@@ -96,6 +96,27 @@ const initDatabase = async () => {
       MODIFY COLUMN gender ENUM('male', 'female', 'unisex') NOT NULL DEFAULT 'unisex'
     `);
   }
+
+  // Create settings table for VAT and other configs
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS settings (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      key_name VARCHAR(100) NOT NULL UNIQUE,
+      value LONGTEXT NOT NULL,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )
+  `);
+
+  // Initialize VAT rate if not already set
+  const [existingVat] = await db.query(
+    "SELECT * FROM settings WHERE key_name = 'vat_rate'"
+  );
+
+  if (!existingVat || existingVat.length === 0) {
+    await db.query(
+      "INSERT INTO settings (key_name, value) VALUES ('vat_rate', '0.18')"
+    );
+  }
 };
 
 module.exports = initDatabase;

@@ -1,4 +1,5 @@
 const db = require("../db/connection");
+const { calculateVatPricing, roundMoney, getVatRateFromDb } = require("../utils/pricing");
 
 const resolvePrimaryImage = (value) => {
   if (!value) {
@@ -67,13 +68,14 @@ const resolvePrimaryImage = (value) => {
 
 // Converts raw cart rows into the shape the frontend already expects.
 // This keeps the API response consistent across cart actions.
-const mapCartRows = (rows) =>
+const mapCartRows = (rows, vatRate = 0.18) =>
   rows.map((row) => ({
     product: {
       _id: row.id,
       id: row.id,
       name: row.name,
-      price: Number(row.price),
+      price: roundMoney(row.price),
+      ...calculateVatPricing(row.price, vatRate),
       stock: Number(row.stock),
       category: row.category || "",
       image: resolvePrimaryImage(row.image_url),
@@ -85,6 +87,8 @@ const mapCartRows = (rows) =>
 // The query joins products and categories so the frontend can render details.
 const getCart = async (req, res) => {
   try {
+    const vatRate = await getVatRateFromDb(db);
+    
     const [rows] = await db.query(
       `
         SELECT
@@ -104,7 +108,7 @@ const getCart = async (req, res) => {
       [req.user.id],
     );
 
-    return res.status(200).json(mapCartRows(rows));
+    return res.status(200).json(mapCartRows(rows, vatRate));
   } catch (error) {
     return res.status(500).json({ message: "Server error" });
   }
@@ -114,6 +118,7 @@ const getCart = async (req, res) => {
 // It validates the product first, then returns the refreshed cart state.
 const addToCart = async (req, res) => {
   try {
+    const vatRate = await getVatRateFromDb(db);
     const { productId, quantity } = req.body;
     const sourcePage = req.headers["x-source-page"] || "unknown";
 
@@ -185,7 +190,7 @@ const addToCart = async (req, res) => {
       [req.user.id],
     );
 
-    return res.status(200).json(mapCartRows(rows));
+    return res.status(200).json(mapCartRows(rows, vatRate));
   } catch (error) {
     console.error(`[cart:add] failed: ${error.message}`);
     return res.status(500).json({ message: "Server error" });
@@ -196,6 +201,7 @@ const addToCart = async (req, res) => {
 // The response again returns the updated cart so the UI stays in sync.
 const removeFromCart = async (req, res) => {
   try {
+    const vatRate = await getVatRateFromDb(db);
     const { productId } = req.params;
 
     await db.query(
@@ -222,7 +228,7 @@ const removeFromCart = async (req, res) => {
       [req.user.id],
     );
 
-    return res.status(200).json(mapCartRows(rows));
+    return res.status(200).json(mapCartRows(rows, vatRate));
   } catch (error) {
     return res.status(500).json({ message: "Server error" });
   }
@@ -282,14 +288,18 @@ const checkout = async (req, res) => {
           [Number(item.quantity), item.id],
         );
 
-        const subtotal = Number(item.price) * Number(item.quantity);
-        total += subtotal;
+        const pricing = calculateVatPricing(item.price);
+        const subtotal = roundMoney(pricing.finalPrice * Number(item.quantity));
+        total = roundMoney(total + subtotal);
 
         items.push({
           product: item.id,
           name: item.name,
-          price: Number(item.price),
+          basePrice: pricing.basePrice,
+          vatAmount: pricing.vatAmount,
+          finalPrice: pricing.finalPrice,
           quantity: Number(item.quantity),
+          subtotal,
         });
       }
 
@@ -305,7 +315,7 @@ const checkout = async (req, res) => {
             orderResult.insertId,
             item.product,
             item.name,
-            item.price,
+            item.finalPrice,
             item.quantity,
           ],
         );
@@ -322,7 +332,7 @@ const checkout = async (req, res) => {
         order: {
           id: orderResult.insertId,
           items,
-          total,
+          total: roundMoney(total),
           status: "paid",
         },
       });

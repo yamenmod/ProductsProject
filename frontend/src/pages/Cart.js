@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
+import { getBasePrice, getDisplayPrice, getVatAmount, fetchVatRate } from "../utils/pricing";
 
 function Cart({
   session,
@@ -55,6 +56,132 @@ function Cart({
     setDisplayItems(cartItems);
   }, [cartItems]);
 
+  const parseImageValue = (value) => {
+    if (!value) {
+      return [];
+    }
+
+    if (Array.isArray(value)) {
+      return value.flatMap((item) => parseImageValue(item));
+    }
+
+    if (typeof value !== "string") {
+      return [];
+    }
+
+    const trimmed = value.trim();
+
+    if (!trimmed) {
+      return [];
+    }
+
+    if (trimmed.startsWith("[")) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          return parsed.flatMap((item) => parseImageValue(item));
+        }
+      } catch (error) {
+        // fallback to loose parsing
+      }
+
+      return trimmed
+        .slice(1, -1)
+        .split(",")
+        .map((part) => part.trim().replace(/^['"]+|['"]+$/g, ""))
+        .filter(Boolean);
+    }
+
+    const values = trimmed.includes(",")
+      ? trimmed
+          .split(",")
+          .map((part) => part.trim().replace(/^['"]+|['"]+$/g, ""))
+      : [trimmed];
+
+    return values
+      .map((part) => part.replace(/\\/g, "/").trim())
+      .map((part) => {
+        if (!part) {
+          return "";
+        }
+
+        if (part === "[]" || part.endsWith("/[]")) {
+          return "";
+        }
+
+        if (part.toLowerCase().startsWith("data:image/")) {
+          return part;
+        }
+
+        if (part.toLowerCase().startsWith("data:")) {
+          return "";
+        }
+
+        if (part.toLowerCase().startsWith("blob:")) {
+          return "";
+        }
+
+        if (
+          (part.startsWith("http://") || part.startsWith("https://")) &&
+          part.includes("localhost:5000")
+        ) {
+          try {
+            return new URL(part).pathname || "";
+          } catch (error) {
+            return part;
+          }
+        }
+
+        return part;
+      })
+      .filter(Boolean);
+  };
+
+  const resolveImageSrc = (imagePath) => {
+    if (!imagePath) {
+      return "https://via.placeholder.com/120x120?text=No+Image";
+    }
+
+    const normalized = imagePath.replace(/\\/g, "/").trim();
+
+    if (normalized.startsWith("http://") || normalized.startsWith("https://")) {
+      return normalized;
+    }
+
+    if (normalized.startsWith("/uploads/") || normalized.startsWith("/public/")) {
+      return `http://localhost:5000${normalized}`;
+    }
+
+    if (normalized.startsWith("uploads/") || normalized.startsWith("public/")) {
+      return `http://localhost:5000/${normalized}`;
+    }
+
+    if (normalized.startsWith("assets/img/products/")) {
+      return `http://localhost:5000/public/${normalized}`;
+    }
+
+    if (normalized.startsWith("/assets/img/products/")) {
+      return `http://localhost:5000/public${normalized}`;
+    }
+
+    return `http://localhost:5000/public/assets/img/products/${normalized.replace(/^\/+/, "")}`;
+  };
+
+  const getProductImages = (product) => {
+    const rawImages = [
+      ...parseImageValue(product?.image_urls),
+      ...parseImageValue(product?.imageUrls),
+      ...parseImageValue(product?.image_url),
+      ...parseImageValue(product?.image),
+    ];
+
+    const uniqueImages = [...new Set(rawImages.filter(Boolean))];
+
+    return uniqueImages.length
+      ? uniqueImages.map((imagePath) => resolveImageSrc(imagePath))
+      : [resolveImageSrc("")];
+  };
+
   useEffect(() => {
     const normalizeCartItems = (items = []) =>
       (Array.isArray(items) ? items : []).map((item) => {
@@ -86,6 +213,7 @@ function Cart({
       }
 
       try {
+        await fetchVatRate();
         const response = await axios.get("/api/cart", {
           headers: {
             Authorization: `Bearer ${session.token}`,
@@ -102,7 +230,8 @@ function Cart({
   }, [session?.token]);
 
   const totalPrice = displayItems.reduce(
-    (total, item) => total + (Number(item.price) || 0) * (Number(item.quantity) || 1),
+    (total, item) =>
+      total + getDisplayPrice(item) * (Number(item.quantity) || 1),
     0,
   );
 
@@ -164,14 +293,35 @@ function Cart({
                   }}
                 >
                   <img
-                    src={
-                      item.image ||
-                      item.image_urls ||
-                      item.imageUrl ||
-                      item.image_url ||
-                      "https://via.placeholder.com/120x120?text=No+Image"
-                    }
+                    src={getProductImages(item)[0]}
                     alt={item.name || "Cart product"}
+                    onError={(e) => {
+                      try {
+                        if (!e?.target) return;
+                        if (e.target.dataset?.imgerror) return;
+                        e.target.dataset.imgerror = "1";
+
+                        // try resolved candidates
+                        const candidates = getProductImages(item);
+                        for (const c of candidates) {
+                          if (c && c !== e.target.src) {
+                            e.target.src = c;
+                            return;
+                          }
+                        }
+
+                        // try building from basename to /uploads/
+                        const fallback = (item?.image || item?.image_url || "").toString().split("/").pop();
+                        if (fallback) {
+                          e.target.src = `http://localhost:5000/uploads/${fallback}`;
+                          return;
+                        }
+
+                        e.target.src = "https://via.placeholder.com/120x120?text=No+Image";
+                      } catch (err) {
+                        e.target.src = "https://via.placeholder.com/120x120?text=No+Image";
+                      }
+                    }}
                     style={{
                       width: "120px",
                       height: "120px",
@@ -188,7 +338,15 @@ function Cart({
                       {item.category || ""}
                     </p>
                     <p style={{ margin: 0, color: "#1f1813", fontWeight: 700 }}>
-                      ${(Number(item.price) || 0).toFixed(2)} x {item.quantity || 1}
+                      <span style={{ display: "block", color: "#8d8178", textDecoration: "line-through", fontSize: "12px", fontWeight: 600 }}>
+                        ${getBasePrice(item).toFixed(2)}
+                      </span>
+                      <span style={{ display: "block", fontSize: "14px", color: "#65574d", marginTop: "4px" }}>
+                        + ${getVatAmount(item).toFixed(2)} VAT
+                      </span>
+                      <span style={{ display: "block", fontSize: "18px", fontWeight: 800, color: "#1f1813", marginTop: "4px" }}>
+                        ${getDisplayPrice(item).toFixed(2)} x {item.quantity || 1}
+                      </span>
                     </p>
                   </div>
                   <div

@@ -6,6 +6,7 @@ const authRoutes = require("./routes/authRoutes");
 const cartRoutes = require("./routes/cartRoutes");
 const categoryRoutes = require("./routes/categoryRoutes");
 const adminRoutes = require("./routes/adminRoutes");
+const assistantRoutes = require("./routes/assistant");
 const initDatabase = require("./db/init");
 
 const app = express();
@@ -28,6 +29,7 @@ app.use("/api/products", productRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/cart", cartRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/assistant", assistantRoutes);
 app.use("/api/categories", categoryRoutes);
 
 app.use((error, req, res, next) => {

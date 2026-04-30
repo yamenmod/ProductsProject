@@ -16,6 +16,7 @@ function ManageCustomers({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [actionMessage, setActionMessage] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
@@ -41,6 +42,18 @@ function ManageCustomers({
   useEffect(() => {
     loadUsers();
   }, [loadUsers]);
+
+  const filteredUsers = users.filter((user) => {
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+
+    if (!normalizedSearch) {
+      return true;
+    }
+
+    return [user.username, user.email].some((value) =>
+      (value || "").toString().toLowerCase().includes(normalizedSearch),
+    );
+  });
 
   const handleDelete = async (userId) => {
     if (userId === session.user.id) {
@@ -91,6 +104,24 @@ function ManageCustomers({
             </p>
           </div>
 
+          <div style={{ marginBottom: "18px" }}>
+            <input
+              type="search"
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder="Search by username or email"
+              style={{
+                width: "100%",
+                maxWidth: "520px",
+                padding: "12px 14px",
+                border: "1px solid rgba(31, 24, 19, 0.14)",
+                borderRadius: "12px",
+                background: "rgba(255, 250, 242, 0.95)",
+                fontSize: "14px",
+              }}
+            />
+          </div>
+
           {actionMessage && (
             <div className="ps-surface" style={{ padding: "16px 18px", marginBottom: "18px" }}>
               <p style={{ margin: 0 }}>{actionMessage}</p>
@@ -126,7 +157,7 @@ function ManageCustomers({
                   </tr>
                 </thead>
                 <tbody>
-                  {users.map((user) => (
+                  {filteredUsers.map((user) => (
                     <tr key={user.id} style={{ borderTop: "1px solid rgba(31, 24, 19, 0.08)" }}>
                       <td style={{ padding: "14px 10px", color: "#1f1813" }}>{user.username}</td>
                       <td style={{ padding: "14px 10px", color: "#65574d" }}>{user.email}</td>
@@ -148,6 +179,11 @@ function ManageCustomers({
                   ))}
                 </tbody>
               </table>
+            )}
+            {!loading && !error && filteredUsers.length === 0 && (
+              <p style={{ marginTop: "12px", color: "#65574d" }}>
+                No customers match your search.
+              </p>
             )}
           </div>
         </div>

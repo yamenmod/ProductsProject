@@ -1,4 +1,5 @@
 const db = require("../db/connection");
+const { calculateVatPricing, roundMoney, getVatRateFromDb } = require("../utils/pricing");
 
 const PRODUCT_IMAGE_DIR = "/public/assets/img/products";
 
@@ -221,12 +222,13 @@ const normalizeGenderInput = (value) => {
   return "unisex";
 };
 
-const normalizeProduct = (row) => ({
+const normalizeProduct = (row, vatRate = 0.18) => ({
   _id: row.id,
   id: row.id,
   name: row.name,
   description: row.description,
-  price: Number(row.price),
+  price: roundMoney(row.price),
+  ...calculateVatPricing(row.price, vatRate),
   stock: Number(row.stock),
   category_id: row.category_id,
   category: row.category || "",
@@ -263,6 +265,8 @@ const resolveCategoryId = async (categoryName) => {
 
 const getProducts = async (req, res) => {
   try {
+    const vatRate = await getVatRateFromDb(db);
+    
     const [products] = await db.query(
       `
         SELECT
@@ -283,7 +287,7 @@ const getProducts = async (req, res) => {
       `,
     );
 
-    const response = products.map(normalizeProduct);
+    const response = products.map((product) => normalizeProduct(product, vatRate));
     return res.status(200).json(response);
   } catch (error) {
     return res.status(500).json({ message: "Server error" });
@@ -292,6 +296,8 @@ const getProducts = async (req, res) => {
 
 const getProductById = async (req, res) => {
   try {
+    const vatRate = await getVatRateFromDb(db);
+    
     const [products] = await db.query(
       `
         SELECT
@@ -318,7 +324,7 @@ const getProductById = async (req, res) => {
       return res.status(404).json({ message: "Product not found" });
     }
 
-    return res.status(200).json(normalizeProduct(products[0]));
+    return res.status(200).json(normalizeProduct(products[0], vatRate));
   } catch (error) {
     return res.status(500).json({ message: "Server error" });
   }
@@ -370,7 +376,7 @@ const createProduct = async (req, res) => {
       [
         name.trim(),
         description || "",
-        Number(price),
+        calculateVatPricing(price).basePrice,
         stock === undefined ? 0 : Number(stock),
         categoryId,
         nextGender,
@@ -400,7 +406,7 @@ const createProduct = async (req, res) => {
       [insertResult.insertId],
     );
 
-    return res.status(201).json(normalizeProduct(createdRows[0]));
+    return res.status(201).json(normalizeProduct(createdRows[0], await getVatRateFromDb(db)));
   } catch (error) {
     console.error("Create product error:", error);
     return res.status(500).json({ message: error.message || "Server error" });
@@ -450,7 +456,7 @@ const updateProduct = async (req, res) => {
 
     const nextName = name !== undefined ? name.trim() : existingProduct.name;
     const nextPrice =
-      price !== undefined ? Number(price) : Number(existingProduct.price);
+      price !== undefined ? calculateVatPricing(price).basePrice : Number(existingProduct.price);
 
     if (!nextName || Number.isNaN(nextPrice)) {
       return res.status(400).json({ message: "Name and price are required" });
@@ -509,7 +515,7 @@ const updateProduct = async (req, res) => {
       [req.params.id],
     );
 
-    return res.status(200).json(normalizeProduct(updatedRows[0]));
+    return res.status(200).json(normalizeProduct(updatedRows[0], await getVatRateFromDb(db)));
   } catch (error) {
     console.error("Update product error:", error);
     return res.status(500).json({ message: error.message || "Server error" });

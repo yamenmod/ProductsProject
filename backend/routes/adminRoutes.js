@@ -1,21 +1,22 @@
 const express = require("express");
 const authMiddleware = require("../middleware/authMiddleware");
 const adminMiddleware = require("../middleware/adminMiddleware");
-<<<<<<< HEAD
-const { getCustomers } = require("../controllers/customerController");
+const { getCustomers, deleteCustomer } = require("../controllers/customerController");
+const { getSetting, getAllSettings, updateSetting } = require("../controllers/settingsController");
 
 const router = express.Router();
 
+router.get("/users", authMiddleware, adminMiddleware, getCustomers);
+router.delete("/users/:userId", authMiddleware, adminMiddleware, deleteCustomer);
 router.get("/customers", authMiddleware, adminMiddleware, getCustomers);
+router.delete("/customers/:userId", authMiddleware, adminMiddleware, deleteCustomer);
+
+// Settings endpoints (admin only)
+router.get("/settings", authMiddleware, adminMiddleware, getAllSettings);
+router.get("/settings/:key", authMiddleware, adminMiddleware, getSetting);
+router.put("/settings/:key", authMiddleware, adminMiddleware, updateSetting);
+
+// Public endpoint to get current VAT rate (no auth required)
+router.get("/vat-rate", getSetting);
 
 module.exports = router;
-=======
-const { getAllUsers, deleteUser } = require("../controllers/adminController");
-
-const router = express.Router();
-
-router.get("/users", authMiddleware, adminMiddleware, getAllUsers);
-router.delete("/users/:id", authMiddleware, adminMiddleware, deleteUser);
-
-module.exports = router;
->>>>>>> 9abd17a2b135d79ae7c5870af8a853e6eba0e9d1

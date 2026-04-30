@@ -56,6 +56,7 @@ function App() {
   const [session, setSession] = useState(null);
   const [currentPage, setCurrentPage] = useState("home");
   const [selectedCategory, setSelectedCategory] = useState("");
+  const [selectedOrderFilter, setSelectedOrderFilter] = useState("all");
   const [cartItems, setCartItems] = useState([]);
 
   // Restore the saved session so refreshes keep the user logged in.
@@ -122,7 +123,11 @@ function App() {
     }
 
     setCurrentPage(page);
-    if (typeof category !== "undefined") {
+    if (page === "manage-orders" && typeof category === "string") {
+      setSelectedOrderFilter(category);
+    }
+
+    if (page !== "manage-orders" && typeof category !== "undefined") {
       setSelectedCategory(category);
     }
   };
@@ -345,6 +350,7 @@ function App() {
         onPreferredGenderChange={handlePreferredGenderChange}
         onLogout={logout}
         cartCount={cartCount}
+        initialFilter={selectedOrderFilter}
       />
     );
   }
@@ -387,6 +393,10 @@ function App() {
         onPreferredGenderChange={handlePreferredGenderChange}
         onLogout={logout}
         cartCount={cartCount}
+        onOpenOrders={(filter) => {
+          setSelectedOrderFilter(filter);
+          setCurrentPage("manage-orders");
+        }}
       />
     );
   }

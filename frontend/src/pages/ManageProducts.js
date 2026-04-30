@@ -34,6 +34,8 @@ function ManageProducts({
   const [swipeStartX, setSwipeStartX] = useState(null);
   const [cardImageIndices, setCardImageIndices] = useState({});
   const [selectedImagePreviewUrls, setSelectedImagePreviewUrls] = useState([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
   const fileInputRef = React.useRef(null);
 
   const normalizeGenderValue = (value) => {
@@ -428,6 +430,19 @@ function ManageProducts({
     "Surfboard Accessories",
   ];
 
+  const visibleProducts = products.filter((product) => {
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+    const matchesSearch = !normalizedSearch
+      ? true
+      : (product.name || "").toString().toLowerCase().includes(normalizedSearch);
+
+    const normalizedCategory = (product.category || "").toString().trim().toLowerCase();
+    const matchesCategory =
+      categoryFilter === "all" ? true : normalizedCategory === categoryFilter;
+
+    return matchesSearch && matchesCategory;
+  });
+
   return (
     <div className="ps-page">
       <Header
@@ -517,6 +532,52 @@ function ManageProducts({
               ✓ {success}
             </div>
           )}
+
+          <div
+            style={{
+              display: "flex",
+              gap: "12px",
+              flexWrap: "wrap",
+              marginBottom: "20px",
+            }}
+          >
+            <input
+              type="search"
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder="Search products by name"
+              style={{
+                minWidth: "260px",
+                flex: "1 1 260px",
+                padding: "12px 14px",
+                border: "1px solid #d9c3ad",
+                borderRadius: "12px",
+                background: "#fffdf8",
+                fontSize: "14px",
+              }}
+            />
+
+            <select
+              value={categoryFilter}
+              onChange={(event) => setCategoryFilter(event.target.value)}
+              style={{
+                minWidth: "240px",
+                padding: "12px 14px",
+                border: "1px solid #d9c3ad",
+                borderRadius: "12px",
+                background: "#fffdf8",
+                fontSize: "14px",
+                cursor: "pointer",
+              }}
+            >
+              <option value="all">All categories</option>
+              {categories.slice(1).map((category) => (
+                <option key={category} value={category.toLowerCase()}>
+                  {category}
+                </option>
+              ))}
+            </select>
+          </div>
 
           <button
             onClick={() => {
@@ -942,7 +1003,7 @@ function ManageProducts({
               letterSpacing: "0.5px",
             }}
           >
-            All Products ({products.length})
+            All Products ({visibleProducts.length})
           </h3>
 
           <div
@@ -952,7 +1013,7 @@ function ManageProducts({
               gap: "20px",
             }}
           >
-            {products.map((product) => {
+            {visibleProducts.map((product) => {
               const productImages = getProductImages(product);
               const productId = product._id || product.id;
               const activeCardImageIndex = cardImageIndices[productId] || 0;
@@ -1155,6 +1216,12 @@ function ManageProducts({
               );
             })}
           </div>
+
+          {visibleProducts.length === 0 && (
+            <p style={{ marginTop: "18px", color: "#65574d" }}>
+              No products match your search or category filter.
+            </p>
+          )}
 
           {productToDelete && (
             <div

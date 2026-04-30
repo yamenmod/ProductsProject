@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
+import { getBasePrice, getDisplayPrice, getVatAmount } from "../utils/pricing";
 
 function Products({
   session,
@@ -722,11 +723,19 @@ function Products({
                       <p
                         style={{
                           margin: "0 0 6px 0",
-                          fontWeight: "700",
-                          color: "#1f1813",
+                          display: "grid",
+                          gap: "2px",
                         }}
                       >
-                        ${Number(product.price).toFixed(2)}
+                        <span style={{ color: "#8d8178", textDecoration: "line-through", fontSize: "12px", fontWeight: 600 }}>
+                          ${getBasePrice(product).toFixed(2)}
+                        </span>
+                        <span style={{ fontWeight: 800, color: "#1f1813", fontSize: "18px" }}>
+                          ${getDisplayPrice(product).toFixed(2)}
+                        </span>
+                        <span style={{ color: "#65574d", fontSize: "11px" }}>
+                          VAT ${getVatAmount(product).toFixed(2)} included
+                        </span>
                       </p>
                       <p style={{ margin: "0 0 6px 0", color: "#5f5550" }}>
                         Category: {product.category || "-"}
@@ -863,11 +872,17 @@ function Products({
                 style={{ gap: "12px", alignItems: "flex-start", flexDirection: "column" }}
               >
                 <div>
-                  <p className="ps-previewPrice">
-                    {Number.isFinite(Number(previewProduct.price))
-                      ? `$${Number(previewProduct.price).toFixed(2)}`
-                      : "View price"}
-                  </p>
+                  <div className="ps-previewPrice" style={{ display: "grid", gap: "2px" }}>
+                    <span style={{ color: "#8d8178", textDecoration: "line-through", fontSize: "14px", fontWeight: 600 }}>
+                      ${getBasePrice(previewProduct).toFixed(2)}
+                    </span>
+                    <span style={{ fontWeight: 800, color: "#1f1813", fontSize: "22px" }}>
+                      ${getDisplayPrice(previewProduct).toFixed(2)}
+                    </span>
+                    <span style={{ color: "#65574d", fontSize: "12px" }}>
+                      VAT ${getVatAmount(previewProduct).toFixed(2)} included
+                    </span>
+                  </div>
                   <p className="ps-previewStock">
                     Stock: {previewProduct.stock ?? 0}
                   </p>

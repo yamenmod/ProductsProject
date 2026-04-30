@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
+import Assistant from "../components/Assistant";
+import { getBasePrice, getDisplayPrice, getVatAmount, fetchVatRate } from "../utils/pricing";
 
 function Home({
   user,
@@ -489,11 +491,17 @@ function Home({
                     <h3 className="ps-dropName">
                       {product.name || "New product"}
                     </h3>
-                    <p className="ps-dropPrice">
-                      {Number.isFinite(Number(product.price))
-                        ? `$${Number(product.price).toFixed(2)}`
-                        : "View price"}
-                    </p>
+                    <div className="ps-dropPrice" style={{ display: "grid", gap: "2px" }}>
+                      <span style={{ color: "#8d8178", textDecoration: "line-through", fontSize: "13px", fontWeight: 600 }}>
+                        ${getBasePrice(product).toFixed(2)}
+                      </span>
+                      <span style={{ fontSize: "18px", fontWeight: 800, color: "#1f1813" }}>
+                        ${getDisplayPrice(product).toFixed(2)}
+                      </span>
+                      <span style={{ color: "#65574d", fontSize: "12px" }}>
+                        VAT ${getVatAmount(product).toFixed(2)} included
+                      </span>
+                    </div>
                     <button
                       type="button"
                       className="ps-btn ps-btn-primary"
@@ -694,11 +702,17 @@ function Home({
 
               <div className="ps-previewPurchaseRow" style={{ gap: "12px", alignItems: "flex-start", flexDirection: "column" }}>
                 <div>
-                  <p className="ps-previewPrice">
-                    {Number.isFinite(Number(previewProduct.price))
-                      ? `$${Number(previewProduct.price).toFixed(2)}`
-                      : "View price"}
-                  </p>
+                  <div className="ps-previewPrice" style={{ display: "grid", gap: "2px" }}>
+                    <span style={{ color: "#8d8178", textDecoration: "line-through", fontSize: "14px", fontWeight: 600 }}>
+                      ${getBasePrice(previewProduct).toFixed(2)}
+                    </span>
+                    <span style={{ fontSize: "22px", fontWeight: 800, color: "#1f1813" }}>
+                      ${getDisplayPrice(previewProduct).toFixed(2)}
+                    </span>
+                    <span style={{ color: "#65574d", fontSize: "12px" }}>
+                      VAT ${getVatAmount(previewProduct).toFixed(2)} included
+                    </span>
+                  </div>
                   <p className="ps-previewStock">
                     Stock: {previewProduct.stock ?? 0}
                   </p>
@@ -733,6 +747,7 @@ function Home({
       )}
 
       <Footer />
+      <Assistant session={session} user={user} />
     </div>
   );
 }
