@@ -3,7 +3,12 @@ import axios from "axios";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import Assistant from "../components/Assistant";
-import { getBasePrice, getDisplayPrice, getVatAmount, fetchVatRate } from "../utils/pricing";
+import {
+  getBasePrice,
+  getDisplayPrice,
+  getVatAmount,
+  fetchVatRate,
+} from "../utils/pricing";
 
 function Home({
   user,
@@ -481,40 +486,60 @@ function Home({
                       )}
                     </div>
 
-                    <div className="ps-dropMetaRow">
-                      <span className="ps-dropSwatch" />
-                      <span className="ps-dropCategory">
-                        {product.category || pill}
-                      </span>
-                    </div>
+                    <div className="ps-dropBody">
+                      <div className="ps-dropMetaRow">
+                        <span className="ps-dropSwatch" />
+                        <span className="ps-dropCategory">
+                          {product.category || pill}
+                        </span>
+                      </div>
 
-                    <h3 className="ps-dropName">
-                      {product.name || "New product"}
-                    </h3>
-                    <div className="ps-dropPrice" style={{ display: "grid", gap: "2px" }}>
-                      <span style={{ color: "#8d8178", textDecoration: "line-through", fontSize: "13px", fontWeight: 600 }}>
-                        ${getBasePrice(product).toFixed(2)}
-                      </span>
-                      <span style={{ fontSize: "18px", fontWeight: 800, color: "#1f1813" }}>
-                        ${getDisplayPrice(product).toFixed(2)}
-                      </span>
-                      <span style={{ color: "#65574d", fontSize: "12px" }}>
-                        VAT ${getVatAmount(product).toFixed(2)} included
-                      </span>
+                      <h3 className="ps-dropName">
+                        {product.name || "New product"}
+                      </h3>
+
+                      <div
+                        className="ps-dropPrice"
+                        style={{ display: "grid", gap: "2px" }}
+                      >
+                        <span
+                          style={{
+                            color: "#8d8178",
+                            textDecoration: "line-through",
+                            fontSize: "13px",
+                            fontWeight: 600,
+                          }}
+                        >
+                          ${getBasePrice(product).toFixed(2)}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: "18px",
+                            fontWeight: 800,
+                            color: "#1f1813",
+                          }}
+                        >
+                          ${getDisplayPrice(product).toFixed(2)}
+                        </span>
+                        <span style={{ color: "#65574d", fontSize: "12px" }}>
+                          VAT ${getVatAmount(product).toFixed(2)} included
+                        </span>
+                      </div>
                     </div>
                     <button
                       type="button"
                       className="ps-btn ps-btn-primary"
                       style={{
                         width: "100%",
-                        marginTop: "12px",
                         fontSize: "12px",
                         padding: "8px 12px",
                       }}
                       onClick={() => handleCardAddToCart(product)}
                       disabled={(product.stock ?? 0) < 1}
                     >
-                      {(product.stock ?? 0) < 1 ? "Out of Stock" : "Add to Cart"}
+                      {(product.stock ?? 0) < 1
+                        ? "Out of Stock"
+                        : "Add to Cart"}
                     </button>
                   </article>
                 );
@@ -700,13 +725,36 @@ function Home({
                 {previewProduct.description || "No description available yet."}
               </p>
 
-              <div className="ps-previewPurchaseRow" style={{ gap: "12px", alignItems: "flex-start", flexDirection: "column" }}>
+              <div
+                className="ps-previewPurchaseRow"
+                style={{
+                  gap: "12px",
+                  alignItems: "flex-start",
+                  flexDirection: "column",
+                }}
+              >
                 <div>
-                  <div className="ps-previewPrice" style={{ display: "grid", gap: "2px" }}>
-                    <span style={{ color: "#8d8178", textDecoration: "line-through", fontSize: "14px", fontWeight: 600 }}>
+                  <div
+                    className="ps-previewPrice"
+                    style={{ display: "grid", gap: "2px" }}
+                  >
+                    <span
+                      style={{
+                        color: "#8d8178",
+                        textDecoration: "line-through",
+                        fontSize: "14px",
+                        fontWeight: 600,
+                      }}
+                    >
                       ${getBasePrice(previewProduct).toFixed(2)}
                     </span>
-                    <span style={{ fontSize: "22px", fontWeight: 800, color: "#1f1813" }}>
+                    <span
+                      style={{
+                        fontSize: "22px",
+                        fontWeight: 800,
+                        color: "#1f1813",
+                      }}
+                    >
                       ${getDisplayPrice(previewProduct).toFixed(2)}
                     </span>
                     <span style={{ color: "#65574d", fontSize: "12px" }}>

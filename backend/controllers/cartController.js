@@ -1,5 +1,9 @@
 const db = require("../db/connection");
-const { calculateVatPricing, roundMoney, getVatRateFromDb } = require("../utils/pricing");
+const {
+  calculateVatPricing,
+  roundMoney,
+  getVatRateFromDb,
+} = require("../utils/pricing");
 
 const resolvePrimaryImage = (value) => {
   if (!value) {
@@ -17,6 +21,15 @@ const resolvePrimaryImage = (value) => {
   const trimmedValue = value.trim();
 
   if (!trimmedValue) {
+    return "";
+  }
+
+  // Handle empty brackets [] or [""]
+  if (
+    trimmedValue === "[]" ||
+    trimmedValue === '[""]' ||
+    trimmedValue === "['']"
+  ) {
     return "";
   }
 
@@ -44,6 +57,10 @@ const resolvePrimaryImage = (value) => {
 
       return `/uploads/${imageValue.replace(/^\/+/, "")}`;
     } catch (error) {
+      // If JSON parse fails and it's just brackets, return empty
+      if (trimmedValue === "[]" || trimmedValue.match(/^\[\s*\]$/)) {
+        return "";
+      }
       return trimmedValue;
     }
   }
@@ -64,6 +81,98 @@ const resolvePrimaryImage = (value) => {
   }
 
   return `/uploads/${trimmedValue.replace(/^\/+/, "")}`;
+};
+
+// quickCheckout allows purchasing a single product immediately without
+// mutating the user's cart. It mirrors the checkout logic but for one
+// specified product and quantity in the request body.
+const quickCheckout = async (req, res) => {
+  try {
+    const { productId, quantity } = req.body;
+
+    if (!productId) {
+      return res.status(400).json({ message: "Product ID is required" });
+    }
+
+    const qty = Number(quantity) > 0 ? Number(quantity) : 1;
+
+    const [products] = await db.query(
+      "SELECT id, name, price, stock FROM products WHERE id = ? LIMIT 1",
+      [productId],
+    );
+
+    if (!products.length) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    const product = products[0];
+
+    if (Number(product.stock) < qty) {
+      return res
+        .status(400)
+        .json({ message: `Not enough stock for ${product.name}` });
+    }
+
+    const connection = await db.getConnection();
+
+    try {
+      await connection.beginTransaction();
+
+      await connection.query(
+        "UPDATE products SET stock = stock - ?, updated_at = NOW() WHERE id = ?",
+        [qty, productId],
+      );
+
+      const pricing = calculateVatPricing(product.price);
+      const subtotal = roundMoney(pricing.finalPrice * qty);
+      const total = roundMoney(subtotal);
+
+      const [orderResult] = await connection.query(
+        "INSERT INTO orders (user_id, total, status, created_at) VALUES (?, ?, 'paid', NOW())",
+        [req.user.id, total],
+      );
+
+      await connection.query(
+        "INSERT INTO order_items (order_id, product_id, name, price, quantity) VALUES (?, ?, ?, ?, ?)",
+        [
+          orderResult.insertId,
+          productId,
+          product.name,
+          pricing.finalPrice,
+          qty,
+        ],
+      );
+
+      await connection.commit();
+      connection.release();
+
+      return res.status(200).json({
+        message: "Purchase completed successfully",
+        order: {
+          id: orderResult.insertId,
+          items: [
+            {
+              product: productId,
+              name: product.name,
+              basePrice: pricing.basePrice,
+              vatAmount: pricing.vatAmount,
+              finalPrice: pricing.finalPrice,
+              quantity: qty,
+              subtotal,
+            },
+          ],
+          total,
+          status: "paid",
+        },
+      });
+    } catch (transactionError) {
+      await connection.rollback();
+      connection.release();
+      return res.status(500).json({ message: "Server error" });
+    }
+  } catch (error) {
+    return res.status(500).json({ message: "Server error" });
+  }
 };
 
 // Converts raw cart rows into the shape the frontend already expects.
@@ -88,7 +197,7 @@ const mapCartRows = (rows, vatRate = 0.18) =>
 const getCart = async (req, res) => {
   try {
     const vatRate = await getVatRateFromDb(db);
-    
+
     const [rows] = await db.query(
       `
         SELECT
@@ -391,5 +500,6 @@ module.exports = {
   addToCart,
   removeFromCart,
   checkout,
+  quickCheckout,
   getAdminOrders,
 };

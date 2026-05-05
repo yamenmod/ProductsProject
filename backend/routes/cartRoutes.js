@@ -5,6 +5,7 @@ const {
   removeFromCart,
   checkout,
   getAdminOrders,
+  quickCheckout,
 } = require("../controllers/cartController");
 const authMiddleware = require("../middleware/authMiddleware");
 const adminMiddleware = require("../middleware/adminMiddleware");
@@ -17,6 +18,7 @@ router.get("/", authMiddleware, getCart);
 router.post("/", authMiddleware, addToCart);
 router.delete("/:productId", authMiddleware, removeFromCart);
 router.post("/checkout", authMiddleware, checkout);
+router.post("/quick", authMiddleware, quickCheckout);
 
 // Admin-only order listing used by the Manage orders page.
 // The admin middleware blocks everyone except users with the admin role.

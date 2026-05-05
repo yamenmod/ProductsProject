@@ -169,36 +169,44 @@ function SizeCharts({
     .slice(0, 4);
 
   const resolveImageSrc = (imagePath) => {
-    if (!imagePath) {
-      return "https://via.placeholder.com/420x520?text=Wetsuit";
-    }
+    if (!imagePath) return "https://via.placeholder.com/420x520?text=Wetsuit";
 
-    const normalized = imagePath.replace(/\\/g, "/").trim();
+    let normalized = imagePath.toString().replace(/\\/g, "/").trim();
+    normalized = normalized.replace(/\[|\]/g, "").trim();
+    if (!normalized) return "https://via.placeholder.com/420x520?text=Wetsuit";
 
     if (normalized.startsWith("http://") || normalized.startsWith("https://")) {
       return normalized;
     }
 
+    if (normalized.startsWith("/public/") || normalized.startsWith("public/")) {
+      const pathPart = normalized.startsWith("/")
+        ? normalized
+        : `/${normalized}`;
+      return `http://localhost:5000${pathPart}`;
+    }
+
     if (
       normalized.startsWith("/uploads/") ||
-      normalized.startsWith("/public/")
+      normalized.startsWith("uploads/")
     ) {
-      return `http://localhost:5000${normalized}`;
+      const pathPart = normalized.startsWith("/")
+        ? normalized
+        : `/${normalized}`;
+      return `http://localhost:5000${pathPart}`;
     }
 
-    if (normalized.startsWith("uploads/") || normalized.startsWith("public/")) {
-      return `http://localhost:5000/${normalized}`;
+    if (
+      /^[A-Za-z]:\\/.test(normalized) ||
+      normalized.includes("E:/") ||
+      normalized.includes(":/")
+    ) {
+      const filename = normalized.split(/\\|\//).pop();
+      return `http://localhost:5000/public/assets/img/products/${filename}`;
     }
 
-    if (normalized.startsWith("assets/img/products/")) {
-      return `http://localhost:5000/public/${normalized}`;
-    }
-
-    if (normalized.startsWith("/assets/img/products/")) {
-      return `http://localhost:5000/public${normalized}`;
-    }
-
-    return `http://localhost:5000/public/assets/img/products/${normalized.replace(/^\/+/, "")}`;
+    const filename = normalized.split("/").pop();
+    return `http://localhost:5000/public/assets/img/products/${filename}`;
   };
 
   const getProductImages = (product) => {
@@ -430,13 +438,15 @@ function SizeCharts({
               </p>
             </div>
 
-            <button
-              type="button"
-              className="ps-btn ps-btn-primary"
-              onClick={() => onNavigate("products", "wetsuits")}
-            >
-              View All Wetsuits
-            </button>
+            <div>
+              <button
+                type="button"
+                className="ps-btn ps-btn-primary"
+                onClick={() => onNavigate("products", "wetsuits")}
+              >
+                View All Wetsuits
+              </button>
+            </div>
           </div>
 
           <div className="ps-sizeChartProductGrid">
@@ -536,15 +546,19 @@ function SizeCharts({
                       </h3>
                       <button
                         type="button"
-                        className="ps-sizeChartAddButton"
+                        className="ps-btn ps-btn-primary"
+                        style={{
+                          width: "100%",
+                          marginTop: "12px",
+                          fontSize: "12px",
+                          padding: "8px 12px",
+                        }}
                         onClick={() => handleAddToCart(product)}
+                        disabled={(product.stock ?? 0) < 1}
                       >
-                        <img
-                          src="/CartLogo/AddToCartLogo.png"
-                          alt="Add to cart"
-                          className="ps-sizeChartAddIcon"
-                        />
-                        <span>Add to Cart</span>
+                        {(product.stock ?? 0) < 1
+                          ? "Out of Stock"
+                          : "Add to Cart"}
                       </button>
                     </div>
                   </article>

@@ -95,6 +95,41 @@ const initDatabase = async () => {
       ALTER TABLE products
       MODIFY COLUMN gender ENUM('male', 'female', 'unisex') NOT NULL DEFAULT 'unisex'
     `);
+
+    // Add board_length and volume columns if they don't exist
+    const [boardLengthColumnRows] = await db.query(
+      `
+        SELECT COUNT(*) AS total
+        FROM information_schema.columns
+        WHERE table_schema = DATABASE()
+          AND table_name = 'products'
+          AND column_name = 'board_length'
+      `,
+    );
+
+    if (boardLengthColumnRows[0]?.total === 0) {
+      await db.query(`
+        ALTER TABLE products
+        ADD COLUMN board_length DECIMAL(5, 2) NULL DEFAULT NULL
+      `);
+    }
+
+    const [volumeColumnRows] = await db.query(
+      `
+        SELECT COUNT(*) AS total
+        FROM information_schema.columns
+        WHERE table_schema = DATABASE()
+          AND table_name = 'products'
+          AND column_name = 'volume'
+      `,
+    );
+
+    if (volumeColumnRows[0]?.total === 0) {
+      await db.query(`
+        ALTER TABLE products
+        ADD COLUMN volume DECIMAL(5, 2) NULL DEFAULT NULL
+      `);
+    }
   }
 
   // Create settings table for VAT and other configs
@@ -109,12 +144,12 @@ const initDatabase = async () => {
 
   // Initialize VAT rate if not already set
   const [existingVat] = await db.query(
-    "SELECT * FROM settings WHERE key_name = 'vat_rate'"
+    "SELECT * FROM settings WHERE key_name = 'vat_rate'",
   );
 
   if (!existingVat || existingVat.length === 0) {
     await db.query(
-      "INSERT INTO settings (key_name, value) VALUES ('vat_rate', '0.18')"
+      "INSERT INTO settings (key_name, value) VALUES ('vat_rate', '0.18')",
     );
   }
 };

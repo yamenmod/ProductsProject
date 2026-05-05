@@ -2,7 +2,12 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
-import { getBasePrice, getDisplayPrice, getVatAmount, fetchVatRate } from "../utils/pricing";
+import {
+  getBasePrice,
+  getDisplayPrice,
+  getVatAmount,
+  fetchVatRate,
+} from "../utils/pricing";
 
 function Cart({
   session,
@@ -49,6 +54,39 @@ function Cart({
       console.error("Remove item failed:", error.message);
     } finally {
       setIsRemoving(false);
+    }
+  };
+
+  // Checkout the entire cart (backend will validate stock and create order)
+  const handleCheckout = async () => {
+    if (!session?.token) {
+      alert("Please sign in to complete purchases.");
+      return;
+    }
+
+    try {
+      const resp = await axios.post(
+        "/api/cart/checkout",
+        {},
+        { headers: { Authorization: `Bearer ${session.token}` } },
+      );
+
+      // Refresh cart (should be empty after successful checkout)
+      const refreshed = await axios.get("/api/cart", {
+        headers: { Authorization: `Bearer ${session.token}` },
+      });
+
+      setDisplayItems(Array.isArray(refreshed.data) ? refreshed.data : []);
+      alert(resp.data?.message || "Purchase completed successfully.");
+    } catch (error) {
+      console.error(
+        "Checkout failed:",
+        error?.response?.data || error.message || error,
+      );
+      const msg =
+        (error?.response?.data && error.response.data.message) ||
+        "Purchase failed. Please try again or contact support.";
+      alert(msg);
     }
   };
 
@@ -105,6 +143,14 @@ function Cart({
           return "";
         }
 
+        // If the string contains a filename (jpg/png/webp/gif), extract it.
+        const filenameMatch = part.match(
+          /([\w\-.]+\.(?:jpg|jpeg|png|gif|webp))(?:\?.*)?$/i,
+        );
+        if (filenameMatch) {
+          part = filenameMatch[1];
+        }
+
         if (part === "[]" || part.endsWith("/[]")) {
           return "";
         }
@@ -138,33 +184,58 @@ function Cart({
   };
 
   const resolveImageSrc = (imagePath) => {
-    if (!imagePath) {
-      return "https://via.placeholder.com/120x120?text=No+Image";
+    // sanitize empty or array-like values
+    if (!imagePath) return "https://via.placeholder.com/120x120?text=No+Image";
+
+    let normalized = imagePath.toString().replace(/\\/g, "/").trim();
+
+    // Handle backend bug: /uploads/[] should map to public/assets/img/products/
+    if (normalized === "/uploads/[]" || normalized === "uploads/[]") {
+      // Return empty to trigger fallback in onError handler
+      return "about:blank";
     }
 
-    const normalized = imagePath.replace(/\\/g, "/").trim();
+    // strip any stray brackets or empty-array markers
+    normalized = normalized.replace(/\[|\]/g, "").trim();
+    if (!normalized) return "https://via.placeholder.com/120x120?text=No+Image";
 
+    // if it's already a full URL, use it
     if (normalized.startsWith("http://") || normalized.startsWith("https://")) {
       return normalized;
     }
 
-    if (normalized.startsWith("/uploads/") || normalized.startsWith("/public/")) {
-      return `http://localhost:5000${normalized}`;
+    // If it's an absolute public path served by backend (/public/... or /uploads/...)
+    if (normalized.startsWith("/public/") || normalized.startsWith("public/")) {
+      // ensure leading slash for server mapping
+      const pathPart = normalized.startsWith("/")
+        ? normalized
+        : `/${normalized}`;
+      return `http://localhost:5000${pathPart}`;
     }
 
-    if (normalized.startsWith("uploads/") || normalized.startsWith("public/")) {
-      return `http://localhost:5000/${normalized}`;
+    if (
+      normalized.startsWith("/uploads/") ||
+      normalized.startsWith("uploads/")
+    ) {
+      const pathPart = normalized.startsWith("/")
+        ? normalized
+        : `/${normalized}`;
+      return `http://localhost:5000${pathPart}`;
     }
 
-    if (normalized.startsWith("assets/img/products/")) {
-      return `http://localhost:5000/public/${normalized}`;
+    // If a full filesystem path was provided (Windows E:\...), extract filename
+    if (
+      /^[A-Za-z]:\\/.test(normalized) ||
+      normalized.includes("E:/") ||
+      normalized.includes(":/")
+    ) {
+      const filename = normalized.split(/\\|\//).pop();
+      return `http://localhost:5000/public/assets/img/products/${filename}`;
     }
 
-    if (normalized.startsWith("/assets/img/products/")) {
-      return `http://localhost:5000/public${normalized}`;
-    }
-
-    return `http://localhost:5000/public/assets/img/products/${normalized.replace(/^\/+/, "")}`;
+    // Fallback: treat the value as a filename and map into public assets
+    const filename = normalized.split("/").pop();
+    return `http://localhost:5000/public/assets/img/products/${filename}`;
   };
 
   const getProductImages = (product) => {
@@ -220,7 +291,21 @@ function Cart({
           },
         });
 
-        setDisplayItems(normalizeCartItems(response.data));
+        const normalized = normalizeCartItems(response.data);
+        setDisplayItems(normalized);
+
+        // DEBUG: Log what the backend returned for images
+        console.group("🛒 CART LOADED - Image Debug");
+        normalized.forEach((item) => {
+          const imageUrl = item?.image_url || item?.image || item?.imageUrls;
+          const resolved = getProductImages(item);
+          console.log(`Product: ${item.name || "?"}`, {
+            id: item.id,
+            backendImageUrl: imageUrl,
+            resolvedImages: resolved,
+          });
+        });
+        console.groupEnd();
       } catch (error) {
         console.error("Failed to load cart page items:", error.message);
       }
@@ -248,7 +333,10 @@ function Cart({
       />
 
       <main className="ps-main" style={{ padding: "70px 0" }}>
-        <div className="ps-shell" style={{ maxWidth: "1080px", margin: "0 auto" }}>
+        <div
+          className="ps-shell"
+          style={{ maxWidth: "1080px", margin: "0 auto" }}
+        >
           <div
             style={{
               display: "flex",
@@ -273,7 +361,10 @@ function Cart({
           </div>
 
           {displayItems.length === 0 ? (
-            <div className="ps-surface" style={{ padding: "40px", textAlign: "center" }}>
+            <div
+              className="ps-surface"
+              style={{ padding: "40px", textAlign: "center" }}
+            >
               <p style={{ margin: 0, fontSize: "18px", color: "#65574d" }}>
                 Your cart is empty. Add products from the home page or the shop.
               </p>
@@ -301,25 +392,18 @@ function Cart({
                         if (e.target.dataset?.imgerror) return;
                         e.target.dataset.imgerror = "1";
 
-                        // try resolved candidates
-                        const candidates = getProductImages(item);
-                        for (const c of candidates) {
-                          if (c && c !== e.target.src) {
-                            e.target.src = c;
-                            return;
-                          }
-                        }
+                        console.error(
+                          `%c❌ Image failed: ${e.target.src}`,
+                          "color: red; font-weight: bold",
+                        );
 
-                        // try building from basename to /uploads/
-                        const fallback = (item?.image || item?.image_url || "").toString().split("/").pop();
-                        if (fallback) {
-                          e.target.src = `http://localhost:5000/uploads/${fallback}`;
-                          return;
-                        }
-
-                        e.target.src = "https://via.placeholder.com/120x120?text=No+Image";
+                        // Show placeholder on error since backend now assigns images
+                        e.target.src =
+                          "https://via.placeholder.com/120x120?text=No+Image";
                       } catch (err) {
-                        e.target.src = "https://via.placeholder.com/120x120?text=No+Image";
+                        console.error("Image fallback error:", err);
+                        e.target.src =
+                          "https://via.placeholder.com/120x120?text=No+Image";
                       }
                     }}
                     style={{
@@ -334,20 +418,51 @@ function Cart({
                     <h2 style={{ margin: "0 0 8px", fontSize: "18px" }}>
                       {item.name || "Product"}
                     </h2>
-                    <p style={{ margin: "0 0 8px", color: "#65574d", fontSize: "14px" }}>
+                    <p
+                      style={{
+                        margin: "0 0 8px",
+                        color: "#65574d",
+                        fontSize: "14px",
+                      }}
+                    >
                       {item.category || ""}
                     </p>
-                    <p style={{ margin: 0, color: "#1f1813", fontWeight: 700 }}>
-                      <span style={{ display: "block", color: "#8d8178", textDecoration: "line-through", fontSize: "12px", fontWeight: 600 }}>
+                    <div
+                      style={{ margin: 0, color: "#1f1813", fontWeight: 700 }}
+                    >
+                      <span
+                        style={{
+                          display: "block",
+                          fontSize: "14px",
+                          color: "#65574d",
+                        }}
+                      >
                         ${getBasePrice(item).toFixed(2)}
                       </span>
-                      <span style={{ display: "block", fontSize: "14px", color: "#65574d", marginTop: "4px" }}>
-                        + ${getVatAmount(item).toFixed(2)} VAT
+                      <span
+                        style={{
+                          display: "block",
+                          fontSize: "16px",
+                          fontWeight: 800,
+                          color: "#1f1813",
+                          marginTop: "4px",
+                        }}
+                      >
+                        ${getDisplayPrice(item).toFixed(2)} x{" "}
+                        {item.quantity || 1}
                       </span>
-                      <span style={{ display: "block", fontSize: "18px", fontWeight: 800, color: "#1f1813", marginTop: "4px" }}>
-                        ${getDisplayPrice(item).toFixed(2)} x {item.quantity || 1}
+                      <span
+                        style={{
+                          display: "block",
+                          fontSize: "12px",
+                          color: "#999",
+                          marginTop: "6px",
+                          fontWeight: 400,
+                        }}
+                      >
+                        VAT included (18%)
                       </span>
-                    </p>
+                    </div>
                   </div>
                   <div
                     style={{
@@ -382,12 +497,34 @@ function Cart({
                 <div>
                   <p style={{ margin: "0 0 6px", color: "#65574d" }}>Items</p>
                   <h2 style={{ margin: 0 }}>
-                    {displayItems.length} {displayItems.length === 1 ? "item" : "items"}
+                    {displayItems.length}{" "}
+                    {displayItems.length === 1 ? "item" : "items"}
                   </h2>
                 </div>
-                <div style={{ textAlign: "right" }}>
-                  <p style={{ margin: "0 0 6px", color: "#65574d" }}>Total</p>
-                  <h2 style={{ margin: 0 }}>${totalPrice.toFixed(2)}</h2>
+                <div
+                  style={{
+                    textAlign: "right",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "flex-end",
+                    gap: "12px",
+                  }}
+                >
+                  <div>
+                    <p style={{ margin: "0 0 6px", color: "#65574d" }}>Total</p>
+                    <h2 style={{ margin: 0 }}>${totalPrice.toFixed(2)}</h2>
+                  </div>
+                  <div style={{ display: "flex", gap: 12 }}>
+                    <button
+                      type="button"
+                      className="ps-btn ps-btn-primary"
+                      onClick={handleCheckout}
+                      style={{ padding: "9px 16px" }}
+                      disabled={displayItems.length === 0}
+                    >
+                      Buy Now
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -396,7 +533,10 @@ function Cart({
       </main>
 
       {pendingRemoveItem && (
-        <div className="ps-cartConfirmBackdrop" onClick={handleCloseRemoveDialog}>
+        <div
+          className="ps-cartConfirmBackdrop"
+          onClick={handleCloseRemoveDialog}
+        >
           <div
             className="ps-cartConfirmCard"
             role="dialog"

@@ -247,6 +247,10 @@ textarea {
 
 .ps-dropCard {
   scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 560px;
 }
 
 .ps-dropImageWrap {
@@ -319,6 +323,27 @@ textarea {
   color: var(--ps-muted);
   font-size: 13px;
   font-weight: 600;
+}
+
+/* Ensure Add to Cart button sits at the bottom of the card */
+.ps-dropCard {
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 560px;
+}
+
+/* Ensure the variable content grows so the button can sit at the bottom */
+.ps-dropBody {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+}
+
+/* Ensure Add to Cart button sits at the bottom of the card */
+.ps-dropCard .ps-btn {
+  margin-top: auto;
 }
 
 .ps-dropsArrow {
@@ -671,6 +696,8 @@ textarea {
   padding: 0;
   overflow: hidden;
   border-radius: 18px;
+  display: flex;
+  flex-direction: column;
 }
 
 .ps-sizeChartProductImageWrap {
@@ -690,9 +717,12 @@ textarea {
 }
 
 .ps-sizeChartProductBody {
-  display: grid;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
   gap: 8px;
   padding: 18px 18px 20px;
+  flex: 1 1 auto;
 }
 
 .ps-sizeChartProductCategory {
