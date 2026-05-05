@@ -926,17 +926,17 @@ textarea {
   display: flex;
   align-items: center;
   justify-content: center;
+  min-height: 100vh;
   padding: 20px;
-  background: rgba(255, 255, 255, 0.35);
-  backdrop-filter: blur(6px);
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(8px);
 }
 
 .ps-cartConfirmCard {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
   width: min(460px, 100%);
+  height: fit-content;
+  max-height: 90vh;
+  margin: auto;
   display: grid;
   gap: 14px;
   padding: 24px;

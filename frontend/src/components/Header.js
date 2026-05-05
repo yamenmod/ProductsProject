@@ -228,14 +228,7 @@ function Header({
             aria-label="Confirm logout"
             onClick={(event) => event.stopPropagation()}
           >
-            <p className="ps-pill" style={{ margin: 0, width: "fit-content" }}>
-              Confirm sign out
-            </p>
-            <h2 className="ps-cartConfirmTitle">Sign out of your account?</h2>
-            <p className="ps-cartConfirmText">
-              You are about to end your session. If you finish any active tasks,
-              you can sign back in at any time.
-            </p>
+            <h2 className="ps-cartConfirmTitle">Are you sure you want to logout?</h2>
             <div className="ps-cartConfirmActions">
               <button
                 type="button"
@@ -249,7 +242,7 @@ function Header({
                 className="ps-btn ps-cartConfirmDelete"
                 onClick={handleConfirmLogout}
               >
-                Sign out
+                Logout
               </button>
             </div>
           </div>
