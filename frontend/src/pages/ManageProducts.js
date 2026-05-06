@@ -22,6 +22,8 @@ function ManageProducts({
     image: "",
     image_urls: [],
     stock: "",
+    boardLength: "",
+    volume: "",
   });
   const [editId, setEditId] = useState(null);
   const [imageFiles, setImageFiles] = useState([]);
@@ -177,6 +179,8 @@ function ManageProducts({
       image: "",
       image_urls: [],
       stock: "",
+      boardLength: "",
+      volume: "",
     });
     setImageFiles([]);
     setEditId(null);
@@ -203,6 +207,16 @@ function ManageProducts({
     payload.append("category", form.category.trim());
     payload.append("gender", normalizeGenderValue(form.gender));
     payload.append("stock", form.stock === "" ? 0 : Number(form.stock));
+
+    // Add surfboard-specific fields if category is Surfboard
+    if (form.category.toLowerCase() === "surfboard") {
+      if (form.boardLength) {
+        payload.append("boardLength", Number(form.boardLength));
+      }
+      if (form.volume) {
+        payload.append("volume", Number(form.volume));
+      }
+    }
 
     if (editId) {
       payload.append("images", JSON.stringify(form.image_urls || []));
@@ -272,6 +286,8 @@ function ManageProducts({
       image: product.image || "",
       image_urls: uniqueExistingImages,
       stock: product.stock ?? 0,
+      boardLength: product.boardLength ?? "",
+      volume: product.volume ?? "",
     });
     setImageFiles([]);
     setEditId(product._id);
@@ -434,9 +450,15 @@ function ManageProducts({
     const normalizedSearch = searchTerm.trim().toLowerCase();
     const matchesSearch = !normalizedSearch
       ? true
-      : (product.name || "").toString().toLowerCase().includes(normalizedSearch);
+      : (product.name || "")
+          .toString()
+          .toLowerCase()
+          .includes(normalizedSearch);
 
-    const normalizedCategory = (product.category || "").toString().trim().toLowerCase();
+    const normalizedCategory = (product.category || "")
+      .toString()
+      .trim()
+      .toLowerCase();
     const matchesCategory =
       categoryFilter === "all" ? true : normalizedCategory === categoryFilter;
 
@@ -753,6 +775,68 @@ function ManageProducts({
                       e.target.style.boxShadow = "none";
                     }}
                   />
+
+                  {form.category.toLowerCase() === "surfboard" && (
+                    <>
+                      <input
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        placeholder="Board Length (feet)"
+                        value={form.boardLength}
+                        onChange={(e) =>
+                          setForm({ ...form, boardLength: e.target.value })
+                        }
+                        style={{
+                          padding: "10px 12px",
+                          border: "1px solid #d9c3ad",
+                          borderRadius: "8px",
+                          fontSize: "14px",
+                          fontFamily: "inherit",
+                          transition: "all 0.2s ease",
+                          background: "#fffdf8",
+                        }}
+                        onFocus={(e) => {
+                          e.target.style.borderColor = "#245860";
+                          e.target.style.boxShadow =
+                            "0 0 0 3px rgba(36, 88, 96, 0.12)";
+                        }}
+                        onBlur={(e) => {
+                          e.target.style.borderColor = "#d9c3ad";
+                          e.target.style.boxShadow = "none";
+                        }}
+                      />
+
+                      <input
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        placeholder="Volume (liters)"
+                        value={form.volume}
+                        onChange={(e) =>
+                          setForm({ ...form, volume: e.target.value })
+                        }
+                        style={{
+                          padding: "10px 12px",
+                          border: "1px solid #d9c3ad",
+                          borderRadius: "8px",
+                          fontSize: "14px",
+                          fontFamily: "inherit",
+                          transition: "all 0.2s ease",
+                          background: "#fffdf8",
+                        }}
+                        onFocus={(e) => {
+                          e.target.style.borderColor = "#245860";
+                          e.target.style.boxShadow =
+                            "0 0 0 3px rgba(36, 88, 96, 0.12)";
+                        }}
+                        onBlur={(e) => {
+                          e.target.style.borderColor = "#d9c3ad";
+                          e.target.style.boxShadow = "none";
+                        }}
+                      />
+                    </>
+                  )}
                 </div>
 
                 <textarea

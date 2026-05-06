@@ -1,5 +1,9 @@
 const db = require("../db/connection");
-const { calculateVatPricing, roundMoney, getVatRateFromDb } = require("../utils/pricing");
+const {
+  calculateVatPricing,
+  roundMoney,
+  getVatRateFromDb,
+} = require("../utils/pricing");
 
 const PRODUCT_IMAGE_DIR = "/public/assets/img/products";
 
@@ -168,16 +172,29 @@ const normalizeImageValue = (value) => {
     return "";
   }
 
+  // Handle empty brackets [] or [""]
+  if (safeValue === "[]" || safeValue === '[""]' || safeValue === "['']") {
+    return "";
+  }
+
   if (safeValue.startsWith("[")) {
     try {
       const parsedValue = JSON.parse(safeValue);
       if (Array.isArray(parsedValue) && parsedValue.length) {
         return normalizeImageValue(parsedValue[0]);
       }
+      // If array is empty, return empty
+      if (Array.isArray(parsedValue) && !parsedValue.length) {
+        return "";
+      }
     } catch (error) {
       const dataUrlMatch = safeValue.match(/"(data:[^"]+)"/);
       if (dataUrlMatch?.[1]) {
         return dataUrlMatch[1];
+      }
+      // If JSON parse fails and it's just brackets, return empty
+      if (safeValue === "[]" || safeValue.match(/^\[\s*\]$/)) {
+        return "";
       }
     }
   }
@@ -236,6 +253,8 @@ const normalizeProduct = (row, vatRate = 0.18) => ({
   image: resolveImagePayload(row.image_url).imageUrl,
   image_url: resolveImagePayload(row.image_url).imageUrl,
   image_urls: resolveImagePayload(row.image_url).imageUrls,
+  boardLength: row.board_length ? Number(row.board_length) : null,
+  volume: row.volume ? Number(row.volume) : null,
   created_at: row.created_at,
   updated_at: row.updated_at,
 });
@@ -266,7 +285,7 @@ const resolveCategoryId = async (categoryName) => {
 const getProducts = async (req, res) => {
   try {
     const vatRate = await getVatRateFromDb(db);
-    
+
     const [products] = await db.query(
       `
         SELECT
@@ -278,6 +297,8 @@ const getProducts = async (req, res) => {
           p.category_id,
           p.gender,
           p.image_url,
+          p.board_length,
+          p.volume,
           p.created_at,
           p.updated_at,
           c.name AS category
@@ -287,7 +308,9 @@ const getProducts = async (req, res) => {
       `,
     );
 
-    const response = products.map((product) => normalizeProduct(product, vatRate));
+    const response = products.map((product) =>
+      normalizeProduct(product, vatRate),
+    );
     return res.status(200).json(response);
   } catch (error) {
     return res.status(500).json({ message: "Server error" });
@@ -297,7 +320,7 @@ const getProducts = async (req, res) => {
 const getProductById = async (req, res) => {
   try {
     const vatRate = await getVatRateFromDb(db);
-    
+
     const [products] = await db.query(
       `
         SELECT
@@ -309,6 +332,8 @@ const getProductById = async (req, res) => {
           p.category_id,
           p.gender,
           p.image_url,
+          p.board_length,
+          p.volume,
           p.created_at,
           p.updated_at,
           c.name AS category
@@ -332,8 +357,18 @@ const getProductById = async (req, res) => {
 
 const createProduct = async (req, res) => {
   try {
-    const { name, description, price, category, gender, image, images, stock } =
-      req.body;
+    const {
+      name,
+      description,
+      price,
+      category,
+      gender,
+      image,
+      images,
+      stock,
+      boardLength,
+      volume,
+    } = req.body;
     const uploadedImagePaths = Array.isArray(req.files)
       ? req.files
           .filter(
@@ -369,9 +404,11 @@ const createProduct = async (req, res) => {
           category_id,
           gender,
           image_url,
+          board_length,
+          volume,
           created_at,
           updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
       `,
       [
         name.trim(),
@@ -381,6 +418,8 @@ const createProduct = async (req, res) => {
         categoryId,
         nextGender,
         storedImageValue,
+        boardLength === undefined ? null : Number(boardLength),
+        volume === undefined ? null : Number(volume),
       ],
     );
 
@@ -395,6 +434,8 @@ const createProduct = async (req, res) => {
           p.category_id,
           p.gender,
           p.image_url,
+          p.board_length,
+          p.volume,
           p.created_at,
           p.updated_at,
           c.name AS category
@@ -406,7 +447,9 @@ const createProduct = async (req, res) => {
       [insertResult.insertId],
     );
 
-    return res.status(201).json(normalizeProduct(createdRows[0], await getVatRateFromDb(db)));
+    return res
+      .status(201)
+      .json(normalizeProduct(createdRows[0], await getVatRateFromDb(db)));
   } catch (error) {
     console.error("Create product error:", error);
     return res.status(500).json({ message: error.message || "Server error" });
@@ -416,7 +459,7 @@ const createProduct = async (req, res) => {
 const updateProduct = async (req, res) => {
   try {
     const [existingRows] = await db.query(
-      "SELECT id, name, price, stock, category_id, description, gender, image_url FROM products WHERE id = ? LIMIT 1",
+      "SELECT id, name, price, stock, category_id, description, gender, image_url, board_length, volume FROM products WHERE id = ? LIMIT 1",
       [req.params.id],
     );
 
@@ -425,8 +468,18 @@ const updateProduct = async (req, res) => {
     }
 
     const existingProduct = existingRows[0];
-    const { name, description, price, category, gender, image, images, stock } =
-      req.body;
+    const {
+      name,
+      description,
+      price,
+      category,
+      gender,
+      image,
+      images,
+      stock,
+      boardLength,
+      volume,
+    } = req.body;
     const uploadedImagePaths = Array.isArray(req.files)
       ? req.files
           .filter(
@@ -456,7 +509,9 @@ const updateProduct = async (req, res) => {
 
     const nextName = name !== undefined ? name.trim() : existingProduct.name;
     const nextPrice =
-      price !== undefined ? calculateVatPricing(price).basePrice : Number(existingProduct.price);
+      price !== undefined
+        ? calculateVatPricing(price).basePrice
+        : Number(existingProduct.price);
 
     if (!nextName || Number.isNaN(nextPrice)) {
       return res.status(400).json({ message: "Name and price are required" });
@@ -478,6 +533,8 @@ const updateProduct = async (req, res) => {
           category_id = ?,
           gender = ?,
           image_url = ?,
+          board_length = ?,
+          volume = ?,
           updated_at = NOW()
         WHERE id = ?
       `,
@@ -489,6 +546,10 @@ const updateProduct = async (req, res) => {
         nextCategoryId,
         nextGender,
         storedImageValue,
+        boardLength !== undefined
+          ? Number(boardLength)
+          : existingProduct.board_length,
+        volume !== undefined ? Number(volume) : existingProduct.volume,
         req.params.id,
       ],
     );
@@ -504,6 +565,8 @@ const updateProduct = async (req, res) => {
           p.category_id,
           p.gender,
           p.image_url,
+          p.board_length,
+          p.volume,
           p.created_at,
           p.updated_at,
           c.name AS category
@@ -515,7 +578,9 @@ const updateProduct = async (req, res) => {
       [req.params.id],
     );
 
-    return res.status(200).json(normalizeProduct(updatedRows[0], await getVatRateFromDb(db)));
+    return res
+      .status(200)
+      .json(normalizeProduct(updatedRows[0], await getVatRateFromDb(db)));
   } catch (error) {
     console.error("Update product error:", error);
     return res.status(500).json({ message: error.message || "Server error" });
@@ -538,10 +603,215 @@ const deleteProduct = async (req, res) => {
   }
 };
 
+// Scans the products folder and assigns images to products based on product ID
+const syncImages = async (req, res) => {
+  try {
+    const fs = require("fs");
+    const path = require("path");
+
+    // Path to products folder
+    const productsImageDir = path.join(
+      __dirname,
+      "..",
+      "..",
+      "public",
+      "assets",
+      "img",
+      "products",
+    );
+
+    // Check if directory exists
+    if (!fs.existsSync(productsImageDir)) {
+      return res
+        .status(400)
+        .json({ message: "Products image directory not found" });
+    }
+
+    // Read all files in the products folder
+    const files = fs
+      .readdirSync(productsImageDir)
+      .filter((file) => /\.(jpg|jpeg|png|gif|webp)$/i.test(file))
+      .sort();
+
+    if (!files.length) {
+      return res
+        .status(400)
+        .json({ message: "No images found in products folder" });
+    }
+
+    // Get all products
+    const [products] = await db.query(
+      "SELECT id FROM products ORDER BY id ASC",
+    );
+
+    if (!products.length) {
+      return res.status(400).json({ message: "No products found" });
+    }
+
+    // Update each product with an image based on its ID
+    let updatedCount = 0;
+    for (const product of products) {
+      // Use product ID to pick an image deterministically
+      const imageIdx = (product.id - 1) % files.length;
+      const imagePath = `${PRODUCT_IMAGE_DIR}/${files[imageIdx]}`;
+
+      await db.query(
+        "UPDATE products SET image_url = ?, updated_at = NOW() WHERE id = ?",
+        [imagePath, product.id],
+      );
+      updatedCount++;
+    }
+
+    return res.status(200).json({
+      message: "Images synced successfully",
+      totalProducts: products.length,
+      totalImages: files.length,
+      updatedCount,
+      imagesSample: files.slice(0, 5),
+    });
+  } catch (error) {
+    console.error("Sync images error:", error);
+    return res.status(500).json({ message: error.message || "Server error" });
+  }
+};
+
+const recommendBoards = async (req, res) => {
+  try {
+    const { weight, height, skillLevel } = req.body;
+
+    if (!weight || !height || !skillLevel) {
+      return res.status(400).json({
+        message: "weight, height, and skillLevel are required",
+      });
+    }
+
+    // Validate weight and height
+    const weightNum = Number(weight);
+    const heightNum = Number(height);
+
+    if (Number.isNaN(weightNum) || Number.isNaN(heightNum)) {
+      return res.status(400).json({
+        message: "weight and height must be valid numbers",
+      });
+    }
+
+    // Get all surfboards from database
+    const [surfboards] = await db.query(
+      `
+        SELECT
+          p.id,
+          p.name,
+          p.description,
+          p.price,
+          p.stock,
+          p.category_id,
+          p.gender,
+          p.image_url,
+          p.board_length,
+          p.volume,
+          p.created_at,
+          p.updated_at,
+          c.name AS category
+        FROM products p
+        LEFT JOIN categories c ON c.id = p.category_id
+        WHERE c.name = 'Surfboard' OR c.name = 'surfboard'
+        ORDER BY p.volume ASC
+      `,
+    );
+
+    if (!surfboards.length) {
+      return res.status(200).json({
+        recommendations: [],
+        message: "No surfboards available",
+      });
+    }
+
+    // Calculate recommended volume based on weight and skill level
+    // Beginner: weight (kg) * 0.8 to 1.0
+    // Intermediate: weight (kg) * 0.6 to 0.8
+    // Advanced: weight (kg) * 0.35 to 0.5
+    let volumeMultiplierMin, volumeMultiplierMax;
+
+    if (skillLevel === "beginner" || skillLevel === "Beginner") {
+      volumeMultiplierMin = 0.8;
+      volumeMultiplierMax = 1.0;
+    } else if (skillLevel === "intermediate" || skillLevel === "Intermediate") {
+      volumeMultiplierMin = 0.6;
+      volumeMultiplierMax = 0.8;
+    } else if (skillLevel === "advanced" || skillLevel === "Advanced") {
+      volumeMultiplierMin = 0.35;
+      volumeMultiplierMax = 0.5;
+    } else {
+      volumeMultiplierMin = 0.6;
+      volumeMultiplierMax = 0.8;
+    }
+
+    const targetVolumeMin = weightNum * volumeMultiplierMin;
+    const targetVolumeMax = weightNum * volumeMultiplierMax;
+
+    // Height also influences board length preferences
+    // General rule: taller people generally want longer boards
+
+    // Get VAT rate once
+    const vatRate = await getVatRateFromDb(db);
+
+    // Score each surfboard based on volume match
+    const scoredBoards = surfboards
+      .filter((board) => board.volume)
+      .map((board) => {
+        const volume = Number(board.volume);
+
+        // Calculate volume score (closer to target range is better)
+        // This is the primary (and only) factor for recommendations
+        let volumeScore = 0;
+        if (volume >= targetVolumeMin && volume <= targetVolumeMax) {
+          volumeScore = 100;
+        } else if (volume < targetVolumeMin) {
+          const distanceBelow = targetVolumeMin - volume;
+          volumeScore = Math.max(0, 100 - distanceBelow * 10);
+        } else {
+          const distanceAbove = volume - targetVolumeMax;
+          volumeScore = Math.max(0, 100 - distanceAbove * 10);
+        }
+
+        return {
+          ...normalizeProduct(board, vatRate),
+          recommendationScore: Math.round(volumeScore),
+          volumeScore: Math.round(volumeScore),
+        };
+      })
+      .sort((a, b) => b.recommendationScore - a.recommendationScore);
+
+    const topRecommendations = scoredBoards.slice(0, 5);
+
+    return res.status(200).json({
+      recommendations: topRecommendations,
+      userProfile: {
+        weight: weightNum,
+        height: heightNum,
+        skillLevel,
+        targetVolumeRange: {
+          min: Math.round(targetVolumeMin * 10) / 10,
+          max: Math.round(targetVolumeMax * 10) / 10,
+        },
+        targetLengthRange: {
+          min: targetLengthMin,
+          max: targetLengthMax,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Board recommendation error:", error);
+    return res.status(500).json({ message: error.message || "Server error" });
+  }
+};
+
 module.exports = {
   getProducts,
   getProductById,
   createProduct,
   updateProduct,
   deleteProduct,
+  syncImages,
+  recommendBoards,
 };

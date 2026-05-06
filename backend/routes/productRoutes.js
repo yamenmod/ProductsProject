@@ -5,6 +5,8 @@ const {
   createProduct,
   updateProduct,
   deleteProduct,
+  syncImages,
+  recommendBoards,
 } = require("../controllers/productController");
 const authMiddleware = require("../middleware/authMiddleware");
 const adminMiddleware = require("../middleware/adminMiddleware");
@@ -14,6 +16,8 @@ const router = express.Router();
 
 router.get("/", getProducts);
 router.get("/:id", getProductById);
+router.post("/sync-images", syncImages);
+router.post("/recommend-boards", recommendBoards);
 router.post("/", authMiddleware, adminMiddleware, upload.any(), createProduct);
 router.put(
   "/:id",
