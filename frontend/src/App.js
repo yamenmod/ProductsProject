@@ -54,7 +54,7 @@ const extractProductId = (value) => {
 
 function App() {
   const [session, setSession] = useState(null);
-  const [currentPage, setCurrentPage] = useState("home");
+  const [currentPage, setCurrentPage] = useState("login");
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedOrderFilter, setSelectedOrderFilter] = useState("all");
   const [cartItems, setCartItems] = useState([]);
@@ -240,6 +240,7 @@ function App() {
             authSession.user?.role === "admin" ? "admin-dashboard" : "home",
           );
         }}
+        onNavigate={setCurrentPage}
       />
     );
   }

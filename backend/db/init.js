@@ -8,10 +8,40 @@ const initDatabase = async () => {
       email VARCHAR(255) NOT NULL UNIQUE,
       password VARCHAR(255) NOT NULL,
       role ENUM('user', 'admin') NOT NULL DEFAULT 'user',
+      reset_code VARCHAR(6) DEFAULT NULL,
+      reset_code_expires DATETIME DEFAULT NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     )
   `);
+
+  const [resetCodeColumn] = await db.query(
+    `
+      SELECT COUNT(*) AS total
+      FROM information_schema.columns
+      WHERE table_schema = DATABASE()
+        AND table_name = 'users'
+        AND column_name = 'reset_code'
+    `,
+  );
+
+  if (resetCodeColumn[0]?.total === 0) {
+    await db.query(`ALTER TABLE users ADD COLUMN reset_code VARCHAR(6) DEFAULT NULL`);
+  }
+
+  const [resetCodeExpiresColumn] = await db.query(
+    `
+      SELECT COUNT(*) AS total
+      FROM information_schema.columns
+      WHERE table_schema = DATABASE()
+        AND table_name = 'users'
+        AND column_name = 'reset_code_expires'
+    `,
+  );
+
+  if (resetCodeExpiresColumn[0]?.total === 0) {
+    await db.query(`ALTER TABLE users ADD COLUMN reset_code_expires DATETIME DEFAULT NULL`);
+  }
 
   await db.query(`
     CREATE TABLE IF NOT EXISTS cart_items (

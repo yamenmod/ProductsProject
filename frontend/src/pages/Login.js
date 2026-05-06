@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import axios from "axios";
 
-function Login({ onLoginSuccess }) {
+function Login({ onLoginSuccess, onNavigate }) {
   const [isRegister, setIsRegister] = useState(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -11,9 +11,7 @@ function Login({ onLoginSuccess }) {
   const handleSubmit = async () => {
     setMessage("");
 
-    // check if fields r empty
     if (isRegister) {
-      // registration checks
       if (!username || !password || !email) {
         setMessage("⚠️ All fields are required! (Username, Email, Password)");
         return;
@@ -30,30 +28,44 @@ function Login({ onLoginSuccess }) {
         setMessage("⚠️ Please enter a valid email address!");
         return;
       }
-    } else {
-      // login checks
-      if (!username || !password) {
-        setMessage("⚠️ Username and password are required!");
-        return;
+
+      try {
+        const res = await axios.post("/api/auth/register", {
+          username,
+          password,
+          email,
+        });
+
+        if (res.data.message === "success") {
+          onLoginSuccess({ token: res.data.token, user: res.data.user });
+        } else {
+          setMessage(res.data.message);
+        }
+      } catch (err) {
+        setMessage(err.response?.data?.message || "Server Error");
       }
+
+      return;
+    }
+
+    if (!username || !password) {
+      setMessage("⚠️ Username and password are required!");
+      return;
     }
 
     try {
-      const url = isRegister ? "/api/auth/register" : "/api/auth/login";
-
-      const body = isRegister
-        ? { username, password, email }
-        : { username, password };
-
-      const res = await axios.post(url, body); //Connects to backend using POST request, sending user data
+      const res = await axios.post("/api/auth/login", {
+        username,
+        password,
+      });
 
       if (res.data.message === "success") {
         onLoginSuccess({ token: res.data.token, user: res.data.user });
       } else {
-        setMessage(res.data.message); // Backend returned error message (like Server Error)
+        setMessage(res.data.message);
       }
     } catch (err) {
-      setMessage(err.response?.data?.message || "Server Error"); //Backend connection failed (network error, server down, or invalid response)
+      setMessage(err.response?.data?.message || "Server Error");
     }
   };
 
@@ -135,6 +147,7 @@ function Login({ onLoginSuccess }) {
               onChange={(e) => setPassword(e.target.value)}
             />
           </div>
+
         </div>
 
         {message && (
