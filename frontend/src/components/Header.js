@@ -42,6 +42,7 @@ function Header({
     setRecommendationLoading(true);
 
     try {
+      // The board chooser uses the shopper's body data to ask the backend for matches.
       if (!boardInputs.weight || !boardInputs.height) {
         setRecommendationError("Please enter weight and height");
         setRecommendationLoading(false);
@@ -65,6 +66,7 @@ function Header({
   };
 
   const resetBoardChooser = () => {
+    // Close the chooser and clear the previous recommendation results.
     setBoardInputs({ weight: "", height: "", skillLevel: "beginner" });
     setBoardRecommendations(null);
     setRecommendationError("");
@@ -304,6 +306,7 @@ function Header({
       )}
 
       {chooseBoardOpen && (
+        // This modal is the "Choose My Board" helper that suggests surfboards.
         <div className="ps-cartConfirmBackdrop" onClick={resetBoardChooser}>
           <div
             className="ps-cartConfirmCard"
@@ -326,6 +329,7 @@ function Header({
                     marginBottom: "20px",
                   }}
                 >
+                  {/* Weight, height, and skill level are sent to the recommendation endpoint. */}
                   <input
                     type="number"
                     placeholder="Weight (kg)"
