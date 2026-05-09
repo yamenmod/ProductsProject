@@ -94,6 +94,10 @@ function AdminDashboard({
     onNavigate("manage-orders", filter);
   };
 
+  const openProductEdit = (product) => {
+    onNavigate("manage-products", product);
+  };
+
   const cards = [
     { key: "successful", label: "Successful", value: orderSummary.successful, tone: "success", filter: "successful" },
     { key: "failed", label: "Failed", value: orderSummary.failed, tone: "danger", filter: "failed" },
@@ -207,7 +211,17 @@ function AdminDashboard({
                         </div>
                         <div style={{ display: "flex", justifyContent: "space-between", gap: "10px", marginTop: "6px", alignItems: "center" }}>
                           <div style={{ color: "#5e5148", fontSize: "13px" }}>{product.category || "Uncategorized"}</div>
-                          <span style={{ color: "#245860", fontWeight: 700 }}>Stock {stock}</span>
+                          <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                            <button
+                              type="button"
+                              className="ps-btn ps-btn-secondary"
+                              onClick={() => openProductEdit(product)}
+                              style={{ padding: "8px 12px", fontSize: "12px" }}
+                            >
+                              Edit
+                            </button>
+                            <span style={{ color: "#245860", fontWeight: 700 }}>Stock {stock}</span>
+                          </div>
                         </div>
                       </div>
                     );

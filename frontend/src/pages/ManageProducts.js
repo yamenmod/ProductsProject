@@ -11,6 +11,7 @@ function ManageProducts({
   onNavigate,
   onLogout,
   cartCount = 0,
+  initialProductToEdit,
 }) {
   const [products, setProducts] = useState([]);
   const [form, setForm] = useState({
@@ -296,6 +297,12 @@ function ManageProducts({
       fileInputRef.current.value = "";
     }
   };
+
+  useEffect(() => {
+    if (initialProductToEdit && typeof initialProductToEdit === "object") {
+      handleEdit(initialProductToEdit);
+    }
+  }, [initialProductToEdit]);
 
   const handleDelete = async (id) => {
     setSuccess("");

@@ -57,6 +57,7 @@ function App() {
   const [currentPage, setCurrentPage] = useState("login");
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedOrderFilter, setSelectedOrderFilter] = useState("all");
+  const [selectedProductToEdit, setSelectedProductToEdit] = useState(null);
   const [cartItems, setCartItems] = useState([]);
 
   // Restore the saved session so refreshes keep the user logged in.
@@ -103,7 +104,7 @@ function App() {
 
   // Central navigation handler used by the header and page buttons.
   // It also blocks non-admin users from opening the admin orders page.
-  const handleNavigate = (page, category) => {
+  const handleNavigate = (page, categoryOrData) => {
     const isAdmin = session?.user?.role === "admin";
 
     if (
@@ -112,6 +113,17 @@ function App() {
     ) {
       setCurrentPage("home");
       return;
+    }
+
+    if (page === "manage-products") {
+      if (categoryOrData && typeof categoryOrData === "object") {
+        setSelectedProductToEdit(categoryOrData);
+        setCurrentPage(page);
+        return;
+      }
+      setSelectedProductToEdit(null);
+    } else {
+      setSelectedProductToEdit(null);
     }
 
     if (
@@ -123,12 +135,12 @@ function App() {
     }
 
     setCurrentPage(page);
-    if (page === "manage-orders" && typeof category === "string") {
-      setSelectedOrderFilter(category);
+    if (page === "manage-orders" && typeof categoryOrData === "string") {
+      setSelectedOrderFilter(categoryOrData);
     }
 
-    if (page !== "manage-orders" && typeof category !== "undefined") {
-      setSelectedCategory(category);
+    if (page !== "manage-orders" && typeof categoryOrData !== "undefined") {
+      setSelectedCategory(categoryOrData);
     }
   };
 
@@ -366,6 +378,7 @@ function App() {
         onPreferredGenderChange={handlePreferredGenderChange}
         onLogout={logout}
         cartCount={cartCount}
+        initialProductToEdit={selectedProductToEdit}
       />
     );
   }
