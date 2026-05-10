@@ -199,6 +199,13 @@ const register = async (req, res) => {
   try {
     const { username, email, password, weight, height } = req.body;
 
+    console.log("📝 REGISTER REQUEST:", {
+      username,
+      email,
+      weight,
+      height,
+    });
+
     if (!username || !email || !password) {
       return res
         .status(400)
@@ -209,6 +216,13 @@ const register = async (req, res) => {
     const normalizedEmail = email.toLowerCase().trim();
     const normalizedWeight = normalizeOptionalMeasurement(weight, "Weight");
     const normalizedHeight = normalizeOptionalMeasurement(height, "Height");
+
+    console.log("✅ NORMALIZED DATA:", {
+      normalizedUsername,
+      normalizedEmail,
+      normalizedWeight,
+      normalizedHeight,
+    });
 
     const [existingUsers] = await db.query(
       "SELECT id FROM users WHERE username = ? OR email = ? LIMIT 1",
@@ -231,6 +245,8 @@ const register = async (req, res) => {
       ],
     );
 
+    console.log("✅ INSERT RESULT:", { insertId: insertResult.insertId });
+
     const [users] = await db.query(
       "SELECT id, username, email, role, weight, height FROM users WHERE id = ? LIMIT 1",
       [insertResult.insertId],
@@ -238,14 +254,20 @@ const register = async (req, res) => {
 
     const user = users[0];
 
+    console.log("✅ RETRIEVED USER FROM DB:", user);
+
     const token = getToken(user);
+
+    const formattedUser = formatUser(user);
+    console.log("✅ FORMATTED USER:", formattedUser);
 
     return res.status(201).json({
       message: "success",
       token,
-      user: formatUser(user),
+      user: formattedUser,
     });
   } catch (error) {
+    console.error("❌ REGISTER ERROR:", error);
     if (error.statusCode) {
       return res.status(error.statusCode).json({ message: error.message });
     }
@@ -259,6 +281,8 @@ const register = async (req, res) => {
 const login = async (req, res) => {
   try {
     const { username, password } = req.body;
+
+    console.log("🔐 LOGIN REQUEST:", { username });
 
     if (!username || !password) {
       return res
@@ -274,36 +298,58 @@ const login = async (req, res) => {
     const user = users[0];
 
     if (!user) {
+      console.log("❌ LOGIN FAILED: Invalid credentials");
       return res.status(401).json({ message: "Invalid login" });
     }
 
+    console.log("✅ LOGIN SUCCESS: User found:", {
+      id: user.id,
+      username: user.username,
+      weight: user.weight,
+      height: user.height,
+    });
+
     const token = getToken(user);
+    const formattedUser = formatUser(user);
+
+    console.log("✅ FORMATTED USER FOR LOGIN:", formattedUser);
 
     return res.status(200).json({
       message: "success",
       token,
-      user: formatUser(user),
+      user: formattedUser,
     });
   } catch (error) {
+    console.error("❌ LOGIN ERROR:", error);
     return res.status(500).json({ message: "Server error" });
   }
 };
 
 const getProfile = async (req, res) => {
   try {
+    const userId = req.user.id;
+    console.log("📋 GET PROFILE REQUEST: userId =", userId);
+
     const [users] = await db.query(
       "SELECT id, username, email, role, weight, height FROM users WHERE id = ? LIMIT 1",
-      [req.user.id],
+      [userId],
     );
 
     const user = users[0];
 
     if (!user) {
+      console.log("❌ PROFILE NOT FOUND for userId:", userId);
       return res.status(404).json({ message: "User not found" });
     }
 
-    return res.status(200).json({ user: formatUser(user) });
+    console.log("✅ PROFILE FOUND:", user);
+
+    const formattedUser = formatUser(user);
+    console.log("✅ FORMATTED PROFILE:", formattedUser);
+
+    return res.status(200).json({ user: formattedUser });
   } catch (error) {
+    console.error("❌ GET PROFILE ERROR:", error);
     return res.status(500).json({ message: "Server error" });
   }
 };
@@ -311,6 +357,14 @@ const getProfile = async (req, res) => {
 const updateProfile = async (req, res) => {
   try {
     const { username, weight, height } = req.body;
+    const userId = req.user.id;
+
+    console.log("🔧 UPDATE PROFILE REQUEST:", {
+      userId,
+      username,
+      weight,
+      height,
+    });
 
     if (!username || !username.trim()) {
       return res.status(400).json({ message: "Username is required" });
@@ -320,30 +374,44 @@ const updateProfile = async (req, res) => {
     const normalizedWeight = normalizeOptionalMeasurement(weight, "Weight");
     const normalizedHeight = normalizeOptionalMeasurement(height, "Height");
 
+    console.log("✅ NORMALIZED UPDATE DATA:", {
+      normalizedUsername,
+      normalizedWeight,
+      normalizedHeight,
+    });
+
     const [existingUsers] = await db.query(
       "SELECT id FROM users WHERE id = ? LIMIT 1",
-      [req.user.id],
+      [userId],
     );
 
     if (!existingUsers.length) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    await db.query(
+    const [updateResult] = await db.query(
       "UPDATE users SET username = ?, weight = ?, height = ? WHERE id = ?",
-      [normalizedUsername, normalizedWeight, normalizedHeight, req.user.id],
+      [normalizedUsername, normalizedWeight, normalizedHeight, userId],
     );
+
+    console.log("✅ UPDATE RESULT:", {
+      affectedRows: updateResult.affectedRows,
+    });
 
     const [users] = await db.query(
       "SELECT id, username, email, role, weight, height FROM users WHERE id = ? LIMIT 1",
-      [req.user.id],
+      [userId],
     );
+
+    const user = users[0];
+    console.log("✅ RETRIEVED UPDATED USER:", user);
 
     return res.status(200).json({
       message: "Profile updated",
-      user: formatUser(users[0]),
+      user: formatUser(user),
     });
   } catch (error) {
+    console.error("❌ UPDATE PROFILE ERROR:", error);
     if (error.statusCode) {
       return res.status(error.statusCode).json({ message: error.message });
     }

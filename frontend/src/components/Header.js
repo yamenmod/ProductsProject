@@ -237,14 +237,6 @@ function Header({
 
               <button
                 type="button"
-                className={`ps-nav-link ${currentPage === "profile" ? "active" : ""}`}
-                onClick={() => onNavigate("profile")}
-              >
-                Profile
-              </button>
-
-              <button
-                type="button"
                 className="ps-nav-link"
                 onClick={handleOpenBoardChooser}
               >
@@ -297,9 +289,36 @@ function Header({
         <div className="ps-user-row">
           {/* Show the signed-in username so the header always reflects the session. */}
           {/* Cart is hidden for admins because the admin flow is dashboard-only. */}
-          <span style={{ color: "#5f5550", fontSize: "13px", fontWeight: 700 }}>
-            {user.username}
-          </span>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "4px",
+            }}
+          >
+            {user && (
+              <button
+                type="button"
+                className="ps-profile-button"
+                onClick={() => onNavigate("profile")}
+                title="View and edit your profile"
+                aria-label="Profile"
+              >
+                <img
+                  src="/Logo/ProfileLogo/ProfileLogoWithoutBackGround.png"
+                  alt="Profile"
+                  className="ps-profile-icon"
+                />
+                <span className="ps-profile-label-aesthetic">Profile</span>
+              </button>
+            )}
+            <span
+              style={{ color: "#5f5550", fontSize: "13px", fontWeight: 700 }}
+            >
+              {user.username}
+            </span>
+          </div>
 
           {user.role === "user" && (
             <button

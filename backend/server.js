@@ -66,12 +66,18 @@ app.use((error, req, res, next) => {
 
 const startServer = async () => {
   try {
+    console.log("🚀 Starting server...");
+    console.log("🗄️  Initializing database connection...");
+
     await initDatabase();
+
     app.listen(5000, () => {
-      console.log("Server running on port 5000");
+      console.log("✅ Server running on port 5000");
+      console.log("📝 Ready to accept requests at http://localhost:5000");
     });
   } catch (error) {
-    console.error("Server startup failed:", error.message);
+    console.error("❌ Server startup failed:", error.message);
+    console.error("Full error:", error);
     process.exit(1);
   }
 };
