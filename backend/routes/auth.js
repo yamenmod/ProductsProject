@@ -9,6 +9,15 @@ const router = express.Router();
 // Import database connection to query the database
 const db = require("../db/connection");
 
+const normalizeOptionalMeasurement = (value) => {
+  if (value === undefined || value === null || value === "") {
+    return null;
+  }
+
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) ? numericValue : null;
+};
+
 // ===== LOGIN ROUTE =====
 // When frontend sends POST request to /auth/login
 // This handles user login logic
@@ -39,6 +48,9 @@ router.post("/login", async (req, res) => {
     const user = {
       id: results[0].id, // User's ID from database
       username: results[0].username, // User's username
+      email: results[0].email,
+      weight: results[0].weight,
+      height: results[0].height,
     };
 
     // Store user in session: req.session automatically uses cookies
@@ -53,20 +65,27 @@ router.post("/login", async (req, res) => {
 // ===== REGISTER ROUTE =====
 router.post("/register", async (req, res) => {
   // Extract username, email and password from request body
-  const { username, email, password } = req.body;
+  const { username, email, password, weight, height } = req.body;
+  const normalizedWeight = normalizeOptionalMeasurement(weight);
+  const normalizedHeight = normalizeOptionalMeasurement(height);
 
   // SQL query to INSERT a new user into the users table
-  const sql = "INSERT INTO users (username, email, password) VALUES (?,?,?)";
+  const sql =
+    "INSERT INTO users (username, email, password, weight, height) VALUES (?,?,?,?,?)";
 
   // Execute the INSERT query
-  db.query(sql, [username, email, password], (err) => {
-    if (err) {
-      console.error("REGISTER ERROR:", err);
-      return res.status(400).json({ message: "Username exists" });
-    }
+  db.query(
+    sql,
+    [username, email, password, normalizedWeight, normalizedHeight],
+    (err) => {
+      if (err) {
+        console.error("REGISTER ERROR:", err);
+        return res.status(400).json({ message: "Username exists" });
+      }
 
-    res.json({ message: "registered" });
-  });
+      res.json({ message: "registered" });
+    },
+  );
 });
 
 // ===== SESSION CHECK ROUTE =====

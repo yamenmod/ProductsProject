@@ -18,9 +18,25 @@ function Header({
     height: "",
     skillLevel: "beginner",
   });
+  const [boardUsingSavedProfile, setBoardUsingSavedProfile] = useState(false);
   const [boardRecommendations, setBoardRecommendations] = useState(null);
   const [recommendationLoading, setRecommendationLoading] = useState(false);
   const [recommendationError, setRecommendationError] = useState("");
+
+  const parseMeasurementValue = (value) => {
+    if (value === undefined || value === null || value === "") {
+      return "";
+    }
+
+    const numericValue = Number(value);
+    return Number.isFinite(numericValue) ? String(numericValue) : "";
+  };
+
+  const getInitialBoardInputs = () => ({
+    weight: parseMeasurementValue(user?.weight),
+    height: parseMeasurementValue(user?.height),
+    skillLevel: "beginner",
+  });
 
   const handleLogoutClick = () => {
     setLogoutPromptOpen(true);
@@ -37,22 +53,28 @@ function Header({
     setLogoutPromptOpen(false);
   };
 
-  const handleGetRecommendations = async () => {
+  const handleGetRecommendations = async (nextInputs = boardInputs) => {
     setRecommendationError("");
     setRecommendationLoading(true);
 
+    const resolvedInputs = {
+      weight: (nextInputs.weight || "").toString().trim(),
+      height: (nextInputs.height || "").toString().trim(),
+      skillLevel: nextInputs.skillLevel || "beginner",
+    };
+
     try {
       // The board chooser uses the shopper's body data to ask the backend for matches.
-      if (!boardInputs.weight || !boardInputs.height) {
+      if (!resolvedInputs.weight || !resolvedInputs.height) {
         setRecommendationError("Please enter weight and height");
         setRecommendationLoading(false);
         return;
       }
 
       const response = await axios.post("/api/products/recommend-boards", {
-        weight: Number(boardInputs.weight),
-        height: Number(boardInputs.height),
-        skillLevel: boardInputs.skillLevel,
+        weight: Number(resolvedInputs.weight),
+        height: Number(resolvedInputs.height),
+        skillLevel: resolvedInputs.skillLevel,
       });
 
       setBoardRecommendations(response.data);
@@ -70,7 +92,29 @@ function Header({
     setBoardInputs({ weight: "", height: "", skillLevel: "beginner" });
     setBoardRecommendations(null);
     setRecommendationError("");
+    setBoardUsingSavedProfile(false);
     setChooseBoardOpen(false);
+  };
+
+  const handleOpenBoardChooser = () => {
+    const initialInputs = getInitialBoardInputs();
+
+    setBoardInputs(initialInputs);
+    setBoardRecommendations(null);
+    setRecommendationError("");
+
+    // Check if we have any measurements to work with
+    const hasAnyMeasurements =
+      (initialInputs.weight && initialInputs.weight !== "") ||
+      (initialInputs.height && initialInputs.height !== "");
+
+    setBoardUsingSavedProfile(hasAnyMeasurements);
+    setChooseBoardOpen(true);
+
+    // If we have measurements, auto-fetch recommendations
+    if (hasAnyMeasurements && initialInputs.weight && initialInputs.height) {
+      void handleGetRecommendations(initialInputs);
+    }
   };
 
   // Shop is active for both the category landing page and the product list.
@@ -193,8 +237,16 @@ function Header({
 
               <button
                 type="button"
+                className={`ps-nav-link ${currentPage === "profile" ? "active" : ""}`}
+                onClick={() => onNavigate("profile")}
+              >
+                Profile
+              </button>
+
+              <button
+                type="button"
                 className="ps-nav-link"
-                onClick={() => setChooseBoardOpen(true)}
+                onClick={handleOpenBoardChooser}
               >
                 Choose My Board
               </button>
@@ -230,6 +282,13 @@ function Header({
                 onClick={() => onNavigate("manage-customers")}
               >
                 Manage customers
+              </button>
+              <button
+                type="button"
+                className={`ps-nav-link ${currentPage === "profile" ? "active" : ""}`}
+                onClick={() => onNavigate("profile")}
+              >
+                Profile
               </button>
             </>
           )}
@@ -316,117 +375,189 @@ function Header({
             style={{ maxHeight: "90vh", overflowY: "auto" }}
           >
             {!boardRecommendations ? (
-              <>
-                <h2 style={{ marginTop: 0, marginBottom: "20px" }}>
-                  Find Your Perfect Board
-                </h2>
-
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "12px",
-                    marginBottom: "20px",
-                  }}
-                >
-                  {/* Weight, height, and skill level are sent to the recommendation endpoint. */}
-                  <input
-                    type="number"
-                    placeholder="Weight (kg)"
-                    value={boardInputs.weight}
-                    onChange={(e) =>
-                      setBoardInputs({ ...boardInputs, weight: e.target.value })
-                    }
-                    min="30"
-                    max="150"
-                    style={{
-                      padding: "10px 12px",
-                      border: "1px solid #d9c3ad",
-                      borderRadius: "8px",
-                      fontSize: "14px",
-                      fontFamily: "inherit",
-                    }}
-                  />
-
-                  <input
-                    type="number"
-                    placeholder="Height (cm)"
-                    value={boardInputs.height}
-                    onChange={(e) =>
-                      setBoardInputs({ ...boardInputs, height: e.target.value })
-                    }
-                    min="120"
-                    max="220"
-                    style={{
-                      padding: "10px 12px",
-                      border: "1px solid #d9c3ad",
-                      borderRadius: "8px",
-                      fontSize: "14px",
-                      fontFamily: "inherit",
-                    }}
-                  />
-
-                  <select
-                    value={boardInputs.skillLevel}
-                    onChange={(e) =>
-                      setBoardInputs({
-                        ...boardInputs,
-                        skillLevel: e.target.value,
-                      })
-                    }
-                    style={{
-                      padding: "10px 12px",
-                      border: "1px solid #d9c3ad",
-                      borderRadius: "8px",
-                      fontSize: "14px",
-                      fontFamily: "inherit",
-                      cursor: "pointer",
-                    }}
-                  >
-                    <option value="beginner">Beginner</option>
-                    <option value="intermediate">Intermediate</option>
-                    <option value="advanced">Advanced</option>
-                  </select>
-                </div>
-
-                {recommendationError && (
-                  <p
-                    style={{
-                      color: "#d9534f",
-                      marginBottom: "16px",
-                      fontSize: "14px",
-                    }}
-                  >
-                    {recommendationError}
+              recommendationLoading && boardUsingSavedProfile ? (
+                <>
+                  <h2 style={{ marginTop: 0, marginBottom: "12px" }}>
+                    Finding your recommendations
+                  </h2>
+                  <p style={{ margin: 0, color: "#65574d", lineHeight: 1.6 }}>
+                    We found saved measurements on your profile, so the board
+                    chooser is using them automatically.
                   </p>
-                )}
+                </>
+              ) : (
+                <>
+                  <h2 style={{ marginTop: 0, marginBottom: "20px" }}>
+                    Find Your Perfect Board
+                  </h2>
 
-                <div
-                  style={{
-                    display: "flex",
-                    gap: "12px",
-                    justifyContent: "flex-end",
-                  }}
-                >
-                  <button
-                    type="button"
-                    className="ps-btn ps-btn-secondary"
-                    onClick={resetBoardChooser}
+                  {boardUsingSavedProfile && (
+                    <p
+                      style={{
+                        marginTop: 0,
+                        marginBottom: "16px",
+                        color: "#65574d",
+                        lineHeight: 1.5,
+                        fontWeight: 500,
+                      }}
+                    >
+                      Using your saved measurements.
+                    </p>
+                  )}
+
+                  {!boardUsingSavedProfile && (
+                    <p
+                      style={{
+                        marginTop: 0,
+                        marginBottom: "16px",
+                        color: "#65574d",
+                        lineHeight: 1.5,
+                      }}
+                    >
+                      Enter your measurements to find boards that match your
+                      needs.
+                    </p>
+                  )}
+
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "12px",
+                      marginBottom: "20px",
+                    }}
                   >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    className="ps-btn ps-btn-primary"
-                    onClick={handleGetRecommendations}
-                    disabled={recommendationLoading}
+                    {/* Weight, height, and skill level are sent to the recommendation endpoint. */}
+                    <input
+                      type="number"
+                      placeholder="Weight (kg)"
+                      value={boardInputs.weight}
+                      onChange={(e) =>
+                        setBoardInputs({
+                          ...boardInputs,
+                          weight: e.target.value,
+                        })
+                      }
+                      disabled={boardUsingSavedProfile && recommendationLoading}
+                      min="30"
+                      max="150"
+                      style={{
+                        padding: "10px 12px",
+                        border: "1px solid #d9c3ad",
+                        borderRadius: "8px",
+                        fontSize: "14px",
+                        fontFamily: "inherit",
+                        opacity:
+                          boardUsingSavedProfile && recommendationLoading
+                            ? 0.6
+                            : 1,
+                        cursor:
+                          boardUsingSavedProfile && recommendationLoading
+                            ? "not-allowed"
+                            : "auto",
+                      }}
+                    />
+
+                    <input
+                      type="number"
+                      placeholder="Height (cm)"
+                      value={boardInputs.height}
+                      onChange={(e) =>
+                        setBoardInputs({
+                          ...boardInputs,
+                          height: e.target.value,
+                        })
+                      }
+                      disabled={boardUsingSavedProfile && recommendationLoading}
+                      min="120"
+                      max="220"
+                      style={{
+                        padding: "10px 12px",
+                        border: "1px solid #d9c3ad",
+                        borderRadius: "8px",
+                        fontSize: "14px",
+                        fontFamily: "inherit",
+                        opacity:
+                          boardUsingSavedProfile && recommendationLoading
+                            ? 0.6
+                            : 1,
+                        cursor:
+                          boardUsingSavedProfile && recommendationLoading
+                            ? "not-allowed"
+                            : "auto",
+                      }}
+                    />
+
+                    <select
+                      value={boardInputs.skillLevel}
+                      onChange={(e) =>
+                        setBoardInputs({
+                          ...boardInputs,
+                          skillLevel: e.target.value,
+                        })
+                      }
+                      disabled={boardUsingSavedProfile && recommendationLoading}
+                      style={{
+                        padding: "10px 12px",
+                        border: "1px solid #d9c3ad",
+                        borderRadius: "8px",
+                        fontSize: "14px",
+                        fontFamily: "inherit",
+                        cursor:
+                          boardUsingSavedProfile && recommendationLoading
+                            ? "not-allowed"
+                            : "pointer",
+                        opacity:
+                          boardUsingSavedProfile && recommendationLoading
+                            ? 0.6
+                            : 1,
+                      }}
+                    >
+                      <option value="beginner">Beginner</option>
+                      <option value="intermediate">Intermediate</option>
+                      <option value="advanced">Advanced</option>
+                    </select>
+                  </div>
+
+                  {recommendationError && (
+                    <p
+                      style={{
+                        color: "#d9534f",
+                        marginBottom: "16px",
+                        fontSize: "14px",
+                      }}
+                    >
+                      {recommendationError}
+                    </p>
+                  )}
+
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: "12px",
+                      justifyContent: "flex-end",
+                    }}
                   >
-                    {recommendationLoading
-                      ? "Loading..."
-                      : "Get Recommendations"}
-                  </button>
-                </div>
-              </>
+                    <button
+                      type="button"
+                      className="ps-btn ps-btn-secondary"
+                      onClick={resetBoardChooser}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="ps-btn ps-btn-primary"
+                      onClick={handleGetRecommendations}
+                      disabled={recommendationLoading}
+                    >
+                      {recommendationLoading
+                        ? "Loading..."
+                        : "Get Recommendations"}
+                    </button>
+                  </div>
+                </>
+              )
             ) : (
               <>
                 <h2 style={{ marginTop: 0, marginBottom: "16px" }}>

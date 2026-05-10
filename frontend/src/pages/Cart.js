@@ -2,12 +2,7 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
-import {
-  getBasePrice,
-  getDisplayPrice,
-  getVatAmount,
-  fetchVatRate,
-} from "../utils/pricing";
+import { getBasePrice, getDisplayPrice, fetchVatRate } from "../utils/pricing";
 
 function Cart({
   session,
@@ -314,11 +309,15 @@ function Cart({
     loadCart();
   }, [session?.token]);
 
-  const totalPrice = displayItems.reduce(
+  // Calculate cart summary
+  const subtotal = displayItems.reduce(
     (total, item) =>
-      total + getDisplayPrice(item) * (Number(item.quantity) || 1),
+      total + (Number(item.price) || 0) * (Number(item.quantity) || 1),
     0,
   );
+  const shipping = subtotal > 0 ? 10.0 : 0;
+  const tax = (subtotal + shipping) * 0.18;
+  const total = subtotal + shipping + tax;
 
   return (
     <div className="ps-page">
@@ -491,41 +490,118 @@ function Cart({
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
-                  gap: "20px",
+                  gap: "32px",
                 }}
               >
-                <div>
-                  <p style={{ margin: "0 0 6px", color: "#65574d" }}>Items</p>
-                  <h2 style={{ margin: 0 }}>
+                <div style={{ minWidth: "100px" }}>
+                  <p
+                    style={{
+                      margin: "0 0 6px",
+                      color: "#65574d",
+                      fontSize: "13px",
+                    }}
+                  >
+                    Items
+                  </p>
+                  <h2 style={{ margin: 0, fontSize: "20px" }}>
                     {displayItems.length}{" "}
                     {displayItems.length === 1 ? "item" : "items"}
                   </h2>
                 </div>
+
                 <div
                   style={{
-                    textAlign: "right",
+                    flex: 1,
                     display: "flex",
-                    flexDirection: "column",
-                    alignItems: "flex-end",
-                    gap: "12px",
+                    justifyContent: "center",
+                    gap: "48px",
+                    alignItems: "center",
                   }}
                 >
-                  <div>
-                    <p style={{ margin: "0 0 6px", color: "#65574d" }}>Total</p>
-                    <h2 style={{ margin: 0 }}>${totalPrice.toFixed(2)}</h2>
-                  </div>
-                  <div style={{ display: "flex", gap: 12 }}>
-                    <button
-                      type="button"
-                      className="ps-btn ps-btn-primary"
-                      onClick={handleCheckout}
-                      style={{ padding: "9px 16px" }}
-                      disabled={displayItems.length === 0}
+                  <div style={{ textAlign: "center", minWidth: "80px" }}>
+                    <p
+                      style={{
+                        margin: "0 0 4px",
+                        color: "#65574d",
+                        fontSize: "12px",
+                      }}
                     >
-                      Buy Now
-                    </button>
+                      Subtotal
+                    </p>
+                    <p style={{ margin: 0, fontWeight: 700, fontSize: "14px" }}>
+                      ${subtotal.toFixed(2)}
+                    </p>
+                  </div>
+
+                  <div style={{ textAlign: "center", minWidth: "80px" }}>
+                    <p
+                      style={{
+                        margin: "0 0 4px",
+                        color: "#65574d",
+                        fontSize: "12px",
+                      }}
+                    >
+                      Shipping
+                    </p>
+                    <p style={{ margin: 0, fontWeight: 700, fontSize: "14px" }}>
+                      ${shipping.toFixed(2)}
+                    </p>
+                  </div>
+
+                  <div style={{ textAlign: "center", minWidth: "80px" }}>
+                    <p
+                      style={{
+                        margin: "0 0 4px",
+                        color: "#65574d",
+                        fontSize: "12px",
+                      }}
+                    >
+                      Tax (18%)
+                    </p>
+                    <p style={{ margin: 0, fontWeight: 700, fontSize: "14px" }}>
+                      ${tax.toFixed(2)}
+                    </p>
+                  </div>
+
+                  <div
+                    style={{
+                      textAlign: "center",
+                      minWidth: "80px",
+                      borderLeft: "2px solid #d9c3ad",
+                      paddingLeft: "24px",
+                    }}
+                  >
+                    <p
+                      style={{
+                        margin: "0 0 4px",
+                        color: "#65574d",
+                        fontSize: "12px",
+                      }}
+                    >
+                      Total
+                    </p>
+                    <p
+                      style={{
+                        margin: 0,
+                        fontWeight: 800,
+                        fontSize: "16px",
+                        color: "#1f1813",
+                      }}
+                    >
+                      ${total.toFixed(2)}
+                    </p>
                   </div>
                 </div>
+
+                <button
+                  type="button"
+                  className="ps-btn ps-btn-primary"
+                  onClick={handleCheckout}
+                  style={{ padding: "10px 24px", whiteSpace: "nowrap" }}
+                  disabled={displayItems.length === 0}
+                >
+                  Buy Now
+                </button>
               </div>
             </div>
           )}

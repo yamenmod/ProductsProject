@@ -2,6 +2,37 @@ const jwt = require("jsonwebtoken");
 const nodemailer = require("nodemailer");
 const db = require("../db/connection");
 
+const normalizeOptionalMeasurement = (value, fieldName) => {
+  if (value === undefined || value === null || value === "") {
+    return null;
+  }
+
+  const numericValue = Number(value);
+
+  if (!Number.isFinite(numericValue)) {
+    const error = new Error(`${fieldName} must be a valid number`);
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return numericValue;
+};
+
+const formatUser = (user) => ({
+  id: user.id,
+  username: user.username,
+  email: user.email,
+  role: user.role,
+  weight:
+    user.weight === null || user.weight === undefined
+      ? null
+      : Number(user.weight),
+  height:
+    user.height === null || user.height === undefined
+      ? null
+      : Number(user.height),
+});
+
 const createMailTransporter = () => {
   const user = process.env.EMAIL_USER;
   const pass = process.env.EMAIL_PASS;
@@ -166,7 +197,7 @@ const resetPassword = async (req, res) => {
 // The response includes the user role so the frontend can show admin-only UI.
 const register = async (req, res) => {
   try {
-    const { username, email, password } = req.body;
+    const { username, email, password, weight, height } = req.body;
 
     if (!username || !email || !password) {
       return res
@@ -174,10 +205,14 @@ const register = async (req, res) => {
         .json({ message: "Username, email and password are required" });
     }
 
+    const normalizedUsername = username.trim();
     const normalizedEmail = email.toLowerCase().trim();
+    const normalizedWeight = normalizeOptionalMeasurement(weight, "Weight");
+    const normalizedHeight = normalizeOptionalMeasurement(height, "Height");
+
     const [existingUsers] = await db.query(
       "SELECT id FROM users WHERE username = ? OR email = ? LIMIT 1",
-      [username.trim(), normalizedEmail],
+      [normalizedUsername, normalizedEmail],
     );
 
     if (existingUsers.length) {
@@ -185,12 +220,19 @@ const register = async (req, res) => {
     }
 
     const [insertResult] = await db.query(
-      "INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, ?)",
-      [username.trim(), normalizedEmail, password, "user"],
+      "INSERT INTO users (username, email, password, role, weight, height) VALUES (?, ?, ?, ?, ?, ?)",
+      [
+        normalizedUsername,
+        normalizedEmail,
+        password,
+        "user",
+        normalizedWeight,
+        normalizedHeight,
+      ],
     );
 
     const [users] = await db.query(
-      "SELECT id, username, email, role FROM users WHERE id = ? LIMIT 1",
+      "SELECT id, username, email, role, weight, height FROM users WHERE id = ? LIMIT 1",
       [insertResult.insertId],
     );
 
@@ -201,14 +243,13 @@ const register = async (req, res) => {
     return res.status(201).json({
       message: "success",
       token,
-      user: {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        role: user.role,
-      },
+      user: formatUser(user),
     });
   } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ message: error.message });
+    }
+
     return res.status(500).json({ message: "Server error" });
   }
 };
@@ -226,7 +267,7 @@ const login = async (req, res) => {
     }
 
     const [users] = await db.query(
-      "SELECT id, username, email, password, role FROM users WHERE username = ? AND password = ? LIMIT 1",
+      "SELECT id, username, email, password, role, weight, height FROM users WHERE username = ? AND password = ? LIMIT 1",
       [username.trim(), password],
     );
 
@@ -241,14 +282,76 @@ const login = async (req, res) => {
     return res.status(200).json({
       message: "success",
       token,
-      user: {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        role: user.role,
-      },
+      user: formatUser(user),
     });
   } catch (error) {
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+const getProfile = async (req, res) => {
+  try {
+    const [users] = await db.query(
+      "SELECT id, username, email, role, weight, height FROM users WHERE id = ? LIMIT 1",
+      [req.user.id],
+    );
+
+    const user = users[0];
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    return res.status(200).json({ user: formatUser(user) });
+  } catch (error) {
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+const updateProfile = async (req, res) => {
+  try {
+    const { username, weight, height } = req.body;
+
+    if (!username || !username.trim()) {
+      return res.status(400).json({ message: "Username is required" });
+    }
+
+    const normalizedUsername = username.trim();
+    const normalizedWeight = normalizeOptionalMeasurement(weight, "Weight");
+    const normalizedHeight = normalizeOptionalMeasurement(height, "Height");
+
+    const [existingUsers] = await db.query(
+      "SELECT id FROM users WHERE id = ? LIMIT 1",
+      [req.user.id],
+    );
+
+    if (!existingUsers.length) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    await db.query(
+      "UPDATE users SET username = ?, weight = ?, height = ? WHERE id = ?",
+      [normalizedUsername, normalizedWeight, normalizedHeight, req.user.id],
+    );
+
+    const [users] = await db.query(
+      "SELECT id, username, email, role, weight, height FROM users WHERE id = ? LIMIT 1",
+      [req.user.id],
+    );
+
+    return res.status(200).json({
+      message: "Profile updated",
+      user: formatUser(users[0]),
+    });
+  } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ message: error.message });
+    }
+
+    if (error.code === "ER_DUP_ENTRY") {
+      return res.status(400).json({ message: "Username already exists" });
+    }
+
     return res.status(500).json({ message: "Server error" });
   }
 };
@@ -256,4 +359,6 @@ const login = async (req, res) => {
 module.exports = {
   register,
   login,
+  getProfile,
+  updateProfile,
 };

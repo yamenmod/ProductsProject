@@ -1,4 +1,5 @@
 const db = require("../db/connection");
+const jwt = require("jsonwebtoken");
 const {
   calculateVatPricing,
   roundMoney,
@@ -678,16 +679,69 @@ const syncImages = async (req, res) => {
 const recommendBoards = async (req, res) => {
   try {
     const { weight, height, skillLevel } = req.body;
+    let resolvedWeight = weight;
+    let resolvedHeight = height;
 
-    if (!weight || !height || !skillLevel) {
+    const hasMissingMeasurements =
+      resolvedWeight === undefined ||
+      resolvedWeight === null ||
+      resolvedWeight === "" ||
+      resolvedHeight === undefined ||
+      resolvedHeight === null ||
+      resolvedHeight === "";
+
+    if (hasMissingMeasurements) {
+      const authorizationHeader = req.headers.authorization || "";
+
+      if (authorizationHeader.startsWith("Bearer ")) {
+        try {
+          const token = authorizationHeader.split(" ")[1];
+          const decoded = jwt.verify(
+            token,
+            process.env.JWT_SECRET || "secret123",
+          );
+
+          const [users] = await db.query(
+            "SELECT weight, height FROM users WHERE id = ? LIMIT 1",
+            [decoded.id],
+          );
+
+          const profile = users[0];
+
+          if (
+            (resolvedWeight === undefined ||
+              resolvedWeight === null ||
+              resolvedWeight === "") &&
+            profile?.weight !== undefined &&
+            profile?.weight !== null
+          ) {
+            resolvedWeight = profile.weight;
+          }
+
+          if (
+            (resolvedHeight === undefined ||
+              resolvedHeight === null ||
+              resolvedHeight === "") &&
+            profile?.height !== undefined &&
+            profile?.height !== null
+          ) {
+            resolvedHeight = profile.height;
+          }
+        } catch (tokenError) {
+          // Continue with the request body if the token is missing or invalid.
+        }
+      }
+    }
+
+    if (!resolvedWeight || !resolvedHeight || !skillLevel) {
       return res.status(400).json({
         message: "weight, height, and skillLevel are required",
       });
     }
 
     // Validate weight and height
-    const weightNum = Number(weight);
-    const heightNum = Number(height);
+    const weightNum = Number(resolvedWeight);
+    const heightNum = Number(resolvedHeight);
 
     if (Number.isNaN(weightNum) || Number.isNaN(heightNum)) {
       return res.status(400).json({

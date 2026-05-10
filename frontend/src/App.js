@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import Login from "./pages/Login";
 import Home from "./pages/Home";
@@ -11,6 +11,7 @@ import ManageOrders from "./pages/ManageOrders";
 import ManageProducts from "./pages/ManageProducts";
 import ManageCustomers from "./pages/ManageCustomers";
 import AdminDashboard from "./pages/AdminDashboard";
+import Profile from "./pages/Profile";
 
 const normalizeCartItems = (items = []) =>
   (Array.isArray(items) ? items : []).map((item) => {
@@ -60,6 +61,25 @@ function App() {
   const [selectedProductToEdit, setSelectedProductToEdit] = useState(null);
   const [cartItems, setCartItems] = useState([]);
 
+  const handleSessionUpdate = useCallback((nextUser) => {
+    setSession((previousSession) => {
+      if (!previousSession) {
+        return previousSession;
+      }
+
+      const updatedSession = {
+        ...previousSession,
+        user: {
+          ...previousSession.user,
+          ...nextUser,
+        },
+      };
+
+      localStorage.setItem("session", JSON.stringify(updatedSession));
+      return updatedSession;
+    });
+  }, []);
+
   // Restore the saved session so refreshes keep the user logged in.
   // If a session exists, admin users are taken to the admin dashboard.
   useEffect(() => {
@@ -68,15 +88,35 @@ function App() {
       const parsedSession = JSON.parse(savedSession);
       const normalizedGender =
         parsedSession.preferredGender === "female" ? "female" : "male";
-      setSession({
+      const restoredSession = {
         ...parsedSession,
         preferredGender: normalizedGender,
-      });
+      };
+
+      setSession(restoredSession);
+
+      // For non-admin users, ensure profile data is fresh before rendering home
+      if (parsedSession.token && parsedSession.user?.role !== "admin") {
+        axios
+          .get("/api/auth/profile", {
+            headers: {
+              Authorization: `Bearer ${parsedSession.token}`,
+            },
+          })
+          .then((response) => {
+            const profileUser = response.data.user || response.data;
+            handleSessionUpdate(profileUser);
+          })
+          .catch(() => {
+            // Keep the restored session if the profile lookup fails.
+          });
+      }
+
       setCurrentPage(
         parsedSession.user?.role === "admin" ? "admin-dashboard" : "home",
       );
     }
-  }, []);
+  }, [handleSessionUpdate]);
 
   useEffect(() => {
     const loadCart = async () => {
@@ -108,7 +148,12 @@ function App() {
     const isAdmin = session?.user?.role === "admin";
 
     if (
-      ["manage-orders", "manage-products", "manage-customers", "admin-dashboard"].includes(page) &&
+      [
+        "manage-orders",
+        "manage-products",
+        "manage-customers",
+        "admin-dashboard",
+      ].includes(page) &&
       !isAdmin
     ) {
       setCurrentPage("home");
@@ -128,7 +173,9 @@ function App() {
 
     if (
       isAdmin &&
-      ["home", "shop", "size-charts", "contact", "products", "cart"].includes(page)
+      ["home", "shop", "size-charts", "contact", "products", "cart"].includes(
+        page,
+      )
     ) {
       setCurrentPage("admin-dashboard");
       return;
@@ -299,6 +346,22 @@ function App() {
         onPreferredGenderChange={handlePreferredGenderChange}
         onLogout={logout}
         cartCount={cartCount}
+      />
+    );
+  }
+
+  if (currentPage === "profile") {
+    return (
+      <Profile
+        session={session}
+        user={session.user}
+        preferredGender={preferredGender}
+        currentPage={currentPage}
+        onNavigate={handleNavigate}
+        onPreferredGenderChange={handlePreferredGenderChange}
+        onLogout={logout}
+        cartCount={cartCount}
+        onSessionUpdate={handleSessionUpdate}
       />
     );
   }

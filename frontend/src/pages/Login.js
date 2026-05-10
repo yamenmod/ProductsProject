@@ -1,11 +1,36 @@
 import React, { useState } from "react";
 import axios from "axios";
 
+const sanitizeNumericInput = (value) => {
+  const nextValue = (value || "").toString().replace(/[^0-9.]/g, "");
+  const decimalParts = nextValue.split(".");
+
+  if (decimalParts.length <= 2) {
+    return `${decimalParts[0] || ""}${decimalParts.length === 2 ? `.${decimalParts[1].replace(/\./g, "")}` : ""}`;
+  }
+
+  return `${decimalParts[0] || ""}.${decimalParts.slice(1).join("").replace(/\./g, "")}`;
+};
+
+const normalizeOptionalNumber = (value) => {
+  const trimmedValue = (value || "").trim();
+
+  if (!trimmedValue) {
+    return null;
+  }
+
+  const numericValue = Number(trimmedValue);
+
+  return Number.isFinite(numericValue) ? numericValue : NaN;
+};
+
 function Login({ onLoginSuccess, onNavigate }) {
   const [isRegister, setIsRegister] = useState(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [email, setEmail] = useState("");
+  const [weight, setWeight] = useState("");
+  const [height, setHeight] = useState("");
   const [message, setMessage] = useState("");
 
   const handleSubmit = async () => {
@@ -16,6 +41,20 @@ function Login({ onLoginSuccess, onNavigate }) {
         setMessage("⚠️ All fields are required! (Username, Email, Password)");
         return;
       }
+
+      const normalizedWeight = normalizeOptionalNumber(weight);
+      const normalizedHeight = normalizeOptionalNumber(height);
+
+      if (weight.trim() && Number.isNaN(normalizedWeight)) {
+        setMessage("⚠️ Weight must be a valid number!");
+        return;
+      }
+
+      if (height.trim() && Number.isNaN(normalizedHeight)) {
+        setMessage("⚠️ Height must be a valid number!");
+        return;
+      }
+
       if (username.trim().length < 3) {
         setMessage("⚠️ Username must be at least 3 characters!");
         return;
@@ -34,6 +73,8 @@ function Login({ onLoginSuccess, onNavigate }) {
           username,
           password,
           email,
+          weight: normalizedWeight,
+          height: normalizedHeight,
         });
 
         if (res.data.message === "success") {
@@ -109,24 +150,92 @@ function Login({ onLoginSuccess, onNavigate }) {
           </div>
 
           {isRegister && (
-            <div>
-              <label
+            <>
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    marginBottom: "7px",
+                    fontWeight: 700,
+                    fontSize: "13px",
+                  }}
+                >
+                  Email
+                </label>
+                <input
+                  placeholder="Enter your email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+              </div>
+
+              <div
                 style={{
-                  display: "block",
-                  marginBottom: "7px",
-                  fontWeight: 700,
-                  fontSize: "13px",
+                  padding: "14px",
+                  borderRadius: "16px",
+                  border: "1px solid rgba(31, 24, 19, 0.08)",
+                  background: "rgba(247, 239, 229, 0.72)",
                 }}
               >
-                Email
-              </label>
-              <input
-                placeholder="Enter your email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </div>
+                <p
+                  style={{
+                    margin: "0 0 12px",
+                    color: "#65574d",
+                    fontSize: "13px",
+                    fontWeight: 700,
+                  }}
+                >
+                  This might help you for choosing your board
+                </p>
+
+                <div style={{ display: "grid", gap: "12px" }}>
+                  <div>
+                    <label
+                      style={{
+                        display: "block",
+                        marginBottom: "7px",
+                        fontWeight: 700,
+                        fontSize: "13px",
+                      }}
+                    >
+                      Weight
+                    </label>
+                    <input
+                      placeholder="Optional weight"
+                      inputMode="decimal"
+                      value={weight}
+                      onChange={(e) =>
+                        setWeight(sanitizeNumericInput(e.target.value))
+                      }
+                      type="text"
+                    />
+                  </div>
+
+                  <div>
+                    <label
+                      style={{
+                        display: "block",
+                        marginBottom: "7px",
+                        fontWeight: 700,
+                        fontSize: "13px",
+                      }}
+                    >
+                      Height
+                    </label>
+                    <input
+                      placeholder="Optional height"
+                      inputMode="decimal"
+                      value={height}
+                      onChange={(e) =>
+                        setHeight(sanitizeNumericInput(e.target.value))
+                      }
+                      type="text"
+                    />
+                  </div>
+                </div>
+              </div>
+            </>
           )}
 
           <div>
@@ -147,7 +256,6 @@ function Login({ onLoginSuccess, onNavigate }) {
               onChange={(e) => setPassword(e.target.value)}
             />
           </div>
-
         </div>
 
         {message && (

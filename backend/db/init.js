@@ -7,14 +7,49 @@ const initDatabase = async () => {
       username VARCHAR(100) NOT NULL UNIQUE,
       email VARCHAR(255) NOT NULL UNIQUE,
       password VARCHAR(255) NOT NULL,
+      weight DECIMAL(6, 2) DEFAULT NULL,
+      height DECIMAL(6, 2) DEFAULT NULL,
       role ENUM('user', 'admin') NOT NULL DEFAULT 'user',
-      reset_code VARCHAR(6) DEFAULT NULL,
-      reset_code_expires DATETIME DEFAULT NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     )
   `);
 
+  // Add weight column if it doesn't exist
+  const [weightColumn] = await db.query(
+    `
+      SELECT COUNT(*) AS total
+      FROM information_schema.columns
+      WHERE table_schema = DATABASE()
+        AND table_name = 'users'
+        AND column_name = 'weight'
+    `,
+  );
+
+  if (weightColumn[0]?.total === 0) {
+    await db.query(
+      `ALTER TABLE users ADD COLUMN weight DECIMAL(6, 2) DEFAULT NULL`,
+    );
+  }
+
+  // Add height column if it doesn't exist
+  const [heightColumn] = await db.query(
+    `
+      SELECT COUNT(*) AS total
+      FROM information_schema.columns
+      WHERE table_schema = DATABASE()
+        AND table_name = 'users'
+        AND column_name = 'height'
+    `,
+  );
+
+  if (heightColumn[0]?.total === 0) {
+    await db.query(
+      `ALTER TABLE users ADD COLUMN height DECIMAL(6, 2) DEFAULT NULL`,
+    );
+  }
+
+  // Drop reset_code column if it exists (no longer needed)
   const [resetCodeColumn] = await db.query(
     `
       SELECT COUNT(*) AS total
@@ -25,10 +60,11 @@ const initDatabase = async () => {
     `,
   );
 
-  if (resetCodeColumn[0]?.total === 0) {
-    await db.query(`ALTER TABLE users ADD COLUMN reset_code VARCHAR(6) DEFAULT NULL`);
+  if (resetCodeColumn[0]?.total > 0) {
+    await db.query(`ALTER TABLE users DROP COLUMN reset_code`);
   }
 
+  // Drop reset_code_expires column if it exists (no longer needed)
   const [resetCodeExpiresColumn] = await db.query(
     `
       SELECT COUNT(*) AS total
@@ -39,8 +75,8 @@ const initDatabase = async () => {
     `,
   );
 
-  if (resetCodeExpiresColumn[0]?.total === 0) {
-    await db.query(`ALTER TABLE users ADD COLUMN reset_code_expires DATETIME DEFAULT NULL`);
+  if (resetCodeExpiresColumn[0]?.total > 0) {
+    await db.query(`ALTER TABLE users DROP COLUMN reset_code_expires`);
   }
 
   await db.query(`
