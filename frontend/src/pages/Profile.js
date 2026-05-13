@@ -146,7 +146,7 @@ function Profile({
   };
 
   return (
-    <div className="ps-page">
+    <div className="ps-page ps-profile-page">
       <Header
         user={user}
         preferredGender={preferredGender}

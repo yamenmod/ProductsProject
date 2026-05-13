@@ -863,6 +863,10 @@ textarea {
   margin: 0 auto;
 }
 
+.ps-profile-page .ps-title {
+  font-family: "Bebas Neue", Impact, sans-serif;
+}
+
 .ps-pill {
   display: inline-flex;
   align-items: center;
