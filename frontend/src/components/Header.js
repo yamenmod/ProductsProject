@@ -310,14 +310,9 @@ function Header({
                   alt="Profile"
                   className="ps-profile-icon"
                 />
-                <span className="ps-profile-label-aesthetic">Profile</span>
+                <span className="ps-cart-label">Profile</span>
               </button>
             )}
-            <span
-              style={{ color: "#5f5550", fontSize: "13px", fontWeight: 700 }}
-            >
-              {user.username}
-            </span>
           </div>
 
           {user.role === "user" && (
@@ -337,7 +332,7 @@ function Header({
                   {cartCount > 99 ? "99+" : cartCount}
                 </span>
               )}
-              <span className="ps-cart-label">cart</span>
+              <span className="ps-cart-label">Cart</span>
             </button>
           )}
 
