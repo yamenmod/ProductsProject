@@ -727,14 +727,8 @@ function Products({
                           gap: "2px",
                         }}
                       >
-                        <span style={{ color: "#8d8178", textDecoration: "line-through", fontSize: "12px", fontWeight: 600 }}>
-                          ${getBasePrice(product).toFixed(2)}
-                        </span>
                         <span style={{ fontWeight: 800, color: "#1f1813", fontSize: "18px" }}>
-                          ${getDisplayPrice(product).toFixed(2)}
-                        </span>
-                        <span style={{ color: "#65574d", fontSize: "11px" }}>
-                          VAT ${getVatAmount(product).toFixed(2)} included
+                          ${getBasePrice(product).toFixed(2)}
                         </span>
                       </p>
                       <p style={{ margin: "0 0 6px 0", color: "#5f5550" }}>
@@ -873,14 +867,8 @@ function Products({
               >
                 <div>
                   <div className="ps-previewPrice" style={{ display: "grid", gap: "2px" }}>
-                    <span style={{ color: "#8d8178", textDecoration: "line-through", fontSize: "14px", fontWeight: 600 }}>
-                      ${getBasePrice(previewProduct).toFixed(2)}
-                    </span>
                     <span style={{ fontWeight: 800, color: "#1f1813", fontSize: "22px" }}>
-                      ${getDisplayPrice(previewProduct).toFixed(2)}
-                    </span>
-                    <span style={{ color: "#65574d", fontSize: "12px" }}>
-                      VAT ${getVatAmount(previewProduct).toFixed(2)} included
+                      ${getBasePrice(previewProduct).toFixed(2)}
                     </span>
                   </div>
                   <p className="ps-previewStock">

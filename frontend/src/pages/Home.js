@@ -507,13 +507,13 @@ function Home({
                         </span>
                       </div>
                     </div>
+                    <div></div>
                     <button
                       type="button"
                       className="ps-btn ps-btn-primary"
                       style={{
                         width: "100%",
                         fontSize: "12px",
-                        padding: "8px 12px",
                       }}
                       onClick={() => handleCardAddToCart(product)}
                       disabled={(product.stock ?? 0) < 1}

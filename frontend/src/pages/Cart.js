@@ -80,31 +80,38 @@ function Cart({
     }
   };
 
-  // Checkout the entire cart (backend will validate stock and create order)
-  const handleCheckout = async () => {
+  // Initiate PayPal checkout by creating an order server-side and redirecting
+  // the user to PayPal's approval page. This prevents immediate server-side
+  // fulfillment without payment.
+  const handleBuyNow = async () => {
     if (!session?.token) {
       alert("Please sign in to complete purchases.");
       return;
     }
 
+    if (!paypalConfig) {
+      alert("PayPal is not configured for this environment. Contact support.");
+      return;
+    }
+
     try {
       const resp = await axios.post(
-        "/api/cart/checkout",
+        "/api/cart/paypal/create-order",
         {},
         { headers: { Authorization: `Bearer ${session.token}` } },
       );
 
-      await refreshCart();
-      alert(resp.data?.message || "Purchase completed successfully.");
+      const orderID = resp.data?.orderID || resp.data?.id;
+      if (!orderID) {
+        throw new Error("No PayPal order ID returned");
+      }
+
+      const env = paypalConfig.environment === "production" ? "www.paypal.com" : "www.sandbox.paypal.com";
+      // Redirect user to PayPal approval page
+      window.location.href = `https://${env}/checkoutnow?token=${encodeURIComponent(orderID)}`;
     } catch (error) {
-      console.error(
-        "Checkout failed:",
-        error?.response?.data || error.message || error,
-      );
-      const msg =
-        (error?.response?.data && error.response.data.message) ||
-        "Purchase failed. Please try again or contact support.";
-      alert(msg);
+      console.error("Failed to start PayPal checkout:", error?.response || error);
+      alert("Unable to start PayPal checkout. Please try again later.");
     }
   };
 
@@ -164,8 +171,9 @@ function Cart({
       };
       document.body.appendChild(script);
     } catch (error) {
-      console.error("Failed to load PayPal configuration:", error.message);
-      setPaypalMessage("Unable to initialize PayPal checkout.");
+      const errorMsg = error?.response?.data?.message || error.message || "Unknown error";
+      console.error("Failed to load PayPal configuration:", errorMsg);
+      setPaypalMessage(`PayPal Error: ${errorMsg}`);
     } finally {
       setIsPayPalLoading(false);
     }
@@ -747,7 +755,7 @@ function Cart({
                 <button
                   type="button"
                   className="ps-btn ps-btn-primary"
-                  onClick={handleCheckout}
+                  onClick={handleBuyNow}
                   style={{ padding: "10px 24px", whiteSpace: "nowrap" }}
                   disabled={displayItems.length === 0}
                 >

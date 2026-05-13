@@ -327,11 +327,9 @@ function Header({
                 alt="Cart"
                 className="ps-cart-icon"
               />
-              {cartCount > 0 && (
-                <span className="ps-cart-count">
-                  {cartCount > 99 ? "99+" : cartCount}
-                </span>
-              )}
+              <span className="ps-cart-count">
+                {cartCount === 0 ? "empty" : cartCount > 99 ? "99+" : cartCount}
+              </span>
               <span className="ps-cart-label">Cart</span>
             </button>
           )}

@@ -338,12 +338,12 @@ textarea {
 .ps-dropBody {
   display: flex;
   flex-direction: column;
-  flex: 1 1 auto;
 }
 
 /* Ensure Add to Cart button sits at the bottom of the card */
 .ps-dropCard .ps-btn {
-  margin-top: auto;
+  margin-top: 20px;
+  align-self: flex-end;
 }
 
 .ps-dropsArrow {

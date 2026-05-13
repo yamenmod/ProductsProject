@@ -10,6 +10,7 @@ const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID || "";
 const PAYPAL_CLIENT_SECRET = process.env.PAYPAL_CLIENT_SECRET || "";
 const PAYPAL_BASE_URL = process.env.PAYPAL_BASE_URL || "https://api.sandbox.paypal.com";
 const PAYPAL_CURRENCY = process.env.PAYPAL_CURRENCY || "USD";
+const FRONTEND_BASE_URL = process.env.FRONTEND_BASE_URL || "http://localhost:3000";
 
 const getPayPalAccessToken = async () => {
   if (!PAYPAL_CLIENT_ID || !PAYPAL_CLIENT_SECRET) {
@@ -574,6 +575,10 @@ const createPaypalOrder = async (req, res) => {
             },
           },
         ],
+        application_context: {
+          return_url: `${FRONTEND_BASE_URL}/?paypalReturn=1`,
+          cancel_url: `${FRONTEND_BASE_URL}/?paypalCancel=1`,
+        },
       },
       {
         headers: {

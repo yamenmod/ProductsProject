@@ -116,6 +116,44 @@ function App() {
         parsedSession.user?.role === "admin" ? "admin-dashboard" : "home",
       );
     }
+    // Handle PayPal redirect token (approval) present in URL
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const token = params.get("token");
+      if (token) {
+        // If user is signed in, attempt capture immediately
+        const sessionStr = localStorage.getItem("session");
+        const saved = sessionStr ? JSON.parse(sessionStr) : null;
+        if (!saved || !saved.token) {
+          alert("Please sign in to complete PayPal payment.");
+        } else {
+          (async () => {
+            try {
+              const resp = await axios.post(
+                "/api/cart/paypal/capture",
+                { orderID: token },
+                { headers: { Authorization: `Bearer ${saved.token}` } },
+              );
+
+              alert(resp.data?.message || "Payment completed successfully.");
+              // refresh cart items after capture
+              const refreshed = await axios.get("/api/cart", {
+                headers: { Authorization: `Bearer ${saved.token}` },
+              });
+              setCartItems(normalizeCartItems(refreshed.data));
+            } catch (err) {
+              console.error("PayPal capture failed:", err?.response || err);
+              alert((err?.response?.data?.message) || "PayPal capture failed. Please contact support.");
+            }
+          })();
+        }
+
+        // Clean URL
+        window.history.replaceState(null, "", window.location.pathname);
+      }
+    } catch (e) {
+      // ignore
+    }
   }, [handleSessionUpdate]);
 
   useEffect(() => {
