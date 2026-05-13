@@ -19,6 +19,34 @@ function Cart({
   const [displayItems, setDisplayItems] = useState(cartItems);
   const [pendingRemoveItem, setPendingRemoveItem] = useState(null);
   const [isRemoving, setIsRemoving] = useState(false);
+  const [paypalConfig, setPaypalConfig] = useState(null);
+  const [paypalReady, setPaypalReady] = useState(false);
+  const [paypalMessage, setPaypalMessage] = useState("");
+  const [isPayPalLoading, setIsPayPalLoading] = useState(false);
+
+  const normalizeCartItems = (items = []) =>
+    (Array.isArray(items) ? items : []).map((item) => {
+      if (item?.product) {
+        const product = item.product;
+        const productId = product.id || product._id;
+
+        return {
+          ...product,
+          id: productId,
+          _id: productId,
+          quantity: Number(item.quantity) || 1,
+        };
+      }
+
+      const productId = item?.id || item?._id;
+
+      return {
+        ...item,
+        id: productId,
+        _id: productId,
+        quantity: Number(item?.quantity) || 1,
+      };
+    });
 
   const handleRemoveClick = (item) => {
     if (!item?.id || typeof onRemoveFromCart !== "function") {
@@ -66,12 +94,7 @@ function Cart({
         { headers: { Authorization: `Bearer ${session.token}` } },
       );
 
-      // Refresh cart (should be empty after successful checkout)
-      const refreshed = await axios.get("/api/cart", {
-        headers: { Authorization: `Bearer ${session.token}` },
-      });
-
-      setDisplayItems(Array.isArray(refreshed.data) ? refreshed.data : []);
+      await refreshCart();
       alert(resp.data?.message || "Purchase completed successfully.");
     } catch (error) {
       console.error(
@@ -85,9 +108,161 @@ function Cart({
     }
   };
 
+  const refreshCart = async () => {
+    if (!session?.token) {
+      return;
+    }
+
+    try {
+      const response = await axios.get("/api/cart", {
+        headers: {
+          Authorization: `Bearer ${session.token}`,
+        },
+      });
+
+      setDisplayItems(normalizeCartItems(response.data));
+    } catch (error) {
+      console.error("Failed to refresh cart:", error.message);
+    }
+  };
+
+  const loadPayPalConfig = async () => {
+    if (!session?.token || displayItems.length === 0) {
+      return;
+    }
+
+    try {
+      setIsPayPalLoading(true);
+      setPaypalMessage("");
+      const response = await axios.get("/api/cart/paypal/config", {
+        headers: {
+          Authorization: `Bearer ${session.token}`,
+        },
+      });
+
+      if (!response.data?.clientId) {
+        setPaypalMessage("PayPal is not configured for this environment.");
+        return;
+      }
+
+      setPaypalConfig(response.data);
+
+      if (window.paypal) {
+        setPaypalReady(true);
+        return;
+      }
+
+      const script = document.createElement("script");
+      script.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(
+        response.data.clientId,
+      )}&currency=${encodeURIComponent(response.data.currency)}`;
+      script.async = true;
+      script.onload = () => setPaypalReady(true);
+      script.onerror = () => {
+        setPaypalMessage("Failed to load PayPal SDK");
+        setPaypalReady(false);
+      };
+      document.body.appendChild(script);
+    } catch (error) {
+      console.error("Failed to load PayPal configuration:", error.message);
+      setPaypalMessage("Unable to initialize PayPal checkout.");
+    } finally {
+      setIsPayPalLoading(false);
+    }
+  };
+
   useEffect(() => {
     setDisplayItems(cartItems);
   }, [cartItems]);
+
+  useEffect(() => {
+    loadPayPalConfig();
+  }, [session?.token, displayItems.length]);
+
+  useEffect(() => {
+    const renderPayPalButtons = async () => {
+      if (!paypalReady || !paypalConfig || displayItems.length === 0) {
+        return;
+      }
+
+      const container = document.getElementById("paypal-button-container");
+      if (!container) {
+        return;
+      }
+
+      container.innerHTML = "";
+
+      if (!window.paypal || !window.paypal.Buttons) {
+        setPaypalMessage("PayPal checkout is unavailable right now.");
+        return;
+      }
+
+      window.paypal
+        .Buttons({
+          style: {
+            layout: "vertical",
+            color: "gold",
+            shape: "rect",
+            label: "paypal",
+          },
+          createOrder: async () => {
+            try {
+              const response = await axios.post(
+                "/api/cart/paypal/create-order",
+                {},
+                {
+                  headers: {
+                    Authorization: `Bearer ${session.token}`,
+                  },
+                },
+              );
+
+              return response.data.orderID;
+            } catch (error) {
+              console.error("PayPal order creation failed:", error?.response || error);
+              setPaypalMessage(
+                "Could not create PayPal order. Please try again later.",
+              );
+              throw error;
+            }
+          },
+          onApprove: async (data) => {
+            try {
+              setPaypalMessage("Finalizing payment...");
+              const response = await axios.post(
+                "/api/cart/paypal/capture",
+                { orderID: data.orderID },
+                {
+                  headers: {
+                    Authorization: `Bearer ${session.token}`,
+                  },
+                },
+              );
+
+              await refreshCart();
+              setPaypalMessage(response.data?.message || "Payment successful.");
+            } catch (error) {
+              console.error("PayPal capture failed:", error?.response || error);
+              setPaypalMessage(
+                (error?.response?.data && error.response.data.message) ||
+                  "Payment could not be completed.",
+              );
+              throw error;
+            }
+          },
+          onError: (err) => {
+            console.error("PayPal button error:", err);
+            setPaypalMessage("An error occurred during PayPal checkout.");
+          },
+          onCancel: () => {
+            setPaypalMessage("PayPal checkout was cancelled.");
+          },
+        })
+        .render(container);
+    };
+
+    renderPayPalButtons();
+  }, [paypalReady, paypalConfig, displayItems.length, session?.token]);
 
   const parseImageValue = (value) => {
     if (!value) {
@@ -249,30 +424,6 @@ function Cart({
   };
 
   useEffect(() => {
-    const normalizeCartItems = (items = []) =>
-      (Array.isArray(items) ? items : []).map((item) => {
-        if (item?.product) {
-          const product = item.product;
-          const productId = product.id || product._id;
-
-          return {
-            ...product,
-            id: productId,
-            _id: productId,
-            quantity: Number(item.quantity) || 1,
-          };
-        }
-
-        const productId = item?.id || item?._id;
-
-        return {
-          ...item,
-          id: productId,
-          _id: productId,
-          quantity: Number(item?.quantity) || 1,
-        };
-      });
-
     const loadCart = async () => {
       if (!session?.token) {
         return;
@@ -312,12 +463,12 @@ function Cart({
   // Calculate cart summary
   const subtotal = displayItems.reduce(
     (total, item) =>
-      total + (Number(item.price) || 0) * (Number(item.quantity) || 1),
+      total + getDisplayPrice(item) * (Number(item.quantity) || 1),
     0,
   );
   const shipping = subtotal > 0 ? 10.0 : 0;
-  const tax = (subtotal + shipping) * 0.18;
-  const total = subtotal + shipping + tax;
+  const tax = subtotal > 0 ? subtotal - subtotal / 1.18 : 0;
+  const total = Number((subtotal + shipping).toFixed(2));
 
   return (
     <div className="ps-page">
@@ -602,6 +753,21 @@ function Cart({
                 >
                   Buy Now
                 </button>
+              </div>
+
+              <div className="ps-surface" style={{ padding: "24px", minHeight: "200px" }}>
+                <h3 style={{ margin: "0 0 12px", fontSize: "18px" }}>
+                  Pay with PayPal
+                </h3>
+                {isPayPalLoading && (
+                  <p style={{ color: "#65574d" }}>Loading PayPal checkout...</p>
+                )}
+                {paypalMessage && (
+                  <p style={{ color: "#b94d4d", margin: "0 0 12px" }}>
+                    {paypalMessage}
+                  </p>
+                )}
+                <div id="paypal-button-container" />
               </div>
             </div>
           )}

@@ -138,6 +138,22 @@ const initDatabase = async () => {
     )
   `);
 
+    await db.query(`
+    CREATE TABLE IF NOT EXISTS payments (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT NOT NULL,
+      order_id INT DEFAULT NULL,
+      paypal_order_id VARCHAR(255) NOT NULL,
+      status VARCHAR(50) NOT NULL,
+      amount DECIMAL(10, 2) NOT NULL DEFAULT 0,
+      currency VARCHAR(10) NOT NULL DEFAULT 'USD',
+      raw_response LONGTEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE SET NULL
+    )
+  `);
+
     const [productTableRows] = await db.query(
       `
       SELECT COUNT(*) AS total
@@ -200,6 +216,57 @@ const initDatabase = async () => {
         await db.query(`
         ALTER TABLE products
         ADD COLUMN board_length DECIMAL(5, 2) NULL DEFAULT NULL
+      `);
+      }
+
+      const [boardHeightColumnRows] = await db.query(
+        `
+        SELECT COUNT(*) AS total
+        FROM information_schema.columns
+        WHERE table_schema = DATABASE()
+          AND table_name = 'products'
+          AND column_name = 'board_height'
+      `,
+      );
+
+      if (boardHeightColumnRows[0]?.total === 0) {
+        await db.query(`
+        ALTER TABLE products
+        ADD COLUMN board_height DECIMAL(5, 2) NULL DEFAULT NULL
+      `);
+      }
+
+      const [heightColumnRows] = await db.query(
+        `
+        SELECT COUNT(*) AS total
+        FROM information_schema.columns
+        WHERE table_schema = DATABASE()
+          AND table_name = 'products'
+          AND column_name = 'height'
+      `,
+      );
+
+      if (heightColumnRows[0]?.total === 0) {
+        await db.query(`
+        ALTER TABLE products
+        ADD COLUMN height DECIMAL(5, 2) NULL DEFAULT NULL
+      `);
+      }
+
+      const [boardVolumeColumnRows] = await db.query(
+        `
+        SELECT COUNT(*) AS total
+        FROM information_schema.columns
+        WHERE table_schema = DATABASE()
+          AND table_name = 'products'
+          AND column_name = 'board_volume'
+      `,
+      );
+
+      if (boardVolumeColumnRows[0]?.total === 0) {
+        await db.query(`
+        ALTER TABLE products
+        ADD COLUMN board_volume DECIMAL(5, 2) NULL DEFAULT NULL
       `);
       }
 

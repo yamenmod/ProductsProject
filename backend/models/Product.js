@@ -37,6 +37,16 @@ const productSchema = new mongoose.Schema(
       default: null,
       min: 0,
     },
+    boardHeight: {
+      type: Number,
+      default: null,
+      min: 0,
+    },
+    boardVolume: {
+      type: Number,
+      default: null,
+      min: 0,
+    },
     volume: {
       type: Number,
       default: null,

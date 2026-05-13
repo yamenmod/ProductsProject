@@ -240,25 +240,43 @@ const normalizeGenderInput = (value) => {
   return "unisex";
 };
 
-const normalizeProduct = (row, vatRate = 0.18) => ({
-  _id: row.id,
-  id: row.id,
-  name: row.name,
-  description: row.description,
-  price: roundMoney(row.price),
-  ...calculateVatPricing(row.price, vatRate),
-  stock: Number(row.stock),
-  category_id: row.category_id,
-  category: row.category || "",
-  gender: normalizeGenderInput(row.gender),
-  image: resolveImagePayload(row.image_url).imageUrl,
-  image_url: resolveImagePayload(row.image_url).imageUrl,
-  image_urls: resolveImagePayload(row.image_url).imageUrls,
-  boardLength: row.board_length ? Number(row.board_length) : null,
-  volume: row.volume ? Number(row.volume) : null,
-  created_at: row.created_at,
-  updated_at: row.updated_at,
-});
+const normalizeProduct = (row, vatRate = 0.18) => {
+  const normalizedBoardHeight =
+    row.board_height !== undefined && row.board_height !== null
+      ? Number(row.board_height)
+      : row.height !== undefined && row.height !== null
+        ? Number(row.height)
+        : null;
+
+  const normalizedBoardVolume =
+    row.board_volume !== undefined && row.board_volume !== null
+      ? Number(row.board_volume)
+      : row.volume !== undefined && row.volume !== null
+        ? Number(row.volume)
+        : null;
+
+  return {
+    _id: row.id,
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    price: roundMoney(row.price),
+    ...calculateVatPricing(row.price, vatRate),
+    stock: Number(row.stock),
+    category_id: row.category_id,
+    category: row.category || "",
+    gender: normalizeGenderInput(row.gender),
+    image: resolveImagePayload(row.image_url).imageUrl,
+    image_url: resolveImagePayload(row.image_url).imageUrl,
+    image_urls: resolveImagePayload(row.image_url).imageUrls,
+    boardHeight: normalizedBoardHeight,
+    boardVolume: normalizedBoardVolume,
+    height: row.height ? Number(row.height) : null,
+    volume: row.volume ? Number(row.volume) : null,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+};
 
 const resolveCategoryId = async (categoryName) => {
   const trimmedCategory = (categoryName || "").trim();
@@ -299,6 +317,9 @@ const getProducts = async (req, res) => {
           p.gender,
           p.image_url,
           p.board_length,
+          p.board_height,
+          p.height,
+          p.board_volume,
           p.volume,
           p.created_at,
           p.updated_at,
@@ -334,6 +355,9 @@ const getProductById = async (req, res) => {
           p.gender,
           p.image_url,
           p.board_length,
+          p.board_height,
+          p.height,
+          p.board_volume,
           p.volume,
           p.created_at,
           p.updated_at,
@@ -368,8 +392,15 @@ const createProduct = async (req, res) => {
       images,
       stock,
       boardLength,
+      height,
+      boardHeight,
       volume,
+      boardVolume,
     } = req.body;
+    const nextBoardHeight =
+      boardHeight !== undefined ? boardHeight : height !== undefined ? height : null;
+    const nextBoardVolume =
+      boardVolume !== undefined ? boardVolume : volume !== undefined ? volume : null;
     const uploadedImagePaths = Array.isArray(req.files)
       ? req.files
           .filter(
@@ -406,10 +437,13 @@ const createProduct = async (req, res) => {
           gender,
           image_url,
           board_length,
+          board_height,
+          height,
+          board_volume,
           volume,
           created_at,
           updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
       `,
       [
         name.trim(),
@@ -420,7 +454,18 @@ const createProduct = async (req, res) => {
         nextGender,
         storedImageValue,
         boardLength === undefined ? null : Number(boardLength),
-        volume === undefined ? null : Number(volume),
+        nextBoardHeight === undefined || nextBoardHeight === null
+          ? null
+          : Number(nextBoardHeight),
+        nextBoardHeight === undefined || nextBoardHeight === null
+          ? null
+          : Number(nextBoardHeight),
+        nextBoardVolume === undefined || nextBoardVolume === null
+          ? null
+          : Number(nextBoardVolume),
+        nextBoardVolume === undefined || nextBoardVolume === null
+          ? null
+          : Number(nextBoardVolume),
       ],
     );
 
@@ -436,6 +481,9 @@ const createProduct = async (req, res) => {
           p.gender,
           p.image_url,
           p.board_length,
+          p.board_height,
+          p.height,
+          p.board_volume,
           p.volume,
           p.created_at,
           p.updated_at,
@@ -460,7 +508,7 @@ const createProduct = async (req, res) => {
 const updateProduct = async (req, res) => {
   try {
     const [existingRows] = await db.query(
-      "SELECT id, name, price, stock, category_id, description, gender, image_url, board_length, volume FROM products WHERE id = ? LIMIT 1",
+      "SELECT id, name, price, stock, category_id, description, gender, image_url, board_length, board_height, height, board_volume, volume FROM products WHERE id = ? LIMIT 1",
       [req.params.id],
     );
 
@@ -479,8 +527,15 @@ const updateProduct = async (req, res) => {
       images,
       stock,
       boardLength,
+      height,
+      boardHeight,
       volume,
+      boardVolume,
     } = req.body;
+    const nextBoardHeight =
+      boardHeight !== undefined ? boardHeight : height !== undefined ? height : null;
+    const nextBoardVolume =
+      boardVolume !== undefined ? boardVolume : volume !== undefined ? volume : null;
     const uploadedImagePaths = Array.isArray(req.files)
       ? req.files
           .filter(
@@ -535,6 +590,9 @@ const updateProduct = async (req, res) => {
           gender = ?,
           image_url = ?,
           board_length = ?,
+          board_height = ?,
+          height = ?,
+          board_volume = ?,
           volume = ?,
           updated_at = NOW()
         WHERE id = ?
@@ -550,7 +608,18 @@ const updateProduct = async (req, res) => {
         boardLength !== undefined
           ? Number(boardLength)
           : existingProduct.board_length,
-        volume !== undefined ? Number(volume) : existingProduct.volume,
+        nextBoardHeight !== undefined && nextBoardHeight !== null
+          ? Number(nextBoardHeight)
+          : existingProduct.height,
+        nextBoardHeight !== undefined && nextBoardHeight !== null
+          ? Number(nextBoardHeight)
+          : existingProduct.height,
+        nextBoardVolume !== undefined && nextBoardVolume !== null
+          ? Number(nextBoardVolume)
+          : existingProduct.volume,
+        nextBoardVolume !== undefined && nextBoardVolume !== null
+          ? Number(nextBoardVolume)
+          : existingProduct.volume,
         req.params.id,
       ],
     );
@@ -567,6 +636,9 @@ const updateProduct = async (req, res) => {
           p.gender,
           p.image_url,
           p.board_length,
+          p.board_height,
+          p.height,
+          p.board_volume,
           p.volume,
           p.created_at,
           p.updated_at,
@@ -762,13 +834,16 @@ const recommendBoards = async (req, res) => {
           p.gender,
           p.image_url,
           p.board_length,
+          p.board_height,
+          p.height,
+          p.board_volume,
           p.volume,
           p.created_at,
           p.updated_at,
           c.name AS category
         FROM products p
         LEFT JOIN categories c ON c.id = p.category_id
-        WHERE c.name = 'Surfboard' OR c.name = 'surfboard'
+        WHERE LOWER(c.name) LIKE '%surfboard%'
         ORDER BY p.volume ASC
       `,
     );
@@ -803,35 +878,96 @@ const recommendBoards = async (req, res) => {
     const targetVolumeMin = weightNum * volumeMultiplierMin;
     const targetVolumeMax = weightNum * volumeMultiplierMax;
 
+    const boardHeightRatio =
+      skillLevel === "beginner" || skillLevel === "Beginner"
+        ? 0.1
+        : skillLevel === "advanced" || skillLevel === "Advanced"
+          ? 0.09
+          : 0.095;
+    const boardHeightTolerance =
+      skillLevel === "beginner" || skillLevel === "Beginner"
+        ? 3.5
+        : skillLevel === "advanced" || skillLevel === "Advanced"
+          ? 2.0
+          : 2.7;
+
+    const targetBoardHeight = Math.max(0, heightNum * boardHeightRatio);
+    const targetBoardHeightMin = Math.max(0, targetBoardHeight - boardHeightTolerance);
+    const targetBoardHeightMax = targetBoardHeight + boardHeightTolerance;
+
     // Height also influences board length preferences
-    // General rule: taller people generally want longer boards
+    const surferHeightFt = heightNum / 30.48;
+    const baseLengthFt = surferHeightFt + 0.5;
+    let lengthOffsetMin = 0.2;
+    let lengthOffsetMax = 0.7;
+
+    if (skillLevel === "beginner" || skillLevel === "Beginner") {
+      lengthOffsetMin = 0.4;
+      lengthOffsetMax = 1.0;
+    } else if (skillLevel === "intermediate" || skillLevel === "Intermediate") {
+      lengthOffsetMin = 0.3;
+      lengthOffsetMax = 0.8;
+    } else if (skillLevel === "advanced" || skillLevel === "Advanced") {
+      lengthOffsetMin = 0.1;
+      lengthOffsetMax = 0.5;
+    }
+
+    const targetLengthMin = Math.max(5.0, baseLengthFt + lengthOffsetMin);
+    const targetLengthMax = Math.min(12.0, baseLengthFt + lengthOffsetMax);
+    const targetLengthCenter = (targetLengthMin + targetLengthMax) / 2;
+    const targetVolumeCenter = (targetVolumeMin + targetVolumeMax) / 2;
+    const targetHeightCenter = (targetBoardHeightMin + targetBoardHeightMax) / 2;
+
+    const scoreMetric = (value, target) => {
+      if (value === null || value === undefined || Number.isNaN(value)) {
+        return 0;
+      }
+
+      const diff = Math.abs(value - target);
+      if (diff === 0) {
+        return 100;
+      }
+
+      const normalized = Math.max(0, 100 - (diff / Math.max(target, 1)) * 100);
+      return Math.round(Math.min(100, normalized));
+    };
 
     // Get VAT rate once
     const vatRate = await getVatRateFromDb(db);
 
-    // Score each surfboard based on volume match
+    // Score each surfboard based on volume, board feet, and board length matches
     const scoredBoards = surfboards
-      .filter((board) => board.volume)
       .map((board) => {
-        const volume = Number(board.volume);
+        const normalizedHeight =
+          board.board_height !== undefined && board.board_height !== null
+            ? Number(board.board_height)
+            : board.height !== undefined && board.height !== null
+              ? Number(board.height)
+              : null;
+        const normalizedVolume =
+          board.board_volume !== undefined && board.board_volume !== null
+            ? Number(board.board_volume)
+            : board.volume !== undefined && board.volume !== null
+              ? Number(board.volume)
+              : null;
+        const volume = normalizedVolume;
+        const boardHeight = normalizedHeight;
+        const boardLength = Number(board.board_length);
 
-        // Calculate volume score (closer to target range is better)
-        // This is the primary (and only) factor for recommendations
-        let volumeScore = 0;
-        if (volume >= targetVolumeMin && volume <= targetVolumeMax) {
-          volumeScore = 100;
-        } else if (volume < targetVolumeMin) {
-          const distanceBelow = targetVolumeMin - volume;
-          volumeScore = Math.max(0, 100 - distanceBelow * 10);
-        } else {
-          const distanceAbove = volume - targetVolumeMax;
-          volumeScore = Math.max(0, 100 - distanceAbove * 10);
-        }
+        const volumeScore = scoreMetric(volume, targetVolumeCenter);
+        const heightScore = scoreMetric(boardHeight, targetHeightCenter);
+        const lengthScore = scoreMetric(boardLength, targetLengthCenter);
+
+        const recommendationScore = Math.round(
+          volumeScore * 0.5 + heightScore * 0.4 + lengthScore * 0.1,
+        );
 
         return {
           ...normalizeProduct(board, vatRate),
-          recommendationScore: Math.round(volumeScore),
-          volumeScore: Math.round(volumeScore),
+          recommendationScore,
+          volumeScore,
+          boardHeightScore: heightScore,
+          boardLengthScore: lengthScore,
         };
       })
       .sort((a, b) => b.recommendationScore - a.recommendationScore);

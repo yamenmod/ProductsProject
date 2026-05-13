@@ -23,8 +23,8 @@ function ManageProducts({
     image: "",
     image_urls: [],
     stock: "",
-    boardLength: "",
-    volume: "",
+    boardHeight: "",
+    boardVolume: "",
   });
   const [editId, setEditId] = useState(null);
   const [imageFiles, setImageFiles] = useState([]);
@@ -40,6 +40,24 @@ function ManageProducts({
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const fileInputRef = React.useRef(null);
+
+  // Generate height options from 4.0 to 10.0 in 0.1 increments, plus specific inch values
+  const heightOptions = [];
+  for (let feet = 4; feet <= 10; feet++) {
+    for (let inches = 0; inches <= 11; inches++) {
+      if (inches === 0) {
+        heightOptions.push(`${feet}.0`);
+      } else {
+        heightOptions.push(`${feet}.${inches}`);
+      }
+    }
+  }
+
+  // Generate volume options from 10 to 150
+  const volumeOptions = [];
+  for (let i = 10; i <= 150; i++) {
+    volumeOptions.push(i.toString());
+  }
 
   const normalizeGenderValue = (value) => {
     const normalized = (value || "")
@@ -180,8 +198,8 @@ function ManageProducts({
       image: "",
       image_urls: [],
       stock: "",
-      boardLength: "",
-      volume: "",
+      boardHeight: "",
+      boardVolume: "",
     });
     setImageFiles([]);
     setEditId(null);
@@ -201,6 +219,24 @@ function ManageProducts({
       return;
     }
 
+    // Validate surfboard-specific fields
+    if ((form.category || "").toLowerCase().includes("surfboard")) {
+      if (form.boardHeight !== "") {
+        const height = Number(form.boardHeight);
+        if (height < 4.0 || height > 10.11) {
+          setError("Board feet must be between 4'0\" and 10'11\".");
+          return;
+        }
+      }
+      if (form.boardVolume !== "") {
+        const volume = Number(form.boardVolume);
+        if (volume <= 0) {
+          setError("Board volume must be greater than 0 liters.");
+          return;
+        }
+      }
+    }
+
     const payload = new FormData();
     payload.append("name", form.name.trim());
     payload.append("description", form.description.trim());
@@ -210,12 +246,12 @@ function ManageProducts({
     payload.append("stock", form.stock === "" ? 0 : Number(form.stock));
 
     // Add surfboard-specific fields if category is Surfboard
-    if (form.category.toLowerCase() === "surfboard") {
-      if (form.boardLength) {
-        payload.append("boardLength", Number(form.boardLength));
+    if ((form.category || "").toLowerCase().includes("surfboard")) {
+      if (form.boardHeight !== "") {
+        payload.append("boardHeight", Number(form.boardHeight));
       }
-      if (form.volume) {
-        payload.append("volume", Number(form.volume));
+      if (form.boardVolume !== "") {
+        payload.append("boardVolume", Number(form.boardVolume));
       }
     }
 
@@ -287,8 +323,8 @@ function ManageProducts({
       image: product.image || "",
       image_urls: uniqueExistingImages,
       stock: product.stock ?? 0,
-      boardLength: product.boardLength ?? "",
-      volume: product.volume ?? "",
+      boardHeight: product.boardHeight ?? product.height ?? "",
+      boardVolume: product.boardVolume ?? product.volume ?? "",
     });
     setImageFiles([]);
     setEditId(product._id);
@@ -783,16 +819,12 @@ function ManageProducts({
                     }}
                   />
 
-                  {form.category.toLowerCase() === "surfboard" && (
+                  {(form.category || "").toLowerCase().includes("surfboard") && (
                     <>
-                      <input
-                        type="number"
-                        step="0.1"
-                        min="0"
-                        placeholder="Board Length (feet)"
-                        value={form.boardLength}
+                      <select
+                        value={form.boardHeight}
                         onChange={(e) =>
-                          setForm({ ...form, boardLength: e.target.value })
+                          setForm({ ...form, boardHeight: e.target.value })
                         }
                         style={{
                           padding: "10px 12px",
@@ -802,6 +834,7 @@ function ManageProducts({
                           fontFamily: "inherit",
                           transition: "all 0.2s ease",
                           background: "#fffdf8",
+                          width: "100%",
                         }}
                         onFocus={(e) => {
                           e.target.style.borderColor = "#245860";
@@ -812,16 +845,22 @@ function ManageProducts({
                           e.target.style.borderColor = "#d9c3ad";
                           e.target.style.boxShadow = "none";
                         }}
-                      />
+                      >
+                        <option value="">Select Board Feet</option>
+                        {heightOptions.map((height) => {
+                          const [feet, inches] = height.split('.');
+                          return (
+                            <option key={height} value={height}>
+                              {feet}'{inches}"
+                            </option>
+                          );
+                        })}
+                      </select>
 
-                      <input
-                        type="number"
-                        step="0.1"
-                        min="0"
-                        placeholder="Volume (liters)"
-                        value={form.volume}
+                      <select
+                        value={form.boardVolume}
                         onChange={(e) =>
-                          setForm({ ...form, volume: e.target.value })
+                          setForm({ ...form, boardVolume: e.target.value })
                         }
                         style={{
                           padding: "10px 12px",
@@ -831,6 +870,7 @@ function ManageProducts({
                           fontFamily: "inherit",
                           transition: "all 0.2s ease",
                           background: "#fffdf8",
+                          width: "100%",
                         }}
                         onFocus={(e) => {
                           e.target.style.borderColor = "#245860";
@@ -841,7 +881,14 @@ function ManageProducts({
                           e.target.style.borderColor = "#d9c3ad";
                           e.target.style.boxShadow = "none";
                         }}
-                      />
+                      >
+                        <option value="">Select Board Volume</option>
+                        {volumeOptions.map((volume) => (
+                          <option key={volume} value={volume}>
+                            {volume} L
+                          </option>
+                        ))}
+                      </select>
                     </>
                   )}
                 </div>
@@ -1253,6 +1300,11 @@ function ManageProducts({
                     <p style={{ margin: "0 0 12px 0", color: "#5f5550" }}>
                       Stock: {product.stock ?? 0}
                     </p>
+                    {(product.category || "").toLowerCase().includes("surfboard") && (
+                      <p style={{ margin: "0 0 12px 0", color: "#5f5550" }}>
+                        Feet: {product.boardHeight ?? product.height ?? "-"} ft • Volume: {product.boardVolume ?? product.volume ?? "-"} L
+                      </p>
+                    )}
                     <div style={{ display: "flex", gap: "8px" }}>
                       <button
                         onClick={() => handleEdit(product)}

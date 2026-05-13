@@ -1,9 +1,77 @@
+const axios = require("axios");
 const db = require("../db/connection");
 const {
   calculateVatPricing,
   roundMoney,
   getVatRateFromDb,
 } = require("../utils/pricing");
+
+const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID || "";
+const PAYPAL_CLIENT_SECRET = process.env.PAYPAL_CLIENT_SECRET || "";
+const PAYPAL_BASE_URL = process.env.PAYPAL_BASE_URL || "https://api.sandbox.paypal.com";
+const PAYPAL_CURRENCY = process.env.PAYPAL_CURRENCY || "USD";
+
+const getPayPalAccessToken = async () => {
+  if (!PAYPAL_CLIENT_ID || !PAYPAL_CLIENT_SECRET) {
+    throw new Error("PayPal credentials are not configured");
+  }
+
+  const encoded = Buffer.from(
+    `${PAYPAL_CLIENT_ID}:${PAYPAL_CLIENT_SECRET}`,
+    "utf8",
+  ).toString("base64");
+
+  const response = await axios.post(
+    `${PAYPAL_BASE_URL}/v1/oauth2/token`,
+    "grant_type=client_credentials",
+    {
+      headers: {
+        Authorization: `Basic ${encoded}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+    },
+  );
+
+  if (!response.data || !response.data.access_token) {
+    throw new Error("Unable to retrieve PayPal access token");
+  }
+
+  return response.data.access_token;
+};
+
+const calculateCartTotal = async (userId) => {
+  const [cartRows] = await db.query(
+    `
+      SELECT p.id, p.name, p.price, p.stock, ci.quantity
+      FROM cart_items ci
+      JOIN products p ON p.id = ci.product_id
+      WHERE ci.user_id = ?
+    `,
+    [userId],
+  );
+
+  if (!cartRows.length) {
+    return {
+      total: 0,
+      items: [],
+    };
+  }
+
+  let total = 0;
+  const items = cartRows.map((item) => {
+    const pricing = calculateVatPricing(item.price);
+    const itemTotal = roundMoney(pricing.finalPrice * Number(item.quantity));
+    total = roundMoney(total + itemTotal);
+
+    return {
+      ...item,
+      pricing,
+      itemTotal,
+    };
+  });
+
+  return { total, items };
+};
 
 const resolvePrimaryImage = (value) => {
   if (!value) {
@@ -457,6 +525,198 @@ const checkout = async (req, res) => {
 
 // Returns every order for the admin dashboard.
 // The admin page uses this list to show customer, amount, and payment status.
+const createPaypalConfig = async (req, res) => {
+  try {
+    if (!PAYPAL_CLIENT_ID) {
+      return res.status(500).json({
+        message: "PayPal client ID is not configured",
+      });
+    }
+
+    return res.status(200).json({
+      clientId: PAYPAL_CLIENT_ID,
+      currency: PAYPAL_CURRENCY,
+      environment: PAYPAL_BASE_URL.includes("sandbox") ? "sandbox" : "production",
+    });
+  } catch (error) {
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+const createPaypalOrder = async (req, res) => {
+  try {
+    const [users] = await db.query(
+      "SELECT id FROM users WHERE id = ? LIMIT 1",
+      [req.user.id],
+    );
+
+    if (!users.length) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const { total, items } = await calculateCartTotal(req.user.id);
+
+    if (!items.length || total <= 0) {
+      return res.status(400).json({ message: "Cart is empty" });
+    }
+
+    const accessToken = await getPayPalAccessToken();
+
+    const response = await axios.post(
+      `${PAYPAL_BASE_URL}/v2/checkout/orders`,
+      {
+        intent: "CAPTURE",
+        purchase_units: [
+          {
+            amount: {
+              currency_code: PAYPAL_CURRENCY,
+              value: total.toFixed(2),
+            },
+          },
+        ],
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+      },
+    );
+
+    if (!response.data || !response.data.id) {
+      return res.status(500).json({ message: "PayPal order creation failed" });
+    }
+
+    return res.status(200).json({
+      orderID: response.data.id,
+      total: total.toFixed(2),
+      currency: PAYPAL_CURRENCY,
+    });
+  } catch (error) {
+    console.error("[paypal:create-order]", error.message || error);
+    return res.status(500).json({
+      message:
+        (error?.response?.data?.message || error.message) ||
+        "Unable to create PayPal order",
+    });
+  }
+};
+
+const capturePaypalOrder = async (req, res) => {
+  try {
+    const { orderID } = req.body;
+
+    if (!orderID) {
+      return res.status(400).json({ message: "PayPal order ID is required" });
+    }
+
+    const [users] = await db.query(
+      "SELECT id FROM users WHERE id = ? LIMIT 1",
+      [req.user.id],
+    );
+
+    if (!users.length) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const accessToken = await getPayPalAccessToken();
+
+    const response = await axios.post(
+      `${PAYPAL_BASE_URL}/v2/checkout/orders/${orderID}/capture`,
+      {},
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+      },
+    );
+
+    const captureData = response.data;
+    const captureStatus = captureData.status;
+    const captureUnit =
+      captureData.purchase_units?.[0]?.payments?.captures?.[0] || null;
+    const amountValue = captureUnit?.amount?.value || "0.00";
+    const currencyCode = captureUnit?.amount?.currency_code || PAYPAL_CURRENCY;
+
+    const connection = await db.getConnection();
+
+    try {
+      await connection.beginTransaction();
+
+      const { total, items } = await calculateCartTotal(req.user.id);
+
+      const [orderResult] = await connection.query(
+        "INSERT INTO orders (user_id, total, status, created_at) VALUES (?, ?, ?, NOW())",
+        [req.user.id, total, captureStatus === "COMPLETED" ? "paid" : "pending"],
+      );
+
+      for (const item of items) {
+        await connection.query(
+          "INSERT INTO order_items (order_id, product_id, name, price, quantity) VALUES (?, ?, ?, ?, ?)",
+          [
+            orderResult.insertId,
+            item.id,
+            item.name,
+            item.pricing.finalPrice,
+            item.quantity,
+          ],
+        );
+
+        await connection.query(
+          "UPDATE products SET stock = stock - ?, updated_at = NOW() WHERE id = ?",
+          [Number(item.quantity), item.id],
+        );
+      }
+
+      await connection.query("DELETE FROM cart_items WHERE user_id = ?", [req.user.id]);
+
+      await connection.query(
+        "INSERT INTO payments (user_id, order_id, paypal_order_id, status, amount, currency, raw_response) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        [
+          req.user.id,
+          orderResult.insertId,
+          orderID,
+          captureStatus,
+          Number(amountValue),
+          currencyCode,
+          JSON.stringify(captureData),
+        ],
+      );
+
+      await connection.commit();
+      connection.release();
+
+      return res.status(200).json({
+        message: "Payment captured and order persisted successfully",
+        order: {
+          id: orderResult.insertId,
+          total: Number(amountValue),
+          status: captureStatus === "COMPLETED" ? "paid" : "pending",
+        },
+        payment: {
+          paypalOrderId: orderID,
+          status: captureStatus,
+          amount: Number(amountValue),
+          currency: currencyCode,
+        },
+      });
+    } catch (transactionError) {
+      await connection.rollback();
+      connection.release();
+      console.error("[paypal:capture] transaction failed", transactionError.message);
+      return res.status(500).json({ message: "Server error during payment persistence" });
+    }
+  } catch (error) {
+    console.error("[paypal:capture]", error.message || error);
+    return res.status(500).json({
+      message:
+        (error?.response?.data?.details?.[0]?.description || error?.response?.data?.message) ||
+        "Unable to capture PayPal order",
+    });
+  }
+};
+
 const getAdminOrders = async (req, res) => {
   try {
     const [rows] = await db.query(
@@ -501,5 +761,8 @@ module.exports = {
   removeFromCart,
   checkout,
   quickCheckout,
+  createPaypalConfig,
+  createPaypalOrder,
+  capturePaypalOrder,
   getAdminOrders,
 };
