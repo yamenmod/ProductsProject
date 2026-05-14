@@ -1,6 +1,6 @@
 const jwt = require("jsonwebtoken");
-const nodemailer = require("nodemailer");
 const db = require("../db/connection");
+const { createMailTransporter } = require("../utils/mailer");
 
 const normalizeOptionalMeasurement = (value, fieldName) => {
   if (value === undefined || value === null || value === "") {
@@ -32,23 +32,6 @@ const formatUser = (user) => ({
       ? null
       : Number(user.height),
 });
-
-const createMailTransporter = () => {
-  const user = process.env.EMAIL_USER;
-  const pass = process.env.EMAIL_PASS;
-
-  if (!user || !pass) {
-    return null;
-  }
-
-  return nodemailer.createTransport({
-    service: "outlook",
-    auth: {
-      user,
-      pass,
-    },
-  });
-};
 
 // Creates the JWT payload that the frontend stores after login or register.
 // This keeps the user id, username, and role available for later checks.

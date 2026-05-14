@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
@@ -166,7 +166,7 @@ function Cart({
     }
   };
 
-  const loadPayPalConfig = async () => {
+  const loadPayPalConfig = useCallback(async () => {
     if (!session?.token || displayItems.length === 0) {
       return;
     }
@@ -193,7 +193,7 @@ function Cart({
     } finally {
       setIsPayPalLoading(false);
     }
-  };
+  }, [displayItems.length, session?.token]);
 
   useEffect(() => {
     setDisplayItems(cartItems);
@@ -207,7 +207,7 @@ function Cart({
 
   useEffect(() => {
     loadPayPalConfig();
-  }, [session?.token, displayItems.length]);
+  }, [loadPayPalConfig]);
 
   const parseImageValue = (value) => {
     if (!value) {
@@ -382,21 +382,7 @@ function Cart({
           },
         });
 
-        const normalized = normalizeCartItems(response.data);
-        setDisplayItems(normalized);
-
-        // DEBUG: Log what the backend returned for images
-        console.group("🛒 CART LOADED - Image Debug");
-        normalized.forEach((item) => {
-          const imageUrl = item?.image_url || item?.image || item?.imageUrls;
-          const resolved = getProductImages(item);
-          console.log(`Product: ${item.name || "?"}`, {
-            id: item.id,
-            backendImageUrl: imageUrl,
-            resolvedImages: resolved,
-          });
-        });
-        console.groupEnd();
+        setDisplayItems(normalizeCartItems(response.data));
       } catch (error) {
         console.error("Failed to load cart page items:", error.message);
       }

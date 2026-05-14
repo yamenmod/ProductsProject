@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
@@ -25,7 +25,7 @@ function ManageOrders({
 
   const normalizeStatus = (value) => (value || "").toString().trim().toLowerCase();
 
-  const getOrderBucket = (order) => {
+  const getOrderBucket = useCallback((order) => {
     const status = normalizeStatus(order?.status);
 
     if (["paid", "success", "successful", "completed"].includes(status)) {
@@ -37,7 +37,7 @@ function ManageOrders({
     }
 
     return "failed";
-  };
+  }, []);
 
   useEffect(() => {
     const loadOrders = async () => {
@@ -76,7 +76,7 @@ function ManageOrders({
 
       return matchesSearch && matchesFilter;
     });
-  }, [orders, searchTerm, selectedFilter]);
+  }, [orders, searchTerm, selectedFilter, getOrderBucket]);
 
   const summary = useMemo(() => {
     const counts = { successful: 0, failed: 0, pending: 0 };
@@ -86,7 +86,7 @@ function ManageOrders({
     });
 
     return counts;
-  }, [orders]);
+  }, [orders, getOrderBucket]);
 
   const statusTone = (bucket) => {
     if (bucket === "successful") {

@@ -256,6 +256,17 @@ function Products({
     }
   };
 
+  const handleBuyNow = async (product) => {
+    if (!product) {
+      return;
+    }
+
+    const added = await handleAddToCart(product);
+    if (added) {
+      onNavigate("cart");
+    }
+  };
+
   const handlePreviewAddToCart = async () => {
     if (!previewProduct) {
       return;
@@ -627,10 +638,9 @@ function Products({
                 return (
                   <div
                     key={productId}
+                    className="ps-productCard"
                     style={{
                       border: "1px solid #e0cec0",
-                      borderRadius: "14px",
-                      overflow: "hidden",
                       background: "#fffbf5",
                       boxShadow: "0 12px 30px rgba(76, 56, 38, 0.1)",
                     }}
@@ -651,9 +661,10 @@ function Products({
                         <img
                           src={productImages[activeCardImageIndex]}
                           alt={product.name}
+                          className="ps-productCardImage"
                           style={{
                             width: "100%",
-                            height: "160px",
+                            aspectRatio: "4 / 5",
                             objectFit: "cover",
                             display: "block",
                           }}
@@ -713,53 +724,60 @@ function Products({
                         </>
                       )}
                     </div>
-                    <div style={{ padding: "14px" }}>
-                      <h3 style={{ marginBottom: "8px", color: "#1f1813" }}>
+                    <div
+                      className="ps-dropBody"
+                      style={{ padding: "14px 14px 12px" }}
+                    >
+                      <h3 className="ps-productCardTitle">
                         {product.name}
                       </h3>
-                      <p style={{ margin: "0 0 6px 0", color: "#5f5550" }}>
+                      <p className="ps-productCardDescription">
                         {product.description}
                       </p>
-                      <p
-                        style={{
-                          margin: "0 0 6px 0",
-                          display: "grid",
-                          gap: "2px",
-                        }}
-                      >
+                      <p className="ps-productCardPrice">
                         <span style={{ fontWeight: 800, color: "#1f1813", fontSize: "18px" }}>
                           ${getBasePrice(product).toFixed(2)}
                         </span>
                       </p>
-                      <p style={{ margin: "0 0 6px 0", color: "#5f5550" }}>
+                      <p style={{ margin: "0 0 6px", color: "#5f5550" }}>
                         Category: {product.category || "-"}
                       </p>
-                      <p style={{ margin: "0 0 12px 0", color: "#5f5550" }}>
+                      <p style={{ margin: "0 0 10px", color: "#5f5550" }}>
                         Stock: {product.stock ?? 0}
                       </p>
-                      <div style={{ display: "flex", gap: "8px" }}>
+                      <div className="ps-productCardActions">
                         {(() => {
                           const productId = product._id || product.id;
-                          const isInCart = (cartItems || []).some(
-                            (item) => {
-                              const itemId = item.id || item._id;
-                              return Number(itemId) === Number(productId);
-                            },
-                          );
+                          const isInCart = (cartItems || []).some((item) => {
+                            const itemId = item.id || item._id;
+                            return Number(itemId) === Number(productId);
+                          });
+
+                          const isOutOfStock = (product.stock ?? 0) < 1;
 
                           return (
-                            <button
-                              className="ps-btn ps-btn-primary"
-                              style={{ width: "100%" }}
-                              onClick={() => handleAddToCart(product)}
-                              disabled={(product.stock ?? 0) < 1 || isInCart}
-                            >
-                              {(product.stock ?? 0) < 1
-                                ? "Out of Stock"
-                                : isInCart
-                                  ? "In Cart"
-                                  : "Add to Cart"}
-                            </button>
+                            <>
+                              <button
+                                type="button"
+                                className="ps-btn ps-btn-primary ps-productCardButton"
+                                onClick={() => handleAddToCart(product)}
+                                disabled={isOutOfStock}
+                              >
+                                {isOutOfStock
+                                  ? "Out of Stock"
+                                  : isInCart
+                                    ? "In Cart"
+                                    : "Add to Cart"}
+                              </button>
+                              <button
+                                type="button"
+                                className="ps-btn ps-btn-dark ps-productCardButton"
+                                onClick={() => handleBuyNow(product)}
+                                disabled={isOutOfStock}
+                              >
+                                Buy Now
+                              </button>
+                            </>
                           );
                         })()}
                       </div>

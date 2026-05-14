@@ -1,5 +1,7 @@
 const axios = require("axios");
 const db = require("../db/connection");
+const { createMailTransporter, getMailFromAddress } = require("../utils/mailer");
+const { buildOrderEmailHtml } = require("../utils/emailTemplates");
 const {
   calculateVatPricing,
   roundMoney,
@@ -721,11 +723,29 @@ const capturePaypalOrder = async (req, res) => {
       captureData.purchase_units?.[0]?.payments?.captures?.[0] || null;
     const amountValue = captureUnit?.amount?.value || "0.00";
     const currencyCode = captureUnit?.amount?.currency_code || PAYPAL_CURRENCY;
+    const buyerName =
+      captureData?.payer?.name?.given_name ||
+      captureData?.payer?.name?.surname ||
+      captureData?.payer?.email_address ||
+      "Surfer";
 
     const connection = await db.getConnection();
 
     try {
       await connection.beginTransaction();
+
+      const [users] = await connection.query(
+        "SELECT id, username, email FROM users WHERE id = ? LIMIT 1",
+        [req.user.id],
+      );
+
+      const userRecord = users[0] || null;
+
+      if (!userRecord) {
+        await connection.rollback();
+        connection.release();
+        return res.status(404).json({ message: "User not found" });
+      }
 
       const { total, items } = await calculateCartTotal(req.user.id);
 
@@ -769,6 +789,46 @@ const capturePaypalOrder = async (req, res) => {
 
       await connection.commit();
       connection.release();
+
+      const transporter = createMailTransporter();
+      const fromAddress = getMailFromAddress();
+
+      if (transporter && fromAddress && userRecord.email) {
+        const subtotal = items.reduce((sum, item) => sum + Number(item.itemTotal || 0), 0);
+        const shipping = 10;
+        const tax = subtotal > 0 ? subtotal - subtotal / 1.18 : 0;
+        const viewOrderUrl = `${FRONTEND_BASE_URL}/?order=${orderResult.insertId}`;
+
+        const html = buildOrderEmailHtml({
+          customerName: buyerName || userRecord.username || "Surfer",
+          orderId: orderResult.insertId,
+          orderDate: new Date(),
+          paymentStatus: "Paid",
+          transactionId: orderID,
+          currency: currencyCode,
+          items: items.map((item) => ({
+            name: item.name,
+            quantity: item.quantity,
+            finalPrice: item.pricing.finalPrice,
+            subtotal: item.itemTotal,
+          })),
+          subtotal,
+          shipping,
+          tax,
+          total: Number(amountValue) || total,
+          viewOrderUrl,
+        });
+
+        transporter.sendMail({
+          from: fromAddress,
+          to: userRecord.email,
+          subject: "Thank you for your order | Plage Surf",
+          html,
+          text: `Thank you for ordering from Plage Surf. Your order #${orderResult.insertId} has been paid successfully. View your order: ${viewOrderUrl}`,
+        }).catch((emailError) => {
+          console.error("[paypal:capture] order email failed:", emailError.message || emailError);
+        });
+      }
 
       return res.status(200).json({
         message: "Payment captured and order persisted successfully",
