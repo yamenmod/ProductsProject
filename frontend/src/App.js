@@ -60,6 +60,7 @@ function App() {
   const [selectedOrderFilter, setSelectedOrderFilter] = useState("all");
   const [selectedProductToEdit, setSelectedProductToEdit] = useState(null);
   const [cartItems, setCartItems] = useState([]);
+  const [paymentSuccess, setPaymentSuccess] = useState(null);
 
   const handleSessionUpdate = useCallback((nextUser) => {
     setSession((previousSession) => {
@@ -135,7 +136,12 @@ function App() {
                 { headers: { Authorization: `Bearer ${saved.token}` } },
               );
 
-              alert(resp.data?.message || "Payment completed successfully.");
+              setPaymentSuccess({
+                title: "Thank you for ordering from Plage Surf",
+                message:
+                  "Your payment has been captured successfully. Your order is being prepared now.",
+                orderId: resp.data?.order?.id || token,
+              });
               // refresh cart items after capture
               const refreshed = await axios.get("/api/cart", {
                 headers: { Authorization: `Bearer ${saved.token}` },
@@ -143,7 +149,13 @@ function App() {
               setCartItems(normalizeCartItems(refreshed.data));
             } catch (err) {
               console.error("PayPal capture failed:", err?.response || err);
-              alert((err?.response?.data?.message) || "PayPal capture failed. Please contact support.");
+              setPaymentSuccess({
+                title: "Payment could not be completed",
+                message:
+                  err?.response?.data?.message ||
+                  "Please try again or contact support if the issue continues.",
+                orderId: token,
+              });
             }
           })();
         }
@@ -344,8 +356,111 @@ function App() {
     setSession(null);
   };
 
+  const dismissPaymentSuccess = () => {
+    setPaymentSuccess(null);
+  };
+
+  const paymentSuccessModal = paymentSuccess ? (
+    <div
+      className="ps-cartConfirmBackdrop"
+      onClick={dismissPaymentSuccess}
+      role="presentation"
+    >
+      <div
+        className="ps-cartConfirmCard"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Payment confirmation"
+        onClick={(event) => event.stopPropagation()}
+        style={{ maxWidth: "520px", width: "calc(100% - 32px)", padding: "28px" }}
+      >
+        <div style={{ display: "flex", gap: "14px", alignItems: "flex-start" }}>
+          <div
+            style={{
+              width: "44px",
+              height: "44px",
+              borderRadius: "50%",
+              background: "linear-gradient(135deg, #003087 0%, #0070e0 100%)",
+              color: "#fff",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "22px",
+              fontWeight: 800,
+              flexShrink: 0,
+              boxShadow: "0 10px 18px rgba(0, 48, 135, 0.18)",
+            }}
+          >
+            ✓
+          </div>
+
+          <div style={{ flex: 1 }}>
+            <p className="ps-pill" style={{ margin: "0 0 10px", width: "fit-content" }}>
+              Payment confirmed
+            </p>
+            <h2 className="ps-cartConfirmTitle" style={{ marginBottom: "8px" }}>
+              {paymentSuccess.title}
+            </h2>
+            <p className="ps-cartConfirmText" style={{ marginBottom: "8px" }}>
+              {paymentSuccess.message}
+            </p>
+            <p style={{ margin: "0 0 18px", color: "#65574d", fontSize: "13px" }}>
+              Order reference: {paymentSuccess.orderId}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={dismissPaymentSuccess}
+            aria-label="Close payment confirmation"
+            style={{
+              border: "none",
+              background: "transparent",
+              fontSize: "28px",
+              lineHeight: 1,
+              color: "#8b7f74",
+              cursor: "pointer",
+              padding: 0,
+            }}
+          >
+            ×
+          </button>
+        </div>
+
+        <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginTop: "8px" }}>
+          <button
+            type="button"
+            className="ps-btn ps-btn-primary"
+            onClick={() => {
+              dismissPaymentSuccess();
+              setCurrentPage("home");
+            }}
+            style={{ padding: "12px 18px" }}
+          >
+            Continue shopping
+          </button>
+          <button
+            type="button"
+            className="ps-btn ps-btn-secondary"
+            onClick={dismissPaymentSuccess}
+            style={{ padding: "12px 18px" }}
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
+  const withPaymentSuccessModal = (content) => (
+    <>
+      {content}
+      {paymentSuccessModal}
+    </>
+  );
+
   if (!session) {
-    return (
+    return withPaymentSuccessModal(
       <Login
         onLoginSuccess={(authSession) => {
           const nextSession = {
@@ -367,7 +482,7 @@ function App() {
   // Each page is rendered manually because the app uses role-aware shell logic.
   // The admin pages are only reachable when the user role is admin.
   if (currentPage === "home") {
-    return (
+    return withPaymentSuccessModal(
       <Home
         user={session.user}
         session={session}
@@ -383,7 +498,7 @@ function App() {
   }
 
   if (currentPage === "shop") {
-    return (
+    return withPaymentSuccessModal(
       <Shop
         user={session.user}
         preferredGender={preferredGender}
@@ -397,7 +512,7 @@ function App() {
   }
 
   if (currentPage === "contact") {
-    return (
+    return withPaymentSuccessModal(
       <Contact
         user={session.user}
         preferredGender={preferredGender}
@@ -411,7 +526,7 @@ function App() {
   }
 
   if (currentPage === "profile") {
-    return (
+    return withPaymentSuccessModal(
       <Profile
         session={session}
         user={session.user}
@@ -427,7 +542,7 @@ function App() {
   }
 
   if (currentPage === "size-charts") {
-    return (
+    return withPaymentSuccessModal(
       <SizeCharts
         user={session.user}
         session={session}
@@ -443,7 +558,7 @@ function App() {
   }
 
   if (currentPage === "products") {
-    return (
+    return withPaymentSuccessModal(
       <Products
         session={session}
         preferredGender={preferredGender}
@@ -460,7 +575,7 @@ function App() {
   }
 
   if (currentPage === "cart") {
-    return (
+    return withPaymentSuccessModal(
       <Cart
         session={session}
         user={session.user}
@@ -478,7 +593,7 @@ function App() {
   }
 
   if (currentPage === "manage-orders") {
-    return (
+    return withPaymentSuccessModal(
       <ManageOrders
         session={session}
         currentPage={currentPage}
@@ -493,7 +608,7 @@ function App() {
   }
 
   if (currentPage === "manage-products") {
-    return (
+    return withPaymentSuccessModal(
       <ManageProducts
         session={session}
         currentPage={currentPage}
@@ -508,7 +623,7 @@ function App() {
   }
 
   if (currentPage === "manage-customers") {
-    return (
+    return withPaymentSuccessModal(
       <ManageCustomers
         session={session}
         currentPage={currentPage}
@@ -522,7 +637,7 @@ function App() {
   }
 
   if (currentPage === "admin-dashboard") {
-    return (
+    return withPaymentSuccessModal(
       <AdminDashboard
         session={session}
         currentPage={currentPage}
