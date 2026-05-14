@@ -8,7 +8,7 @@ const {
 
 const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID || "";
 const PAYPAL_CLIENT_SECRET = process.env.PAYPAL_CLIENT_SECRET || "";
-const PAYPAL_BASE_URL = process.env.PAYPAL_BASE_URL || "https://api.sandbox.paypal.com";
+const PAYPAL_BASE_URL = "https://api-m.sandbox.paypal.com";
 const PAYPAL_CURRENCY = process.env.PAYPAL_CURRENCY || "USD";
 const FRONTEND_BASE_URL = process.env.FRONTEND_BASE_URL || "http://localhost:3000";
 
@@ -412,6 +412,83 @@ const removeFromCart = async (req, res) => {
   }
 };
 
+const updateCartQuantity = async (req, res) => {
+  try {
+    const vatRate = await getVatRateFromDb(db);
+    const { productId } = req.params;
+    const { quantity } = req.body;
+    const nextQuantity = Number(quantity);
+
+    if (!productId) {
+      return res.status(400).json({ message: "Product ID is required" });
+    }
+
+    if (!Number.isFinite(nextQuantity)) {
+      return res.status(400).json({ message: "Quantity must be a number" });
+    }
+
+    if (nextQuantity <= 0) {
+      await db.query(
+        "DELETE FROM cart_items WHERE user_id = ? AND product_id = ?",
+        [req.user.id, productId],
+      );
+    } else {
+      const [products] = await db.query(
+        "SELECT stock FROM products WHERE id = ? LIMIT 1",
+        [productId],
+      );
+
+      if (!products.length) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+
+      const stock = Number(products[0].stock) || 0;
+      if (nextQuantity > stock) {
+        return res.status(400).json({
+          message: `Only ${stock} item${stock === 1 ? "" : "s"} available in stock`,
+        });
+      }
+
+      const [existingItems] = await db.query(
+        "SELECT id FROM cart_items WHERE user_id = ? AND product_id = ? LIMIT 1",
+        [req.user.id, productId],
+      );
+
+      if (!existingItems.length) {
+        return res.status(404).json({ message: "Cart item not found" });
+      }
+
+      await db.query(
+        "UPDATE cart_items SET quantity = ? WHERE id = ?",
+        [nextQuantity, existingItems[0].id],
+      );
+    }
+
+    const [rows] = await db.query(
+      `
+        SELECT
+          p.id,
+          p.name,
+          p.price,
+          p.stock,
+          p.image_url,
+          c.name AS category,
+          ci.quantity
+        FROM cart_items ci
+        JOIN products p ON p.id = ci.product_id
+        LEFT JOIN categories c ON c.id = p.category_id
+        WHERE ci.user_id = ?
+        ORDER BY ci.id DESC
+      `,
+      [req.user.id],
+    );
+
+    return res.status(200).json(mapCartRows(rows, vatRate));
+  } catch (error) {
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
 // Converts the user's cart into a paid order and clears the cart afterward.
 // This is the checkout flow that creates the order records seen by admin.
 const checkout = async (req, res) => {
@@ -537,7 +614,8 @@ const createPaypalConfig = async (req, res) => {
     return res.status(200).json({
       clientId: PAYPAL_CLIENT_ID,
       currency: PAYPAL_CURRENCY,
-      environment: PAYPAL_BASE_URL.includes("sandbox") ? "sandbox" : "production",
+      environment: "sandbox",
+      baseUrl: PAYPAL_BASE_URL,
     });
   } catch (error) {
     return res.status(500).json({ message: "Server error" });
@@ -764,6 +842,7 @@ module.exports = {
   getCart,
   addToCart,
   removeFromCart,
+  updateCartQuantity,
   checkout,
   quickCheckout,
   createPaypalConfig,

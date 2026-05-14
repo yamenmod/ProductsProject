@@ -14,13 +14,14 @@ function Cart({
   onLogout,
   cartItems = [],
   onRemoveFromCart,
+  onUpdateCartQuantity,
   cartCount = 0,
 }) {
   const [displayItems, setDisplayItems] = useState(cartItems);
   const [pendingRemoveItem, setPendingRemoveItem] = useState(null);
   const [isRemoving, setIsRemoving] = useState(false);
   const [paypalConfig, setPaypalConfig] = useState(null);
-  const [paypalReady, setPaypalReady] = useState(false);
+  const [isPayPalModalOpen, setIsPayPalModalOpen] = useState(false);
   const [paypalMessage, setPaypalMessage] = useState("");
   const [isPayPalLoading, setIsPayPalLoading] = useState(false);
 
@@ -80,6 +81,36 @@ function Cart({
     }
   };
 
+  const handleChangeQuantity = async (item, delta) => {
+    if (!item?.id || typeof onUpdateCartQuantity !== "function") {
+      return;
+    }
+
+    const currentQuantity = Number(item.quantity) || 1;
+    const nextQuantity = currentQuantity + delta;
+
+    if (nextQuantity <= 0) {
+      await onRemoveFromCart?.(item.id);
+      return;
+    }
+
+    await onUpdateCartQuantity(item.id, nextQuantity);
+  };
+
+  const openPayPalModal = () => {
+    if (!session?.token) {
+      alert("Please sign in to complete purchases.");
+      return;
+    }
+
+    if (!paypalConfig) {
+      alert("PayPal is not configured for this environment. Contact support.");
+      return;
+    }
+
+    setIsPayPalModalOpen(true);
+  };
+
   // Initiate PayPal checkout by creating an order server-side and redirecting
   // the user to PayPal's approval page. This prevents immediate server-side
   // fulfillment without payment.
@@ -95,6 +126,8 @@ function Cart({
     }
 
     try {
+      setIsPayPalLoading(true);
+      setPaypalMessage("");
       const resp = await axios.post(
         "/api/cart/paypal/create-order",
         {},
@@ -106,12 +139,12 @@ function Cart({
         throw new Error("No PayPal order ID returned");
       }
 
-      const env = paypalConfig.environment === "production" ? "www.paypal.com" : "www.sandbox.paypal.com";
-      // Redirect user to PayPal approval page
-      window.location.href = `https://${env}/checkoutnow?token=${encodeURIComponent(orderID)}`;
+      window.location.href = `https://www.sandbox.paypal.com/checkoutnow?token=${encodeURIComponent(orderID)}`;
     } catch (error) {
       console.error("Failed to start PayPal checkout:", error?.response || error);
-      alert("Unable to start PayPal checkout. Please try again later.");
+      setPaypalMessage("Unable to start PayPal checkout. Please try again later.");
+    } finally {
+      setIsPayPalLoading(false);
     }
   };
 
@@ -153,23 +186,6 @@ function Cart({
       }
 
       setPaypalConfig(response.data);
-
-      if (window.paypal) {
-        setPaypalReady(true);
-        return;
-      }
-
-      const script = document.createElement("script");
-      script.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(
-        response.data.clientId,
-      )}&currency=${encodeURIComponent(response.data.currency)}`;
-      script.async = true;
-      script.onload = () => setPaypalReady(true);
-      script.onerror = () => {
-        setPaypalMessage("Failed to load PayPal SDK");
-        setPaypalReady(false);
-      };
-      document.body.appendChild(script);
     } catch (error) {
       const errorMsg = error?.response?.data?.message || error.message || "Unknown error";
       console.error("Failed to load PayPal configuration:", errorMsg);
@@ -184,93 +200,14 @@ function Cart({
   }, [cartItems]);
 
   useEffect(() => {
-    loadPayPalConfig();
-  }, [session?.token, displayItems.length]);
+    if (displayItems.length === 0) {
+      setIsPayPalModalOpen(false);
+    }
+  }, [displayItems.length]);
 
   useEffect(() => {
-    const renderPayPalButtons = async () => {
-      if (!paypalReady || !paypalConfig || displayItems.length === 0) {
-        return;
-      }
-
-      const container = document.getElementById("paypal-button-container");
-      if (!container) {
-        return;
-      }
-
-      container.innerHTML = "";
-
-      if (!window.paypal || !window.paypal.Buttons) {
-        setPaypalMessage("PayPal checkout is unavailable right now.");
-        return;
-      }
-
-      window.paypal
-        .Buttons({
-          style: {
-            layout: "vertical",
-            color: "gold",
-            shape: "rect",
-            label: "paypal",
-          },
-          createOrder: async () => {
-            try {
-              const response = await axios.post(
-                "/api/cart/paypal/create-order",
-                {},
-                {
-                  headers: {
-                    Authorization: `Bearer ${session.token}`,
-                  },
-                },
-              );
-
-              return response.data.orderID;
-            } catch (error) {
-              console.error("PayPal order creation failed:", error?.response || error);
-              setPaypalMessage(
-                "Could not create PayPal order. Please try again later.",
-              );
-              throw error;
-            }
-          },
-          onApprove: async (data) => {
-            try {
-              setPaypalMessage("Finalizing payment...");
-              const response = await axios.post(
-                "/api/cart/paypal/capture",
-                { orderID: data.orderID },
-                {
-                  headers: {
-                    Authorization: `Bearer ${session.token}`,
-                  },
-                },
-              );
-
-              await refreshCart();
-              setPaypalMessage(response.data?.message || "Payment successful.");
-            } catch (error) {
-              console.error("PayPal capture failed:", error?.response || error);
-              setPaypalMessage(
-                (error?.response?.data && error.response.data.message) ||
-                  "Payment could not be completed.",
-              );
-              throw error;
-            }
-          },
-          onError: (err) => {
-            console.error("PayPal button error:", err);
-            setPaypalMessage("An error occurred during PayPal checkout.");
-          },
-          onCancel: () => {
-            setPaypalMessage("PayPal checkout was cancelled.");
-          },
-        })
-        .render(container);
-    };
-
-    renderPayPalButtons();
-  }, [paypalReady, paypalConfig, displayItems.length, session?.token]);
+    loadPayPalConfig();
+  }, [session?.token, displayItems.length]);
 
   const parseImageValue = (value) => {
     if (!value) {
@@ -630,6 +567,71 @@ function Cart({
                       gap: "10px",
                     }}
                   >
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        background: "#f3f1ed",
+                        border: "1px solid #d8d1c8",
+                        borderRadius: "999px",
+                        padding: "4px 8px",
+                      }}
+                    >
+                      <button
+                        type="button"
+                        className="ps-btn"
+                        style={{
+                          width: "28px",
+                          height: "28px",
+                          padding: 0,
+                          borderRadius: "999px",
+                          border: "1px solid #c6beb4",
+                          background: "#ffffff",
+                          color: "#6c6258",
+                          fontSize: "18px",
+                          fontWeight: 800,
+                          lineHeight: 1,
+                          boxShadow: "none",
+                        }}
+                        onClick={() => handleChangeQuantity(item, -1)}
+                        aria-label={`Decrease quantity of ${item.name || "item"}`}
+                      >
+                        -
+                      </button>
+                      <span
+                        style={{
+                          minWidth: "20px",
+                          textAlign: "center",
+                          fontWeight: 800,
+                          color: "#5f5550",
+                          fontSize: "13px",
+                        }}
+                      >
+                        {item.quantity || 1}
+                      </span>
+                      <button
+                        type="button"
+                        className="ps-btn"
+                        style={{
+                          width: "28px",
+                          height: "28px",
+                          padding: 0,
+                          borderRadius: "999px",
+                          border: "1px solid #c6beb4",
+                          background: "#ffffff",
+                          color: "#6c6258",
+                          fontSize: "18px",
+                          fontWeight: 800,
+                          lineHeight: 1,
+                          boxShadow: "none",
+                        }}
+                        onClick={() => handleChangeQuantity(item, 1)}
+                        aria-label={`Increase quantity of ${item.name || "item"}`}
+                      >
+                        +
+                      </button>
+                    </div>
                     <button
                       type="button"
                       className="ps-btn ps-btn-secondary"
@@ -755,7 +757,7 @@ function Cart({
                 <button
                   type="button"
                   className="ps-btn ps-btn-primary"
-                  onClick={handleBuyNow}
+                  onClick={openPayPalModal}
                   style={{ padding: "10px 24px", whiteSpace: "nowrap" }}
                   disabled={displayItems.length === 0}
                 >
@@ -763,24 +765,93 @@ function Cart({
                 </button>
               </div>
 
-              <div className="ps-surface" style={{ padding: "24px", minHeight: "200px" }}>
-                <h3 style={{ margin: "0 0 12px", fontSize: "18px" }}>
-                  Pay with PayPal
-                </h3>
-                {isPayPalLoading && (
-                  <p style={{ color: "#65574d" }}>Loading PayPal checkout...</p>
-                )}
-                {paypalMessage && (
-                  <p style={{ color: "#b94d4d", margin: "0 0 12px" }}>
-                    {paypalMessage}
-                  </p>
-                )}
-                <div id="paypal-button-container" />
-              </div>
             </div>
           )}
         </div>
       </main>
+
+      {isPayPalModalOpen && (
+        <div
+          className="ps-cartConfirmBackdrop"
+          onClick={() => setIsPayPalModalOpen(false)}
+        >
+          <div
+            className="ps-cartConfirmCard"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Pay with PayPal"
+            onClick={(event) => event.stopPropagation()}
+            style={{ maxWidth: "460px", width: "calc(100% - 32px)", padding: "28px" }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "16px", marginBottom: "12px" }}>
+              <div>
+                <p className="ps-pill" style={{ margin: "0 0 10px", width: "fit-content" }}>
+                  Secure checkout
+                </p>
+                <h2 className="ps-cartConfirmTitle" style={{ marginBottom: "8px" }}>
+                  Pay with PayPal
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsPayPalModalOpen(false)}
+                aria-label="Close PayPal popup"
+                style={{
+                  border: "none",
+                  background: "transparent",
+                  fontSize: "28px",
+                  lineHeight: 1,
+                  color: "#8b7f74",
+                  cursor: "pointer",
+                  padding: 0,
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            <p style={{ margin: "0 0 18px", color: "#65574d", lineHeight: 1.6 }}>
+              Your payment will open in PayPal's secure checkout window so you can complete the purchase safely.
+            </p>
+
+            {paypalMessage && (
+              <p style={{ margin: "0 0 16px", color: "#5f5550", fontSize: "13px" }}>
+                {paypalMessage}
+              </p>
+            )}
+
+            <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+              <button
+                type="button"
+                className="ps-btn"
+                onClick={handleBuyNow}
+                disabled={isPayPalLoading}
+                style={{
+                  padding: "12px 20px",
+                  minWidth: "220px",
+                  borderRadius: "999px",
+                  background: "linear-gradient(135deg, #003087 0%, #0070e0 100%)",
+                  color: "#ffffff",
+                  border: "none",
+                  boxShadow: "0 10px 18px rgba(0, 48, 135, 0.18)",
+                  fontWeight: 800,
+                }}
+              >
+                Pay with PayPal
+              </button>
+              <button
+                type="button"
+                className="ps-btn ps-btn-secondary"
+                onClick={() => setIsPayPalModalOpen(false)}
+                disabled={isPayPalLoading}
+                style={{ padding: "12px 18px" }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {pendingRemoveItem && (
         <div

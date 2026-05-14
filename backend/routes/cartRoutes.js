@@ -3,6 +3,7 @@ const {
   getCart,
   addToCart,
   removeFromCart,
+  updateCartQuantity,
   checkout,
   getAdminOrders,
   quickCheckout,
@@ -20,6 +21,7 @@ const router = express.Router();
 router.get("/", authMiddleware, getCart);
 router.post("/", authMiddleware, addToCart);
 router.delete("/:productId", authMiddleware, removeFromCart);
+router.patch("/:productId", authMiddleware, updateCartQuantity);
 router.post("/checkout", authMiddleware, checkout);
 router.post("/quick", authMiddleware, quickCheckout);
 router.get("/paypal/config", authMiddleware, createPaypalConfig);

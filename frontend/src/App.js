@@ -290,6 +290,28 @@ function App() {
     }
   };
 
+  const handleUpdateCartQuantity = async (productId, quantity) => {
+    if (!productId || !session?.token) {
+      return;
+    }
+
+    try {
+      const response = await axios.patch(
+        `/api/cart/${productId}`,
+        { quantity },
+        {
+          headers: {
+            Authorization: `Bearer ${session.token}`,
+          },
+        },
+      );
+
+      setCartItems(normalizeCartItems(response.data));
+    } catch (error) {
+      console.error("Update cart quantity failed:", error.message);
+    }
+  };
+
   const handlePreferredGenderChange = (nextGender) => {
     const normalizedGender = nextGender === "female" ? "female" : "male";
 
@@ -449,6 +471,7 @@ function App() {
         onLogout={logout}
         cartItems={cartItems}
         onRemoveFromCart={handleRemoveFromCart}
+        onUpdateCartQuantity={handleUpdateCartQuantity}
         cartCount={cartCount}
       />
     );
