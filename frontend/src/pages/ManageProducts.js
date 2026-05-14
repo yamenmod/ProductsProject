@@ -59,11 +59,6 @@ function ManageProducts({
     volumeOptions.push(i.toString());
   }
 
-  const formatBoardHeight = (height) => {
-    if (!height) return "-";
-    const [feet, inches] = height.toString().split('.');
-    return `${feet}'${inches || 0}"`;
-  };
 
   const normalizeGenderValue = (value) => {
     const normalized = (value || "")
@@ -344,7 +339,7 @@ function ManageProducts({
     if (initialProductToEdit && typeof initialProductToEdit === "object") {
       handleEdit(initialProductToEdit);
     }
-  }, [initialProductToEdit]);
+  }, [initialProductToEdit, handleEdit]);
 
   const handleDelete = async (id) => {
     setSuccess("");

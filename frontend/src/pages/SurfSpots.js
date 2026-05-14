@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
-import { getBasePrice, getDisplayPrice, getVatAmount } from "../utils/pricing";
+import { getBasePrice } from "../utils/pricing";
 
 function Products({
   session,

@@ -898,6 +898,77 @@ const getAdminOrders = async (req, res) => {
   }
 };
 
+const getOrderItems = async (req, res) => {
+  try {
+    const orderId = req.params.orderId;
+
+    if (!orderId) {
+      return res.status(400).json({ message: "Order ID is required" });
+    }
+
+    // First, verify the order exists and admin has access
+    const [orders] = await db.query(
+      `
+        SELECT o.id, o.user_id, o.total, o.status, o.created_at
+        FROM orders o
+        WHERE o.id = ?
+        LIMIT 1
+      `,
+      [orderId],
+    );
+
+    if (!orders.length) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    // Get order items
+    const [items] = await db.query(
+      `
+        SELECT
+          oi.id,
+          oi.product_id,
+          oi.name,
+          oi.quantity,
+          oi.price
+        FROM order_items oi
+        WHERE oi.order_id = ?
+        ORDER BY oi.id ASC
+      `,
+      [orderId],
+    );
+
+    const order = orders[0];
+    const vatRate = await getVatRateFromDb(db);
+    const pricing = calculateVatPricing(order.total, vatRate);
+
+    return res.status(200).json({
+      order: {
+        id: order.id,
+        userId: order.user_id,
+        total: Number(order.total),
+        status: order.status,
+        createdAt: order.created_at,
+        pricing: {
+          basePrice: roundMoney(pricing.basePrice),
+          vatAmount: roundMoney(pricing.vatAmount),
+          finalPrice: roundMoney(pricing.finalPrice),
+        },
+      },
+      items: items.map((item) => ({
+        id: item.id,
+        productId: item.product_id,
+        name: item.name,
+        quantity: Number(item.quantity),
+        price: Number(item.price),
+        subtotal: roundMoney(Number(item.price) * Number(item.quantity)),
+      })),
+    });
+  } catch (error) {
+    console.error("Get order items error:", error);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
 module.exports = {
   getCart,
   addToCart,
@@ -909,4 +980,5 @@ module.exports = {
   createPaypalOrder,
   capturePaypalOrder,
   getAdminOrders,
+  getOrderItems,
 };

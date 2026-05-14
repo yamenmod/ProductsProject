@@ -18,6 +18,8 @@ function ManageOrders({
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedFilter, setSelectedFilter] = useState(initialFilter || "all");
+  const [selectedOrderDetail, setSelectedOrderDetail] = useState(null);
+  const [loadingOrderDetail, setLoadingOrderDetail] = useState(false);
 
   useEffect(() => {
     setSelectedFilter(initialFilter || "all");
@@ -61,6 +63,29 @@ function ManageOrders({
 
     loadOrders();
   }, [session?.token]);
+
+  const loadOrderDetail = useCallback(async (orderId) => {
+    setLoadingOrderDetail(true);
+
+    try {
+      const response = await axios.get(`/api/cart/admin/orders/${orderId}/items`, {
+        headers: {
+          Authorization: `Bearer ${session.token}`,
+        },
+      });
+
+      setSelectedOrderDetail(response.data);
+    } catch (requestError) {
+      console.error("Failed to load order details:", requestError);
+      setSelectedOrderDetail(null);
+    } finally {
+      setLoadingOrderDetail(false);
+    }
+  }, [session?.token]);
+
+  const handleOrderRowClick = (order) => {
+    loadOrderDetail(order.id);
+  };
 
   const filteredOrders = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
@@ -248,7 +273,21 @@ function ManageOrders({
                     const tone = statusTone(bucket);
 
                     return (
-                      <tr key={order.id} style={{ borderTop: "1px solid rgba(31, 24, 19, 0.08)" }}>
+                      <tr
+                        key={order.id}
+                        onClick={() => handleOrderRowClick(order)}
+                        style={{
+                          borderTop: "1px solid rgba(31, 24, 19, 0.08)",
+                          cursor: "pointer",
+                          transition: "background-color 0.2s ease",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = "rgba(36, 88, 96, 0.08)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = "transparent";
+                        }}
+                      >
                         <td style={{ padding: "14px 10px", fontWeight: 700 }}>#{order.id}</td>
                         <td style={{ padding: "14px 10px" }}>{order.username || "-"}</td>
                         <td style={{ padding: "14px 10px", color: "#65574d" }}>{order.email || "-"}</td>
@@ -271,6 +310,229 @@ function ManageOrders({
           </div>
         </div>
       </main>
+
+      {/* Order Detail Modal */}
+      {selectedOrderDetail && (
+        <>
+          <div
+            className="ps-previewBackdrop"
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: "rgba(31, 24, 19, 0.5)",
+              backdropFilter: "blur(4px)",
+              zIndex: 1000,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "20px",
+            }}
+            onClick={() => setSelectedOrderDetail(null)}
+          >
+            <div
+              className="ps-previewCard"
+              style={{
+                background: "#fff",
+                borderRadius: "16px",
+                boxShadow: "0 20px 60px rgba(31, 24, 19, 0.15)",
+                maxWidth: "600px",
+                width: "100%",
+                maxHeight: "80vh",
+                overflow: "auto",
+                position: "relative",
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Close Button */}
+              <button
+                type="button"
+                onClick={() => setSelectedOrderDetail(null)}
+                style={{
+                  position: "absolute",
+                  top: "16px",
+                  right: "16px",
+                  width: "36px",
+                  height: "36px",
+                  borderRadius: "999px",
+                  border: "none",
+                  background: "rgba(31, 24, 19, 0.08)",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "20px",
+                  color: "#1f1813",
+                  transition: "background-color 0.2s ease",
+                  zIndex: 10,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "rgba(31, 24, 19, 0.12)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "rgba(31, 24, 19, 0.08)";
+                }}
+              >
+                ×
+              </button>
+
+              {/* Modal Content */}
+              <div style={{ padding: "32px" }}>
+                {loadingOrderDetail ? (
+                  <div style={{ textAlign: "center", padding: "40px 20px" }}>
+                    <p className="ps-lead">Loading order details...</p>
+                  </div>
+                ) : (
+                  <>
+                    {/* Order Header */}
+                    <div style={{ marginBottom: "32px" }}>
+                      <h2 className="ps-subtitle" style={{ marginBottom: "8px" }}>
+                        Order #{selectedOrderDetail.order.id}
+                      </h2>
+                      <p style={{ color: "#65574d", fontSize: "13px", margin: 0 }}>
+                        {formatDate(selectedOrderDetail.order.createdAt)}
+                      </p>
+                    </div>
+
+                    {/* Order Summary */}
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr 1fr",
+                        gap: "20px",
+                        marginBottom: "32px",
+                        padding: "20px",
+                        background: "rgba(36, 88, 96, 0.06)",
+                        borderRadius: "12px",
+                      }}
+                    >
+                      <div>
+                        <p style={{ color: "#65574d", fontSize: "12px", textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.8px", margin: "0 0 6px 0" }}>
+                          Status
+                        </p>
+                        <span
+                          style={{
+                            display: "inline-flex",
+                            padding: "6px 10px",
+                            borderRadius: "999px",
+                            fontSize: "12px",
+                            fontWeight: 800,
+                            textTransform: "capitalize",
+                            background: statusTone(getOrderBucket(selectedOrderDetail.order)).background,
+                            color: statusTone(getOrderBucket(selectedOrderDetail.order)).color,
+                          }}
+                        >
+                          {getOrderBucket(selectedOrderDetail.order)}
+                        </span>
+                      </div>
+
+                      <div>
+                        <p style={{ color: "#65574d", fontSize: "12px", textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.8px", margin: "0 0 6px 0" }}>
+                          Total Amount
+                        </p>
+                        <p style={{ fontSize: "18px", fontWeight: 700, margin: 0, color: "#1f1813" }}>
+                          ${selectedOrderDetail.order.total.toFixed(2)}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Order Items */}
+                    <div style={{ marginBottom: "24px" }}>
+                      <h3 style={{ fontSize: "14px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.2px", color: "#65574d", marginBottom: "16px" }}>
+                        Order Items
+                      </h3>
+
+                      <div style={{ overflowX: "auto" }}>
+                        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                          <thead>
+                            <tr style={{ textAlign: "left", color: "#65574d", fontSize: "12px", textTransform: "uppercase", letterSpacing: "1.2px", borderBottom: "1px solid rgba(31, 24, 19, 0.08)" }}>
+                              <th style={{ padding: "10px 0", fontWeight: 700 }}>Product</th>
+                              <th style={{ padding: "10px 0", fontWeight: 700, textAlign: "right" }}>Quantity</th>
+                              <th style={{ padding: "10px 0", fontWeight: 700, textAlign: "right" }}>Price</th>
+                              <th style={{ padding: "10px 0", fontWeight: 700, textAlign: "right" }}>Subtotal</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {selectedOrderDetail.items.map((item) => (
+                              <tr
+                                key={item.id}
+                                style={{
+                                  borderBottom: "1px solid rgba(31, 24, 19, 0.06)",
+                                  textAlign: "left",
+                                }}
+                              >
+                                <td style={{ padding: "12px 0" }}>{item.name}</td>
+                                <td style={{ padding: "12px 0", textAlign: "right", color: "#65574d" }}>
+                                  {item.quantity}
+                                </td>
+                                <td style={{ padding: "12px 0", textAlign: "right", color: "#65574d" }}>
+                                  ${item.price.toFixed(2)}
+                                </td>
+                                <td style={{ padding: "12px 0", textAlign: "right", fontWeight: 700 }}>
+                                  ${item.subtotal.toFixed(2)}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* Pricing Breakdown */}
+                    <div
+                      style={{
+                        background: "rgba(36, 88, 96, 0.06)",
+                        borderRadius: "12px",
+                        padding: "16px",
+                        marginTop: "24px",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          marginBottom: "8px",
+                          color: "#65574d",
+                        }}
+                      >
+                        <span>Subtotal:</span>
+                        <span>${selectedOrderDetail.order.pricing.basePrice.toFixed(2)}</span>
+                      </div>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          marginBottom: "12px",
+                          color: "#65574d",
+                        }}
+                      >
+                        <span>VAT (18%):</span>
+                        <span>${selectedOrderDetail.order.pricing.vatAmount.toFixed(2)}</span>
+                      </div>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          paddingTop: "12px",
+                          borderTop: "1px solid rgba(31, 24, 19, 0.12)",
+                          fontSize: "16px",
+                          fontWeight: 700,
+                          color: "#1f1813",
+                        }}
+                      >
+                        <span>Total:</span>
+                        <span>${selectedOrderDetail.order.total.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
 
       <Footer />
     </div>

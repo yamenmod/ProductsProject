@@ -10,6 +10,7 @@ const {
   createPaypalConfig,
   createPaypalOrder,
   capturePaypalOrder,
+  getOrderItems,
 } = require("../controllers/cartController");
 const authMiddleware = require("../middleware/authMiddleware");
 const adminMiddleware = require("../middleware/adminMiddleware");
@@ -31,5 +32,6 @@ router.post("/paypal/capture", authMiddleware, capturePaypalOrder);
 // Admin-only order listing used by the Manage orders page.
 // The admin middleware blocks everyone except users with the admin role.
 router.get("/admin/orders", authMiddleware, adminMiddleware, getAdminOrders);
+router.get("/admin/orders/:orderId/items", authMiddleware, adminMiddleware, getOrderItems);
 
 module.exports = router;
