@@ -9,11 +9,11 @@ const {
 } = require("../utils/pricing");
 const { sendOrderEmail } = require("../utils/email");
 
-const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID || "";
-const PAYPAL_CLIENT_SECRET = process.env.PAYPAL_CLIENT_SECRET || "";
-const PAYPAL_BASE_URL = "https://api-m.sandbox.paypal.com";
-const PAYPAL_CURRENCY = process.env.PAYPAL_CURRENCY || "USD";
-const FRONTEND_BASE_URL = process.env.FRONTEND_BASE_URL || "http://localhost:3000";
+const PAYPAL_CLIENT_ID = (process.env.PAYPAL_CLIENT_ID || "").trim();
+const PAYPAL_CLIENT_SECRET = (process.env.PAYPAL_CLIENT_SECRET || "").trim();
+const PAYPAL_BASE_URL = (process.env.PAYPAL_BASE_URL || "https://api-m.sandbox.paypal.com").trim();
+const PAYPAL_CURRENCY = (process.env.PAYPAL_CURRENCY || "USD").trim();
+const FRONTEND_BASE_URL = (process.env.FRONTEND_BASE_URL || "http://localhost:3000").trim();
 
 const getPayPalAccessToken = async () => {
   if (!PAYPAL_CLIENT_ID || !PAYPAL_CLIENT_SECRET) {
