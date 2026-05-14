@@ -7,6 +7,7 @@ const {
   roundMoney,
   getVatRateFromDb,
 } = require("../utils/pricing");
+const { sendOrderEmail } = require("../utils/email");
 
 const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID || "";
 const PAYPAL_CLIENT_SECRET = process.env.PAYPAL_CLIENT_SECRET || "";
@@ -790,45 +791,8 @@ const capturePaypalOrder = async (req, res) => {
       await connection.commit();
       connection.release();
 
-      const transporter = createMailTransporter();
-      const fromAddress = getMailFromAddress();
 
-      if (transporter && fromAddress && userRecord.email) {
-        const subtotal = items.reduce((sum, item) => sum + Number(item.itemTotal || 0), 0);
-        const shipping = 10;
-        const tax = subtotal > 0 ? subtotal - subtotal / 1.18 : 0;
-        const viewOrderUrl = `${FRONTEND_BASE_URL}/?order=${orderResult.insertId}`;
-
-        const html = buildOrderEmailHtml({
-          customerName: buyerName || userRecord.username || "Surfer",
-          orderId: orderResult.insertId,
-          orderDate: new Date(),
-          paymentStatus: "Paid",
-          transactionId: orderID,
-          currency: currencyCode,
-          items: items.map((item) => ({
-            name: item.name,
-            quantity: item.quantity,
-            finalPrice: item.pricing.finalPrice,
-            subtotal: item.itemTotal,
-          })),
-          subtotal,
-          shipping,
-          tax,
-          total: Number(amountValue) || total,
-          viewOrderUrl,
-        });
-
-        transporter.sendMail({
-          from: fromAddress,
-          to: userRecord.email,
-          subject: "Thank you for your order | Plage Surf",
-          html,
-          text: `Thank you for ordering from Plage Surf. Your order #${orderResult.insertId} has been paid successfully. View your order: ${viewOrderUrl}`,
-        }).catch((emailError) => {
-          console.error("[paypal:capture] order email failed:", emailError.message || emailError);
-        });
-      }
+      
 
       return res.status(200).json({
         message: "Payment captured and order persisted successfully",
