@@ -397,9 +397,8 @@ function Cart({
       total + getDisplayPrice(item) * (Number(item.quantity) || 1),
     0,
   );
-  const shipping = subtotal > 0 ? 10.0 : 0;
   const tax = subtotal > 0 ? subtotal - subtotal / 1.18 : 0;
-  const total = Number((subtotal + shipping).toFixed(2));
+  const total = Number(subtotal.toFixed(2));
 
   return (
     <div className="ps-page">
@@ -516,6 +515,7 @@ function Cart({
                           display: "block",
                           fontSize: "14px",
                           color: "#65574d",
+                          textDecoration: "line-through",
                         }}
                       >
                         ${getBasePrice(item).toFixed(2)}
@@ -680,20 +680,7 @@ function Cart({
                     </p>
                   </div>
 
-                  <div style={{ textAlign: "center", minWidth: "80px" }}>
-                    <p
-                      style={{
-                        margin: "0 0 4px",
-                        color: "#65574d",
-                        fontSize: "12px",
-                      }}
-                    >
-                      Shipping
-                    </p>
-                    <p style={{ margin: 0, fontWeight: 700, fontSize: "14px" }}>
-                      ${shipping.toFixed(2)}
-                    </p>
-                  </div>
+
 
                   <div style={{ textAlign: "center", minWidth: "80px" }}>
                     <p
