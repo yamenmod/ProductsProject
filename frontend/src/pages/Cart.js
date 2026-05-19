@@ -141,8 +141,13 @@ function Cart({
 
       window.location.href = `https://www.sandbox.paypal.com/checkoutnow?token=${encodeURIComponent(orderID)}`;
     } catch (error) {
-      console.error("Failed to start PayPal checkout:", error?.response || error);
-      setPaypalMessage("Unable to start PayPal checkout. Please try again later.");
+      console.error(
+        "Failed to start PayPal checkout:",
+        error?.response || error,
+      );
+      setPaypalMessage(
+        "Unable to start PayPal checkout. Please try again later.",
+      );
     } finally {
       setIsPayPalLoading(false);
     }
@@ -187,7 +192,8 @@ function Cart({
 
       setPaypalConfig(response.data);
     } catch (error) {
-      const errorMsg = error?.response?.data?.message || error.message || "Unknown error";
+      const errorMsg =
+        error?.response?.data?.message || error.message || "Unknown error";
       console.error("Failed to load PayPal configuration:", errorMsg);
       setPaypalMessage(`PayPal Error: ${errorMsg}`);
     } finally {
@@ -680,8 +686,6 @@ function Cart({
                     </p>
                   </div>
 
-
-
                   <div style={{ textAlign: "center", minWidth: "80px" }}>
                     <p
                       style={{
@@ -737,7 +741,6 @@ function Cart({
                   Buy Now
                 </button>
               </div>
-
             </div>
           )}
         </div>
@@ -754,14 +757,32 @@ function Cart({
             aria-modal="true"
             aria-label="Pay with PayPal"
             onClick={(event) => event.stopPropagation()}
-            style={{ maxWidth: "460px", width: "calc(100% - 32px)", padding: "28px" }}
+            style={{
+              maxWidth: "460px",
+              width: "calc(100% - 32px)",
+              padding: "28px",
+            }}
           >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "16px", marginBottom: "12px" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                gap: "16px",
+                marginBottom: "12px",
+              }}
+            >
               <div>
-                <p className="ps-pill" style={{ margin: "0 0 10px", width: "fit-content" }}>
+                <p
+                  className="ps-pill"
+                  style={{ margin: "0 0 10px", width: "fit-content" }}
+                >
                   Secure checkout
                 </p>
-                <h2 className="ps-cartConfirmTitle" style={{ marginBottom: "8px" }}>
+                <h2
+                  className="ps-cartConfirmTitle"
+                  style={{ marginBottom: "8px" }}
+                >
                   Pay with PayPal
                 </h2>
               </div>
@@ -783,12 +804,21 @@ function Cart({
               </button>
             </div>
 
-            <p style={{ margin: "0 0 18px", color: "#65574d", lineHeight: 1.6 }}>
-              Your payment will open in PayPal's secure checkout window so you can complete the purchase safely.
+            <p
+              style={{ margin: "0 0 18px", color: "#65574d", lineHeight: 1.6 }}
+            >
+              Your payment will open in PayPal's secure checkout window so you
+              can complete the purchase safely.
             </p>
 
             {paypalMessage && (
-              <p style={{ margin: "0 0 16px", color: "#5f5550", fontSize: "13px" }}>
+              <p
+                style={{
+                  margin: "0 0 16px",
+                  color: "#5f5550",
+                  fontSize: "13px",
+                }}
+              >
                 {paypalMessage}
               </p>
             )}
@@ -803,7 +833,8 @@ function Cart({
                   padding: "12px 20px",
                   minWidth: "220px",
                   borderRadius: "999px",
-                  background: "linear-gradient(135deg, #003087 0%, #0070e0 100%)",
+                  background:
+                    "linear-gradient(135deg, #003087 0%, #0070e0 100%)",
                   color: "#ffffff",
                   border: "none",
                   boxShadow: "0 10px 18px rgba(0, 48, 135, 0.18)",

@@ -969,11 +969,12 @@ textarea {
   box-shadow: 0 12px 28px rgba(36, 88, 96, 0.24);
 }
 
+
 .ps-btn-secondary {
   padding: 8px 14px;
   font-size: 12px;
-  background: #c1290f;
-  border: 1px solid #c1290f;
+  background: #A0522D;
+  border: 1px solid #A0522D;
   color: #fff;
 }
 

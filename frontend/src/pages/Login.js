@@ -283,6 +283,7 @@ function Login({ onLoginSuccess, onNavigate }) {
           <button
             className="ps-btn ps-btn-secondary"
             onClick={() => setIsRegister(!isRegister)}
+            style={{ backgroundColor: "#A0522D", color: "#ffffff" }}
           >
             {isRegister ? "Already registered? Sign In" : "Create an Account"}
           </button>
