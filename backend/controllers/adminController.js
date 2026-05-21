@@ -2,7 +2,7 @@ const db = require("../db/connection");
 
 const getAllUsers = async (req, res) => {
   try {
-    const [rows] = await db.query(
+    const [rows] = await db.query( //
       `SELECT id, username, email, role, created_at FROM users ORDER BY created_at DESC`,
     );
     return res.status(200).json(rows);
