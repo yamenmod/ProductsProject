@@ -275,13 +275,6 @@ function Header({
               >
                 Manage customers
               </button>
-              <button
-                type="button"
-                className={`ps-nav-link ${currentPage === "profile" ? "active" : ""}`}
-                onClick={() => onNavigate("profile")}
-              >
-                Profile
-              </button>
             </>
           )}
         </nav>
