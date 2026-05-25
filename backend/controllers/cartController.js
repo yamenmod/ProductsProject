@@ -1,6 +1,9 @@
 const axios = require("axios");
 const db = require("../db/connection");
-const { createMailTransporter, getMailFromAddress } = require("../utils/mailer");
+const {
+  createMailTransporter,
+  getMailFromAddress,
+} = require("../utils/mailer");
 const { buildOrderEmailHtml } = require("../utils/emailTemplates");
 const {
   calculateVatPricing,
@@ -11,9 +14,13 @@ const { sendOrderEmail } = require("../utils/email");
 
 const PAYPAL_CLIENT_ID = (process.env.PAYPAL_CLIENT_ID || "").trim();
 const PAYPAL_CLIENT_SECRET = (process.env.PAYPAL_CLIENT_SECRET || "").trim();
-const PAYPAL_BASE_URL = (process.env.PAYPAL_BASE_URL || "https://api-m.sandbox.paypal.com").trim();
+const PAYPAL_BASE_URL = (
+  process.env.PAYPAL_BASE_URL || "https://api-m.sandbox.paypal.com"
+).trim();
 const PAYPAL_CURRENCY = (process.env.PAYPAL_CURRENCY || "USD").trim();
-const FRONTEND_BASE_URL = (process.env.FRONTEND_BASE_URL || "http://localhost:3000").trim();
+const FRONTEND_BASE_URL = (
+  process.env.FRONTEND_BASE_URL || "http://localhost:3000"
+).trim();
 
 const getPayPalAccessToken = async () => {
   if (!PAYPAL_CLIENT_ID || !PAYPAL_CLIENT_SECRET) {
@@ -46,7 +53,7 @@ const getPayPalAccessToken = async () => {
 const calculateCartTotal = async (userId) => {
   const [cartRows] = await db.query(
     `
-      SELECT p.id, p.name, p.price, p.stock, ci.quantity
+      SELECT p.id, p.name, p.price, p.stock, ci.size, ci.quantity
       FROM cart_items ci
       JOIN products p ON p.id = ci.product_id
       WHERE ci.user_id = ?
@@ -69,6 +76,7 @@ const calculateCartTotal = async (userId) => {
 
     return {
       ...item,
+      displayName: item.size ? `${item.name} (Size ${item.size})` : item.name,
       pricing,
       itemTotal,
     };
@@ -259,9 +267,11 @@ const mapCartRows = (rows, vatRate = 0.18) =>
       ...calculateVatPricing(row.price, vatRate),
       stock: Number(row.stock),
       category: row.category || "",
+      size: row.size || "",
       image: resolvePrimaryImage(row.image_url),
     },
     quantity: Number(row.quantity),
+    size: row.size || "",
   }));
 
 // Reads the signed-in user's cart and returns the current items and totals.
@@ -279,6 +289,7 @@ const getCart = async (req, res) => {
           p.stock,
           p.image_url,
           c.name AS category,
+          ci.size,
           ci.quantity
         FROM cart_items ci
         JOIN products p ON p.id = ci.product_id
@@ -300,7 +311,7 @@ const getCart = async (req, res) => {
 const addToCart = async (req, res) => {
   try {
     const vatRate = await getVatRateFromDb(db);
-    const { productId, quantity } = req.body;
+    const { productId, quantity, size } = req.body;
     const sourcePage = req.headers["x-source-page"] || "unknown";
 
     console.log(
@@ -314,11 +325,28 @@ const addToCart = async (req, res) => {
     const qty = Number(quantity) > 0 ? Number(quantity) : 1;
 
     const [products] = await db.query(
-      "SELECT id FROM products WHERE id = ? LIMIT 1",
+      `
+        SELECT p.id, c.name AS category
+        FROM products p
+        LEFT JOIN categories c ON c.id = p.category_id
+        WHERE p.id = ?
+        LIMIT 1
+      `,
       [productId],
     );
     if (!products.length) {
       return res.status(404).json({ message: "Product not found" });
+    }
+
+    const normalizedSize = (size || "").toString().trim().toUpperCase();
+    const isWetsuit = (products[0].category || "")
+      .toString()
+      .trim()
+      .toLowerCase()
+      .includes("wetsuit");
+
+    if (isWetsuit && !normalizedSize) {
+      return res.status(400).json({ message: "Size is required for wetsuits" });
     }
 
     const [users] = await db.query(
@@ -330,8 +358,8 @@ const addToCart = async (req, res) => {
     }
 
     const [existingItems] = await db.query(
-      "SELECT id FROM cart_items WHERE user_id = ? AND product_id = ? LIMIT 1",
-      [req.user.id, productId],
+      "SELECT id FROM cart_items WHERE user_id = ? AND product_id = ? AND size = ? LIMIT 1",
+      [req.user.id, productId, isWetsuit ? normalizedSize : ""],
     );
 
     if (existingItems.length) {
@@ -344,8 +372,8 @@ const addToCart = async (req, res) => {
       );
     } else {
       await db.query(
-        "INSERT INTO cart_items (user_id, product_id, quantity) VALUES (?, ?, ?)",
-        [req.user.id, productId, qty],
+        "INSERT INTO cart_items (user_id, product_id, size, quantity) VALUES (?, ?, ?, ?)",
+        [req.user.id, productId, isWetsuit ? normalizedSize : "", qty],
       );
       console.log(
         `[cart:add] inserted new item user=${req.user.id} product=${productId}`,
@@ -361,6 +389,7 @@ const addToCart = async (req, res) => {
           p.stock,
           p.image_url,
           c.name AS category,
+          ci.size,
           ci.quantity
         FROM cart_items ci
         JOIN products p ON p.id = ci.product_id
@@ -384,10 +413,18 @@ const removeFromCart = async (req, res) => {
   try {
     const vatRate = await getVatRateFromDb(db);
     const { productId } = req.params;
+    const normalizedSize = (req.query.size || "")
+      .toString()
+      .trim()
+      .toUpperCase();
 
     await db.query(
-      "DELETE FROM cart_items WHERE user_id = ? AND product_id = ?",
-      [req.user.id, productId],
+      normalizedSize
+        ? "DELETE FROM cart_items WHERE user_id = ? AND product_id = ? AND size = ?"
+        : "DELETE FROM cart_items WHERE user_id = ? AND product_id = ?",
+      normalizedSize
+        ? [req.user.id, productId, normalizedSize]
+        : [req.user.id, productId],
     );
 
     const [rows] = await db.query(
@@ -399,6 +436,7 @@ const removeFromCart = async (req, res) => {
           p.stock,
           p.image_url,
           c.name AS category,
+          ci.size,
           ci.quantity
         FROM cart_items ci
         JOIN products p ON p.id = ci.product_id
@@ -420,6 +458,10 @@ const updateCartQuantity = async (req, res) => {
     const vatRate = await getVatRateFromDb(db);
     const { productId } = req.params;
     const { quantity } = req.body;
+    const normalizedSize = (req.query.size || req.body.size || "")
+      .toString()
+      .trim()
+      .toUpperCase();
     const nextQuantity = Number(quantity);
 
     if (!productId) {
@@ -432,8 +474,12 @@ const updateCartQuantity = async (req, res) => {
 
     if (nextQuantity <= 0) {
       await db.query(
-        "DELETE FROM cart_items WHERE user_id = ? AND product_id = ?",
-        [req.user.id, productId],
+        normalizedSize
+          ? "DELETE FROM cart_items WHERE user_id = ? AND product_id = ? AND size = ?"
+          : "DELETE FROM cart_items WHERE user_id = ? AND product_id = ?",
+        normalizedSize
+          ? [req.user.id, productId, normalizedSize]
+          : [req.user.id, productId],
       );
     } else {
       const [products] = await db.query(
@@ -453,18 +499,18 @@ const updateCartQuantity = async (req, res) => {
       }
 
       const [existingItems] = await db.query(
-        "SELECT id FROM cart_items WHERE user_id = ? AND product_id = ? LIMIT 1",
-        [req.user.id, productId],
+        "SELECT id FROM cart_items WHERE user_id = ? AND product_id = ? AND size = ? LIMIT 1",
+        [req.user.id, productId, normalizedSize],
       );
 
       if (!existingItems.length) {
         return res.status(404).json({ message: "Cart item not found" });
       }
 
-      await db.query(
-        "UPDATE cart_items SET quantity = ? WHERE id = ?",
-        [nextQuantity, existingItems[0].id],
-      );
+      await db.query("UPDATE cart_items SET quantity = ? WHERE id = ?", [
+        nextQuantity,
+        existingItems[0].id,
+      ]);
     }
 
     const [rows] = await db.query(
@@ -476,6 +522,7 @@ const updateCartQuantity = async (req, res) => {
           p.stock,
           p.image_url,
           c.name AS category,
+          ci.size,
           ci.quantity
         FROM cart_items ci
         JOIN products p ON p.id = ci.product_id
@@ -512,6 +559,7 @@ const checkout = async (req, res) => {
           p.name,
           p.price,
           p.stock,
+          ci.size,
           ci.quantity
         FROM cart_items ci
         JOIN products p ON p.id = ci.product_id
@@ -553,6 +601,9 @@ const checkout = async (req, res) => {
         items.push({
           product: item.id,
           name: item.name,
+          displayName: item.size
+            ? `${item.name} (Size ${item.size})`
+            : item.name,
           basePrice: pricing.basePrice,
           vatAmount: pricing.vatAmount,
           finalPrice: pricing.finalPrice,
@@ -572,7 +623,7 @@ const checkout = async (req, res) => {
           [
             orderResult.insertId,
             item.product,
-            item.name,
+            item.displayName || item.name,
             item.finalPrice,
             item.quantity,
           ],
@@ -682,7 +733,8 @@ const createPaypalOrder = async (req, res) => {
     console.error("[paypal:create-order]", error.message || error);
     return res.status(500).json({
       message:
-        (error?.response?.data?.message || error.message) ||
+        error?.response?.data?.message ||
+        error.message ||
         "Unable to create PayPal order",
     });
   }
@@ -752,7 +804,11 @@ const capturePaypalOrder = async (req, res) => {
 
       const [orderResult] = await connection.query(
         "INSERT INTO orders (user_id, total, status, created_at) VALUES (?, ?, ?, NOW())",
-        [req.user.id, total, captureStatus === "COMPLETED" ? "paid" : "pending"],
+        [
+          req.user.id,
+          total,
+          captureStatus === "COMPLETED" ? "paid" : "pending",
+        ],
       );
 
       for (const item of items) {
@@ -761,7 +817,7 @@ const capturePaypalOrder = async (req, res) => {
           [
             orderResult.insertId,
             item.id,
-            item.name,
+            item.displayName || item.name,
             item.pricing.finalPrice,
             item.quantity,
           ],
@@ -773,7 +829,9 @@ const capturePaypalOrder = async (req, res) => {
         );
       }
 
-      await connection.query("DELETE FROM cart_items WHERE user_id = ?", [req.user.id]);
+      await connection.query("DELETE FROM cart_items WHERE user_id = ?", [
+        req.user.id,
+      ]);
 
       await connection.query(
         "INSERT INTO payments (user_id, order_id, paypal_order_id, status, amount, currency, raw_response) VALUES (?, ?, ?, ?, ?, ?, ?)",
@@ -790,9 +848,6 @@ const capturePaypalOrder = async (req, res) => {
 
       await connection.commit();
       connection.release();
-
-
-      
 
       return res.status(200).json({
         message: "Payment captured and order persisted successfully",
@@ -811,14 +866,20 @@ const capturePaypalOrder = async (req, res) => {
     } catch (transactionError) {
       await connection.rollback();
       connection.release();
-      console.error("[paypal:capture] transaction failed", transactionError.message);
-      return res.status(500).json({ message: "Server error during payment persistence" });
+      console.error(
+        "[paypal:capture] transaction failed",
+        transactionError.message,
+      );
+      return res
+        .status(500)
+        .json({ message: "Server error during payment persistence" });
     }
   } catch (error) {
     console.error("[paypal:capture]", error.message || error);
     return res.status(500).json({
       message:
-        (error?.response?.data?.details?.[0]?.description || error?.response?.data?.message) ||
+        error?.response?.data?.details?.[0]?.description ||
+        error?.response?.data?.message ||
         "Unable to capture PayPal order",
     });
   }

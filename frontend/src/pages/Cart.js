@@ -35,6 +35,7 @@ function Cart({
           ...product,
           id: productId,
           _id: productId,
+          size: product.size || item.size || "",
           quantity: Number(item.quantity) || 1,
         };
       }
@@ -45,6 +46,7 @@ function Cart({
         ...item,
         id: productId,
         _id: productId,
+        size: item.size || item?.product?.size || "",
         quantity: Number(item?.quantity) || 1,
       };
     });
@@ -72,7 +74,10 @@ function Cart({
 
     try {
       setIsRemoving(true);
-      await onRemoveFromCart(pendingRemoveItem.id);
+      await onRemoveFromCart(
+        pendingRemoveItem.id,
+        pendingRemoveItem.size || "",
+      );
       setPendingRemoveItem(null);
     } catch (error) {
       console.error("Remove item failed:", error.message);
@@ -90,11 +95,11 @@ function Cart({
     const nextQuantity = currentQuantity + delta;
 
     if (nextQuantity <= 0) {
-      await onRemoveFromCart?.(item.id);
+      await onRemoveFromCart?.(item.id, item.size || "");
       return;
     }
 
-    await onUpdateCartQuantity(item.id, nextQuantity);
+    await onUpdateCartQuantity(item.id, nextQuantity, item.size || "");
   };
 
   const openPayPalModal = () => {
@@ -459,7 +464,7 @@ function Cart({
             <div style={{ display: "grid", gap: "24px" }}>
               {displayItems.map((item) => (
                 <div
-                  key={item.id}
+                  key={`${item.id}-${item.size || "default"}`}
                   className="ps-surface"
                   style={{
                     padding: "24px",
@@ -513,6 +518,17 @@ function Cart({
                     >
                       {item.category || ""}
                     </p>
+                    {item.size ? (
+                      <p
+                        style={{
+                          margin: "0 0 8px",
+                          color: "#65574d",
+                          fontSize: "14px",
+                        }}
+                      >
+                        Size: {item.size}
+                      </p>
+                    ) : null}
                     <div
                       style={{ margin: 0, color: "#1f1813", fontWeight: 700 }}
                     >

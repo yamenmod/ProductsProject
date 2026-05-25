@@ -23,6 +23,7 @@ const normalizeCartItems = (items = []) =>
         ...product,
         id: productId,
         _id: productId,
+        size: product.size || item.size || "",
         quantity: Number(item.quantity) || 1,
       };
     }
@@ -33,6 +34,7 @@ const normalizeCartItems = (items = []) =>
       ...item,
       id: productId,
       _id: productId,
+      size: item.size || item?.product?.size || "",
       quantity: Number(item?.quantity) || 1,
     };
   });
@@ -262,7 +264,7 @@ function App() {
     try {
       await axios.post(
         "/api/cart",
-        { productId, quantity: 1 },
+        { productId, quantity: 1, size: productOrCart?.size || "" },
         {
           headers: {
             Authorization: `Bearer ${session.token}`,
@@ -284,7 +286,7 @@ function App() {
     }
   };
 
-  const handleRemoveFromCart = async (productId) => {
+  const handleRemoveFromCart = async (productId, size = "") => {
     if (!productId || !session?.token) {
       return;
     }
@@ -294,6 +296,7 @@ function App() {
         headers: {
           Authorization: `Bearer ${session.token}`,
         },
+        params: size ? { size } : undefined,
       });
 
       setCartItems(normalizeCartItems(response.data));
@@ -302,7 +305,7 @@ function App() {
     }
   };
 
-  const handleUpdateCartQuantity = async (productId, quantity) => {
+  const handleUpdateCartQuantity = async (productId, quantity, size = "") => {
     if (!productId || !session?.token) {
       return;
     }
@@ -315,6 +318,7 @@ function App() {
           headers: {
             Authorization: `Bearer ${session.token}`,
           },
+          params: size ? { size } : undefined,
         },
       );
 
@@ -372,7 +376,11 @@ function App() {
         aria-modal="true"
         aria-label="Payment confirmation"
         onClick={(event) => event.stopPropagation()}
-        style={{ maxWidth: "520px", width: "calc(100% - 32px)", padding: "28px" }}
+        style={{
+          maxWidth: "520px",
+          width: "calc(100% - 32px)",
+          padding: "28px",
+        }}
       >
         <div style={{ display: "flex", gap: "14px", alignItems: "flex-start" }}>
           <div
@@ -395,7 +403,10 @@ function App() {
           </div>
 
           <div style={{ flex: 1 }}>
-            <p className="ps-pill" style={{ margin: "0 0 10px", width: "fit-content" }}>
+            <p
+              className="ps-pill"
+              style={{ margin: "0 0 10px", width: "fit-content" }}
+            >
               Payment confirmed
             </p>
             <h2 className="ps-cartConfirmTitle" style={{ marginBottom: "8px" }}>
@@ -404,7 +415,9 @@ function App() {
             <p className="ps-cartConfirmText" style={{ marginBottom: "8px" }}>
               {paymentSuccess.message}
             </p>
-            <p style={{ margin: "0 0 18px", color: "#65574d", fontSize: "13px" }}>
+            <p
+              style={{ margin: "0 0 18px", color: "#65574d", fontSize: "13px" }}
+            >
               Order reference: {paymentSuccess.orderId}
             </p>
           </div>
@@ -427,7 +440,14 @@ function App() {
           </button>
         </div>
 
-        <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginTop: "8px" }}>
+        <div
+          style={{
+            display: "flex",
+            gap: "12px",
+            flexWrap: "wrap",
+            marginTop: "8px",
+          }}
+        >
           <button
             type="button"
             className="ps-btn ps-btn-primary"
@@ -475,7 +495,7 @@ function App() {
           );
         }}
         onNavigate={setCurrentPage}
-      />
+      />,
     );
   }
 
@@ -493,7 +513,7 @@ function App() {
         onPreferredGenderChange={handlePreferredGenderChange}
         onLogout={logout}
         cartCount={cartCount}
-      />
+      />,
     );
   }
 
@@ -507,7 +527,7 @@ function App() {
         onPreferredGenderChange={handlePreferredGenderChange}
         onLogout={logout}
         cartCount={cartCount}
-      />
+      />,
     );
   }
 
@@ -521,7 +541,7 @@ function App() {
         onPreferredGenderChange={handlePreferredGenderChange}
         onLogout={logout}
         cartCount={cartCount}
-      />
+      />,
     );
   }
 
@@ -537,7 +557,7 @@ function App() {
         onLogout={logout}
         cartCount={cartCount}
         onSessionUpdate={handleSessionUpdate}
-      />
+      />,
     );
   }
 
@@ -553,7 +573,7 @@ function App() {
         onPreferredGenderChange={handlePreferredGenderChange}
         onLogout={logout}
         cartCount={cartCount}
-      />
+      />,
     );
   }
 
@@ -570,7 +590,7 @@ function App() {
         onPreferredGenderChange={handlePreferredGenderChange}
         onLogout={logout}
         cartCount={cartCount}
-      />
+      />,
     );
   }
 
@@ -588,7 +608,7 @@ function App() {
         onRemoveFromCart={handleRemoveFromCart}
         onUpdateCartQuantity={handleUpdateCartQuantity}
         cartCount={cartCount}
-      />
+      />,
     );
   }
 
@@ -603,7 +623,7 @@ function App() {
         onLogout={logout}
         cartCount={cartCount}
         initialFilter={selectedOrderFilter}
-      />
+      />,
     );
   }
 
@@ -618,7 +638,7 @@ function App() {
         onLogout={logout}
         cartCount={cartCount}
         initialProductToEdit={selectedProductToEdit}
-      />
+      />,
     );
   }
 
@@ -632,7 +652,7 @@ function App() {
         onPreferredGenderChange={handlePreferredGenderChange}
         onLogout={logout}
         cartCount={cartCount}
-      />
+      />,
     );
   }
 
@@ -650,7 +670,7 @@ function App() {
           setSelectedOrderFilter(filter);
           setCurrentPage("manage-orders");
         }}
-      />
+      />,
     );
   }
 

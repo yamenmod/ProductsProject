@@ -240,6 +240,9 @@ const normalizeGenderInput = (value) => {
   return "unisex";
 };
 
+const isWetsuitCategory = (value) =>
+  (value || "").toString().trim().toLowerCase().includes("wetsuit");
+
 const normalizeProduct = (row, vatRate = 0.18) => {
   const normalizedBoardHeight =
     row.board_height !== undefined && row.board_height !== null
@@ -266,6 +269,7 @@ const normalizeProduct = (row, vatRate = 0.18) => {
     category_id: row.category_id,
     category: row.category || "",
     gender: normalizeGenderInput(row.gender),
+    size: row.size || "",
     image: resolveImagePayload(row.image_url).imageUrl,
     image_url: resolveImagePayload(row.image_url).imageUrl,
     image_urls: resolveImagePayload(row.image_url).imageUrls,
@@ -316,6 +320,7 @@ const getProducts = async (req, res) => {
           p.category_id,
           p.gender,
           p.image_url,
+          p.size,
           p.board_length,
           p.board_height,
           p.height,
@@ -354,6 +359,7 @@ const getProductById = async (req, res) => {
           p.category_id,
           p.gender,
           p.image_url,
+          p.size,
           p.board_length,
           p.board_height,
           p.height,
@@ -396,11 +402,21 @@ const createProduct = async (req, res) => {
       boardHeight,
       volume,
       boardVolume,
+      size,
     } = req.body;
     const nextBoardHeight =
-      boardHeight !== undefined ? boardHeight : height !== undefined ? height : null;
+      boardHeight !== undefined
+        ? boardHeight
+        : height !== undefined
+          ? height
+          : null;
     const nextBoardVolume =
-      boardVolume !== undefined ? boardVolume : volume !== undefined ? volume : null;
+      boardVolume !== undefined
+        ? boardVolume
+        : volume !== undefined
+          ? volume
+          : null;
+    const nextSize = isWetsuitCategory(category) ? size || null : null;
     const uploadedImagePaths = Array.isArray(req.files)
       ? req.files
           .filter(
@@ -436,6 +452,7 @@ const createProduct = async (req, res) => {
           category_id,
           gender,
           image_url,
+          size,
           board_length,
           board_height,
           height,
@@ -453,6 +470,7 @@ const createProduct = async (req, res) => {
         categoryId,
         nextGender,
         storedImageValue,
+        nextSize,
         boardLength === undefined ? null : Number(boardLength),
         nextBoardHeight === undefined || nextBoardHeight === null
           ? null
@@ -480,6 +498,7 @@ const createProduct = async (req, res) => {
           p.category_id,
           p.gender,
           p.image_url,
+          p.size,
           p.board_length,
           p.board_height,
           p.height,
@@ -508,7 +527,7 @@ const createProduct = async (req, res) => {
 const updateProduct = async (req, res) => {
   try {
     const [existingRows] = await db.query(
-      "SELECT id, name, price, stock, category_id, description, gender, image_url, board_length, board_height, height, board_volume, volume FROM products WHERE id = ? LIMIT 1",
+      "SELECT p.id, p.name, p.price, p.stock, p.category_id, p.description, p.gender, p.image_url, p.size, p.board_length, p.board_height, p.height, p.board_volume, p.volume, c.name AS category FROM products p LEFT JOIN categories c ON c.id = p.category_id WHERE p.id = ? LIMIT 1",
       [req.params.id],
     );
 
@@ -531,11 +550,30 @@ const updateProduct = async (req, res) => {
       boardHeight,
       volume,
       boardVolume,
+      size,
     } = req.body;
     const nextBoardHeight =
-      boardHeight !== undefined ? boardHeight : height !== undefined ? height : null;
+      boardHeight !== undefined
+        ? boardHeight
+        : height !== undefined
+          ? height
+          : null;
     const nextBoardVolume =
-      boardVolume !== undefined ? boardVolume : volume !== undefined ? volume : null;
+      boardVolume !== undefined
+        ? boardVolume
+        : volume !== undefined
+          ? volume
+          : null;
+    const nextSize =
+      category !== undefined
+        ? isWetsuitCategory(category)
+          ? size || null
+          : null
+        : isWetsuitCategory(existingProduct.category)
+          ? size !== undefined
+            ? size || null
+            : existingProduct.size || null
+          : null;
     const uploadedImagePaths = Array.isArray(req.files)
       ? req.files
           .filter(
@@ -589,6 +627,7 @@ const updateProduct = async (req, res) => {
           category_id = ?,
           gender = ?,
           image_url = ?,
+          size = ?,
           board_length = ?,
           board_height = ?,
           height = ?,
@@ -605,6 +644,7 @@ const updateProduct = async (req, res) => {
         nextCategoryId,
         nextGender,
         storedImageValue,
+        nextSize,
         boardLength !== undefined
           ? Number(boardLength)
           : existingProduct.board_length,
@@ -635,6 +675,7 @@ const updateProduct = async (req, res) => {
           p.category_id,
           p.gender,
           p.image_url,
+          p.size,
           p.board_length,
           p.board_height,
           p.height,
@@ -833,6 +874,7 @@ const recommendBoards = async (req, res) => {
           p.category_id,
           p.gender,
           p.image_url,
+          p.size,
           p.board_length,
           p.board_height,
           p.height,
@@ -892,7 +934,10 @@ const recommendBoards = async (req, res) => {
           : 2.7;
 
     const targetBoardHeight = Math.max(0, heightNum * boardHeightRatio);
-    const targetBoardHeightMin = Math.max(0, targetBoardHeight - boardHeightTolerance);
+    const targetBoardHeightMin = Math.max(
+      0,
+      targetBoardHeight - boardHeightTolerance,
+    );
     const targetBoardHeightMax = targetBoardHeight + boardHeightTolerance;
 
     // Height also influences board length preferences
@@ -916,7 +961,8 @@ const recommendBoards = async (req, res) => {
     const targetLengthMax = Math.min(12.0, baseLengthFt + lengthOffsetMax);
     const targetLengthCenter = (targetLengthMin + targetLengthMax) / 2;
     const targetVolumeCenter = (targetVolumeMin + targetVolumeMax) / 2;
-    const targetHeightCenter = (targetBoardHeightMin + targetBoardHeightMax) / 2;
+    const targetHeightCenter =
+      (targetBoardHeightMin + targetBoardHeightMax) / 2;
 
     const scoreMetric = (value, target) => {
       if (value === null || value === undefined || Number.isNaN(value)) {

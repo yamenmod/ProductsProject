@@ -44,8 +44,14 @@ function SizeCharts({
   const [products, setProducts] = useState([]);
   const [previewProduct, setPreviewProduct] = useState(null);
   const [previewImageIndex, setPreviewImageIndex] = useState(0);
+  const [previewSize, setPreviewSize] = useState("");
   const [cardImageIndices, setCardImageIndices] = useState({});
   const swipeStartXRef = useRef(null);
+
+  const sizeOptions = ["XS", "S", "M", "L", "XL"];
+
+  const isWetsuitProduct = (product) =>
+    (product?.category || "").toString().toLowerCase().includes("wetsuit");
 
   const normalizeGenderValue = (value) =>
     (value || "")
@@ -229,11 +235,13 @@ function SizeCharts({
   const openPreview = (product) => {
     setPreviewProduct(product);
     setPreviewImageIndex(0);
+    setPreviewSize(product?.size || "");
   };
 
   const closePreview = () => {
     setPreviewProduct(null);
     setPreviewImageIndex(0);
+    setPreviewSize("");
   };
 
   const goToPreviewImage = (nextIndex) => {
@@ -285,14 +293,14 @@ function SizeCharts({
     });
   };
 
-  const handleAddToCart = async (product) => {
+  const handleAddToCart = async (product, size = "") => {
     if (!product) {
       return;
     }
 
     try {
       if (typeof onAddToCart === "function") {
-        const added = await onAddToCart(product);
+        const added = await onAddToCart({ ...product, size: size || "" });
         if (!added) {
           return;
         }
@@ -332,7 +340,8 @@ function SizeCharts({
       return;
     }
 
-    await handleAddToCart(previewProduct);
+    const selectedSize = isWetsuitProduct(previewProduct) ? previewSize : "";
+    await handleAddToCart(previewProduct, selectedSize);
     closePreview();
   };
 
@@ -553,12 +562,12 @@ function SizeCharts({
                           fontSize: "12px",
                           padding: "8px 12px",
                         }}
-                        onClick={() => handleAddToCart(product)}
+                        onClick={() => openPreview(product)}
                         disabled={(product.stock ?? 0) < 1}
                       >
                         {(product.stock ?? 0) < 1
                           ? "Out of Stock"
-                          : "Add to Cart"}
+                          : "Choose Size"}
                       </button>
                     </div>
                   </article>
@@ -660,10 +669,33 @@ function SizeCharts({
                 </div>
               )}
 
+              <select
+                value={previewSize}
+                onChange={(event) => setPreviewSize(event.target.value)}
+                style={{
+                  width: "100%",
+                  marginTop: "12px",
+                  padding: "10px 12px",
+                  borderRadius: "10px",
+                  border: "1px solid #d9c3ad",
+                  background: "#fffdf8",
+                  fontSize: "14px",
+                  fontWeight: 600,
+                }}
+              >
+                <option value="">Select size</option>
+                {sizeOptions.map((size) => (
+                  <option key={size} value={size}>
+                    {size}
+                  </option>
+                ))}
+              </select>
+
               <button
                 type="button"
                 className="ps-sizeChartAddButton ps-sizeChartAddButtonModal"
                 onClick={handlePreviewAddToCart}
+                disabled={!previewSize}
               >
                 <img
                   src="/CartLogo/AddToCartLogo.png"

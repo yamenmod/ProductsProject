@@ -18,10 +18,13 @@ function Home({
   const [recentProducts, setRecentProducts] = useState([]);
   const [previewProduct, setPreviewProduct] = useState(null);
   const [previewImageIndex, setPreviewImageIndex] = useState(0);
+  const [previewSize, setPreviewSize] = useState("");
   const [cardImageIndices, setCardImageIndices] = useState({});
   const surfboardRailRef = useRef(null);
   const wetsuitRailRef = useRef(null);
   const swipeStartXRef = useRef(null);
+
+  const sizeOptions = ["XS", "S", "M", "L", "XL"];
 
   const normalizeCategoryValue = (value) =>
     (value || "")
@@ -38,6 +41,9 @@ function Home({
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, " ")
       .trim();
+
+  const isWetsuitProduct = (product) =>
+    normalizeGenderValue(product?.category).includes("wetsuit");
 
   const parseImageValue = (value) => {
     if (!value) {
@@ -233,11 +239,13 @@ function Home({
   const openPreview = (product) => {
     setPreviewProduct(product);
     setPreviewImageIndex(0);
+    setPreviewSize("");
   };
 
   const closePreview = () => {
     setPreviewProduct(null);
     setPreviewImageIndex(0);
+    setPreviewSize("");
   };
 
   const goToPreviewImage = (nextIndex) => {
@@ -289,7 +297,7 @@ function Home({
     });
   };
 
-  const addProductToCart = async (product) => {
+  const addProductToCart = async (product, size = "") => {
     if (!product || !session?.token) {
       return false;
     }
@@ -303,7 +311,7 @@ function Home({
     try {
       const response = await axios.post(
         "/api/cart",
-        { productId, quantity: 1 },
+        { productId, quantity: 1, size: size || "" },
         {
           headers: {
             Authorization: `Bearer ${session.token}`,
@@ -328,7 +336,8 @@ function Home({
       return;
     }
 
-    const added = await addProductToCart(previewProduct);
+    const selectedSize = isWetsuitProduct(previewProduct) ? previewSize : "";
+    const added = await addProductToCart(previewProduct, selectedSize);
     if (added) {
       onNavigate("cart");
     }
@@ -339,7 +348,8 @@ function Home({
       return;
     }
 
-    const added = await addProductToCart(previewProduct);
+    const selectedSize = isWetsuitProduct(previewProduct) ? previewSize : "";
+    const added = await addProductToCart(previewProduct, selectedSize);
     if (!added) {
       return;
     }
@@ -515,7 +525,11 @@ function Home({
                         width: "100%",
                         fontSize: "12px",
                       }}
-                      onClick={() => handleCardAddToCart(product)}
+                      onClick={() =>
+                        isWetsuitProduct(product)
+                          ? openPreview(product)
+                          : handleCardAddToCart(product)
+                      }
                       disabled={(product.stock ?? 0) < 1}
                     >
                       {(product.stock ?? 0) < 1
@@ -734,12 +748,38 @@ function Home({
                   </p>
                 </div>
 
+                {isWetsuitProduct(previewProduct) && (
+                  <select
+                    value={previewSize}
+                    onChange={(event) => setPreviewSize(event.target.value)}
+                    style={{
+                      width: "100%",
+                      padding: "10px 12px",
+                      borderRadius: "10px",
+                      border: "1px solid #d9c3ad",
+                      background: "#fffdf8",
+                      fontSize: "14px",
+                      fontWeight: 600,
+                    }}
+                  >
+                    <option value="">Select size</option>
+                    {sizeOptions.map((size) => (
+                      <option key={size} value={size}>
+                        {size}
+                      </option>
+                    ))}
+                  </select>
+                )}
+
                 <div style={{ display: "flex", gap: "10px", width: "100%" }}>
                   <button
                     type="button"
                     className="ps-btn ps-btn-primary"
                     onClick={handlePreviewAddToCart}
-                    disabled={(previewProduct.stock ?? 0) < 1}
+                    disabled={
+                      (previewProduct.stock ?? 0) < 1 ||
+                      (isWetsuitProduct(previewProduct) && !previewSize)
+                    }
                     style={{ flex: 1 }}
                   >
                     {(previewProduct.stock ?? 0) < 1
@@ -750,7 +790,10 @@ function Home({
                     type="button"
                     className="ps-btn ps-btn-dark"
                     onClick={handlePreviewBuyNow}
-                    disabled={(previewProduct.stock ?? 0) < 1}
+                    disabled={
+                      (previewProduct.stock ?? 0) < 1 ||
+                      (isWetsuitProduct(previewProduct) && !previewSize)
+                    }
                     style={{ flex: 1 }}
                   >
                     Buy Now

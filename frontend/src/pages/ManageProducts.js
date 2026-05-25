@@ -20,6 +20,7 @@ function ManageProducts({
     price: "",
     category: "",
     gender: "unisex",
+    size: "",
     image: "",
     image_urls: [],
     stock: "",
@@ -59,6 +60,10 @@ function ManageProducts({
     volumeOptions.push(i.toString());
   }
 
+  const sizeOptions = ["XS", "S", "M", "L", "XL"];
+
+  const isWetsuitCategory = (value) =>
+    (value || "").toString().trim().toLowerCase().includes("wetsuit");
 
   const normalizeGenderValue = (value) => {
     const normalized = (value || "")
@@ -196,6 +201,7 @@ function ManageProducts({
       price: "",
       category: "",
       gender: "unisex",
+      size: "",
       image: "",
       image_urls: [],
       stock: "",
@@ -245,6 +251,10 @@ function ManageProducts({
     payload.append("category", form.category.trim());
     payload.append("gender", normalizeGenderValue(form.gender));
     payload.append("stock", form.stock === "" ? 0 : Number(form.stock));
+
+    if (isWetsuitCategory(form.category) && form.size) {
+      payload.append("size", form.size);
+    }
 
     // Add surfboard-specific fields if category is Surfboard
     if ((form.category || "").toLowerCase().includes("surfboard")) {
@@ -321,6 +331,7 @@ function ManageProducts({
       price: product.price ?? "",
       category: product.category || "",
       gender: normalizeGenderValue(product.gender),
+      size: product.size || "",
       image: product.image || "",
       image_urls: uniqueExistingImages,
       stock: product.stock ?? 0,
@@ -820,7 +831,44 @@ function ManageProducts({
                     }}
                   />
 
-                  {(form.category || "").toLowerCase().includes("surfboard") && (
+                  {isWetsuitCategory(form.category) && (
+                    <select
+                      value={form.size}
+                      onChange={(e) =>
+                        setForm({ ...form, size: e.target.value })
+                      }
+                      style={{
+                        padding: "10px 12px",
+                        border: "1px solid #d9c3ad",
+                        borderRadius: "8px",
+                        fontSize: "14px",
+                        fontFamily: "inherit",
+                        background: "#fffdf8",
+                        cursor: "pointer",
+                        width: "100%",
+                      }}
+                      onFocus={(e) => {
+                        e.target.style.borderColor = "#245860";
+                        e.target.style.boxShadow =
+                          "0 0 0 3px rgba(36, 88, 96, 0.12)";
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.borderColor = "#d9c3ad";
+                        e.target.style.boxShadow = "none";
+                      }}
+                    >
+                      <option value="">Select Size</option>
+                      {sizeOptions.map((size) => (
+                        <option key={size} value={size}>
+                          {size}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+
+                  {(form.category || "")
+                    .toLowerCase()
+                    .includes("surfboard") && (
                     <>
                       <select
                         value={form.boardHeight}
@@ -849,7 +897,7 @@ function ManageProducts({
                       >
                         <option value="">Select Board Feet</option>
                         {heightOptions.map((height) => {
-                          const [feet, inches] = height.split('.');
+                          const [feet, inches] = height.split(".");
                           return (
                             <option key={height} value={height}>
                               {feet}'{inches}"
@@ -1298,12 +1346,21 @@ function ManageProducts({
                     <p style={{ margin: "0 0 6px 0", color: "#5f5550" }}>
                       Gender: {normalizeGenderValue(product.gender)}
                     </p>
+                    {isWetsuitCategory(product.category) && (
+                      <p style={{ margin: "0 0 6px 0", color: "#5f5550" }}>
+                        Size: {product.size || "-"}
+                      </p>
+                    )}
                     <p style={{ margin: "0 0 12px 0", color: "#5f5550" }}>
                       Stock: {product.stock ?? 0}
                     </p>
-                    {(product.category || "").toLowerCase().includes("surfboard") && (
+                    {(product.category || "")
+                      .toLowerCase()
+                      .includes("surfboard") && (
                       <p style={{ margin: "0 0 12px 0", color: "#5f5550" }}>
-                        Feet: {product.boardHeight ?? product.height ?? "-"} ft • Volume: {product.boardVolume ?? product.volume ?? "-"} L
+                        Feet: {product.boardHeight ?? product.height ?? "-"} ft
+                        • Volume: {product.boardVolume ?? product.volume ?? "-"}{" "}
+                        L
                       </p>
                     )}
                     <div style={{ display: "flex", gap: "8px" }}>
@@ -1336,7 +1393,7 @@ function ManageProducts({
                         style={{
                           flex: 1,
                           padding: "8px 12px",
-                          background: "#c1290f",
+                          background: "#A0522D",
                           color: "#fff",
                           border: "0",
                           borderRadius: "6px",
@@ -1346,10 +1403,10 @@ function ManageProducts({
                           transition: "background 150ms ease",
                         }}
                         onMouseEnter={(e) => {
-                          e.target.style.background = "#8b1d0a";
+                          e.target.style.background = "#8a5633";
                         }}
                         onMouseLeave={(e) => {
-                          e.target.style.background = "#c1290f";
+                          e.target.style.background = "#A0522D";
                         }}
                       >
                         Delete
@@ -1453,7 +1510,7 @@ function ManageProducts({
                     style={{
                       flex: 1,
                       padding: "10px 16px",
-                      background: "#c1290f",
+                      background: "#A0522D",
                       color: "#fff",
                       border: "0",
                       borderRadius: "8px",
@@ -1463,10 +1520,10 @@ function ManageProducts({
                       transition: "background 150ms ease",
                     }}
                     onMouseEnter={(e) => {
-                      e.target.style.background = "#8b1d0a";
+                      e.target.style.background = "#8a5633";
                     }}
                     onMouseLeave={(e) => {
-                      e.target.style.background = "#c1290f";
+                      e.target.style.background = "#A0522D";
                     }}
                   >
                     Delete product

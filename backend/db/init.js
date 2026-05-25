@@ -107,12 +107,59 @@ const initDatabase = async () => {
       id INT AUTO_INCREMENT PRIMARY KEY,
       user_id INT NOT NULL,
       product_id INT NOT NULL,
+      size VARCHAR(10) NOT NULL DEFAULT '',
       quantity INT NOT NULL DEFAULT 1,
-      UNIQUE KEY unique_user_product (user_id, product_id),
+      UNIQUE KEY unique_user_product_size (user_id, product_id, size),
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
       FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
     )
   `);
+
+    const [cartTableRows] = await db.query(
+      `
+      SELECT COUNT(*) AS total
+      FROM information_schema.tables
+      WHERE table_schema = DATABASE()
+        AND table_name = 'cart_items'
+    `,
+    );
+
+    if (cartTableRows[0]?.total > 0) {
+      const [cartSizeColumnRows] = await db.query(
+        `
+        SELECT COUNT(*) AS total
+        FROM information_schema.columns
+        WHERE table_schema = DATABASE()
+          AND table_name = 'cart_items'
+          AND column_name = 'size'
+      `,
+      );
+
+      if (cartSizeColumnRows[0]?.total === 0) {
+        await db.query(`
+        ALTER TABLE cart_items
+        ADD COLUMN size VARCHAR(10) NOT NULL DEFAULT '' AFTER product_id
+      `);
+      }
+
+      const [cartUniqueRows] = await db.query(
+        `
+        SELECT COUNT(*) AS total
+        FROM information_schema.statistics
+        WHERE table_schema = DATABASE()
+          AND table_name = 'cart_items'
+          AND index_name = 'unique_user_product_size'
+      `,
+      );
+
+      if (cartUniqueRows[0]?.total === 0) {
+        await db.query(`
+        ALTER TABLE cart_items
+        DROP INDEX unique_user_product,
+        ADD UNIQUE KEY unique_user_product_size (user_id, product_id, size)
+      `);
+      }
+    }
 
     await db.query(`
     CREATE TABLE IF NOT EXISTS orders (
@@ -284,6 +331,23 @@ const initDatabase = async () => {
         await db.query(`
         ALTER TABLE products
         ADD COLUMN volume DECIMAL(5, 2) NULL DEFAULT NULL
+      `);
+      }
+
+      const [sizeColumnRows] = await db.query(
+        `
+        SELECT COUNT(*) AS total
+        FROM information_schema.columns
+        WHERE table_schema = DATABASE()
+          AND table_name = 'products'
+          AND column_name = 'size'
+      `,
+      );
+
+      if (sizeColumnRows[0]?.total === 0) {
+        await db.query(`
+        ALTER TABLE products
+        ADD COLUMN size VARCHAR(10) NULL DEFAULT NULL
       `);
       }
     }
