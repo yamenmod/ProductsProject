@@ -134,6 +134,56 @@ function ManageOrders({
     return Number.isNaN(date.getTime()) ? "-" : date.toLocaleString();
   };
 
+  const getFilterButtonStyle = (itemKey) => {
+    const isSelected = selectedFilter === itemKey;
+
+    const activeBackground = {
+      all: "linear-gradient(135deg,#245860,#2f747d)",
+      successful: "linear-gradient(135deg,#16515e,#1f5d74)",
+      failed: "linear-gradient(135deg,#7b2f27,#a83f34)",
+      pending: "linear-gradient(135deg,#4b5b6b,#1f2937)",
+    };
+
+    return {
+      background: isSelected ? activeBackground[itemKey] : "rgba(255, 250, 242, 0.88)",
+      color: isSelected ? "#fff" : "#1f1813",
+      border: "1px solid rgba(31, 24, 19, 0.08)",
+      transition: "background 0.2s ease, color 0.2s ease",
+    };
+  };
+
+  const getSummaryCardStyle = (bucket) => {
+    const isSelected = selectedFilter === bucket;
+
+    const baseStyle = {
+      padding: "18px 20px",
+      border: "1px solid rgba(31, 24, 19, 0.08)",
+      textAlign: "left",
+      cursor: "pointer",
+      transition: "background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease",
+    };
+
+    if (!isSelected) {
+      return {
+        ...baseStyle,
+        background: statusTone(bucket).background,
+      };
+    }
+
+    const selectedBackground = {
+      successful: "linear-gradient(135deg,#16515e,#1f5d74)",
+      failed: "linear-gradient(135deg,#7b2f27,#a83f34)",
+      pending: "linear-gradient(135deg,#4b5b6b,#1f2937)",
+    };
+
+    return {
+      ...baseStyle,
+      background: selectedBackground[bucket],
+      color: "#fff",
+      boxShadow: "0 18px 40px rgba(31, 24, 19, 0.18)",
+    };
+  };
+
   if (session?.user?.role !== "admin") {
     return (
       <div className="ps-page">
@@ -192,18 +242,12 @@ function ManageOrders({
                 type="button"
                 className="ps-surface"
                 onClick={() => setSelectedFilter(item.bucket)}
-                style={{
-                  padding: "18px 20px",
-                  border: "1px solid rgba(31, 24, 19, 0.08)",
-                  textAlign: "left",
-                  cursor: "pointer",
-                  background: statusTone(item.bucket).background,
-                }}
+                style={getSummaryCardStyle(item.bucket)}
               >
-                <div style={{ color: "#65574d", fontSize: "13px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.2px" }}>
+                <div style={{ color: selectedFilter === item.bucket ? "rgba(255, 255, 255, 0.85)" : "#65574d", fontSize: "13px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.2px" }}>
                   {item.label}
                 </div>
-                <div style={{ fontFamily: "'Bebas Neue', Impact, sans-serif", fontSize: "44px", lineHeight: 1, marginTop: "8px", color: statusTone(item.bucket).color }}>
+                <div style={{ fontFamily: "'Bebas Neue', Impact, sans-serif", fontSize: "44px", lineHeight: 1, marginTop: "8px", color: selectedFilter === item.bucket ? "#fff" : statusTone(item.bucket).color }}>
                   {loading ? "..." : item.value}
                 </div>
               </button>
@@ -238,11 +282,7 @@ function ManageOrders({
                 type="button"
                 className="ps-btn"
                 onClick={() => setSelectedFilter(item.key)}
-                style={{
-                  background: selectedFilter === item.key ? "linear-gradient(135deg, #245860, #2f747d)" : "rgba(255, 250, 242, 0.88)",
-                  color: selectedFilter === item.key ? "#fff" : "#1f1813",
-                  border: "1px solid rgba(31, 24, 19, 0.08)",
-                }}
+                style={getFilterButtonStyle(item.key)}
               >
                 {item.label}
               </button>
