@@ -12,6 +12,8 @@ const {
 } = require("../utils/pricing");
 const { sendOrderEmail } = require("../utils/email");
 
+// Cart, checkout, payment, and admin order reporting endpoints.
+
 const PAYPAL_CLIENT_ID = (process.env.PAYPAL_CLIENT_ID || "").trim();
 const PAYPAL_CLIENT_SECRET = (process.env.PAYPAL_CLIENT_SECRET || "").trim();
 const PAYPAL_BASE_URL = (
@@ -23,6 +25,7 @@ const FRONTEND_BASE_URL = (
 ).trim();
 
 const getPayPalAccessToken = async () => {
+  // Exchange PayPal client credentials for a short-lived access token.
   if (!PAYPAL_CLIENT_ID || !PAYPAL_CLIENT_SECRET) {
     throw new Error("PayPal credentials are not configured");
   }
@@ -51,6 +54,7 @@ const getPayPalAccessToken = async () => {
 };
 
 const calculateCartTotal = async (userId) => {
+  // Load the current cart and calculate the VAT-inclusive total.
   const [cartRows] = await db.query(
     `
       SELECT p.id, p.name, p.price, p.stock, ci.size, ci.quantity
@@ -86,6 +90,7 @@ const calculateCartTotal = async (userId) => {
 };
 
 const resolvePrimaryImage = (value) => {
+  // Normalize stored image data into a single usable image path.
   if (!value) {
     return "";
   }
@@ -166,6 +171,7 @@ const resolvePrimaryImage = (value) => {
 // quickCheckout allows purchasing a single product immediately without
 // mutating the user's cart. It mirrors the checkout logic but for one
 // specified product and quantity in the request body.
+// Purchases one product immediately without adding it to the cart.
 const quickCheckout = async (req, res) => {
   try {
     const { productId, quantity } = req.body;
@@ -276,6 +282,7 @@ const mapCartRows = (rows, vatRate = 0.18) =>
 
 // Reads the signed-in user's cart and returns the current items and totals.
 // The query joins products and categories so the frontend can render details.
+// Returns the logged-in user's cart contents.
 const getCart = async (req, res) => {
   try {
     const vatRate = await getVatRateFromDb(db);
@@ -308,6 +315,7 @@ const getCart = async (req, res) => {
 
 // Adds or updates a cart item for the current user.
 // It validates the product first, then returns the refreshed cart state.
+// Adds an item to the cart or increments its quantity.
 const addToCart = async (req, res) => {
   try {
     const vatRate = await getVatRateFromDb(db);
@@ -409,6 +417,7 @@ const addToCart = async (req, res) => {
 
 // Removes one product from the current user's cart.
 // The response again returns the updated cart so the UI stays in sync.
+// Removes a cart item for the current user.
 const removeFromCart = async (req, res) => {
   try {
     const vatRate = await getVatRateFromDb(db);
@@ -453,6 +462,7 @@ const removeFromCart = async (req, res) => {
   }
 };
 
+// Changes the quantity of an item already in the cart.
 const updateCartQuantity = async (req, res) => {
   try {
     const vatRate = await getVatRateFromDb(db);
@@ -541,6 +551,7 @@ const updateCartQuantity = async (req, res) => {
 
 // Converts the user's cart into a paid order and clears the cart afterward.
 // This is the checkout flow that creates the order records seen by admin.
+// Finalizes the cart into an order and sends the receipt email.
 const checkout = async (req, res) => {
   try {
     const [users] = await db.query(
@@ -657,6 +668,7 @@ const checkout = async (req, res) => {
 
 // Returns every order for the admin dashboard.
 // The admin page uses this list to show customer, amount, and payment status.
+// Exposes the PayPal config needed by the frontend checkout flow.
 const createPaypalConfig = async (req, res) => {
   try {
     if (!PAYPAL_CLIENT_ID) {
@@ -676,6 +688,7 @@ const createPaypalConfig = async (req, res) => {
   }
 };
 
+// Starts a PayPal order using the current cart total.
 const createPaypalOrder = async (req, res) => {
   try {
     const [users] = await db.query(
@@ -740,6 +753,7 @@ const createPaypalOrder = async (req, res) => {
   }
 };
 
+// Captures a completed PayPal order and persists the payment.
 const capturePaypalOrder = async (req, res) => {
   try {
     const { orderID } = req.body;
@@ -885,6 +899,7 @@ const capturePaypalOrder = async (req, res) => {
   }
 };
 
+// Returns every order for the admin dashboard view.
 const getAdminOrders = async (req, res) => {
   try {
     const [rows] = await db.query(
@@ -923,6 +938,7 @@ const getAdminOrders = async (req, res) => {
   }
 };
 
+// Returns the items that belong to one admin order.
 const getOrderItems = async (req, res) => {
   try {
     const orderId = req.params.orderId;

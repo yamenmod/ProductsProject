@@ -2,6 +2,8 @@ const jwt = require("jsonwebtoken");
 const db = require("../db/connection");
 const { createMailTransporter } = require("../utils/mailer");
 
+// Authentication and profile endpoints.
+
 const normalizeOptionalMeasurement = (value, fieldName) => {
   if (value === undefined || value === null || value === "") {
     return null;
@@ -49,6 +51,7 @@ const getToken = (user) =>
 const generateResetCode = () =>
   String(Math.floor(100000 + Math.random() * 900000)).padStart(6, "0");
 
+// Sends a password reset code to the user's email address.
 const forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
@@ -114,6 +117,7 @@ const forgotPassword = async (req, res) => {
   }
 };
 
+// Confirms that a reset code is valid and not expired.
 const verifyResetCode = async (req, res) => {
   try {
     const { email, code } = req.body;
@@ -142,6 +146,7 @@ const verifyResetCode = async (req, res) => {
   }
 };
 
+// Updates the password after the reset code has been validated.
 const resetPassword = async (req, res) => {
   try {
     const { email, code, newPassword } = req.body;
@@ -178,6 +183,7 @@ const resetPassword = async (req, res) => {
 
 // Creates a normal user account and returns the session token for the app.
 // The response includes the user role so the frontend can show admin-only UI.
+// Creates a new user account and returns a token for the frontend session.
 const register = async (req, res) => {
   try {
     const { username, email, password, weight, height } = req.body;
@@ -261,6 +267,7 @@ const register = async (req, res) => {
 
 // Validates username and password, then returns the signed login session.
 // If the credentials do not match, the request is rejected with a login error.
+// Validates credentials and returns the authenticated session payload.
 const login = async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -308,6 +315,7 @@ const login = async (req, res) => {
   }
 };
 
+// Returns the current user's profile information.
 const getProfile = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -337,6 +345,7 @@ const getProfile = async (req, res) => {
   }
 };
 
+// Updates editable profile fields for the current user.
 const updateProfile = async (req, res) => {
   try {
     const { username, weight, height } = req.body;

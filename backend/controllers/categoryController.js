@@ -1,7 +1,10 @@
 const db = require("../db/connection");
 
+// Category lookup for storefront filters.
+
 const getCategories = async (req, res) => {
   try {
+    // Return categories alphabetically for the UI selector.
     const [categories] = await db.query(
       "SELECT id, name, description FROM categories ORDER BY name ASC",
     );

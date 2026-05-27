@@ -6,14 +6,18 @@ const {
   getVatRateFromDb,
 } = require("../utils/pricing");
 
+// Product catalogue, image normalization, and board recommendation logic.
+
 const PRODUCT_IMAGE_DIR = "/public/assets/img/products";
 
 const isDataOrBlobUrl = (value) => {
+  // Detect values that are not safe to store as image paths.
   const normalized = (value || "").toString().trim().toLowerCase();
   return normalized.startsWith("data:") || normalized.startsWith("blob:");
 };
 
 const normalizeStoredImagePath = (value) => {
+  // Convert a saved image string into the path format used by the app.
   if (!value) {
     return "";
   }
@@ -78,6 +82,7 @@ const normalizeStoredImagePath = (value) => {
 };
 
 const parseLooseArrayString = (value) => {
+  // Extract image paths from legacy array-like strings.
   const trimmed = (value || "").trim();
 
   if (!trimmed) {
@@ -111,6 +116,7 @@ const parseLooseArrayString = (value) => {
 };
 
 const parseStoredImages = (value) => {
+  // Normalize the raw database field into an array of image strings.
   if (!value) {
     return [];
   }
@@ -167,6 +173,7 @@ const parseStoredImages = (value) => {
 };
 
 const normalizeImageValue = (value) => {
+  // Reduce each stored value to a single usable image path.
   const safeValue = (value || "").toString().trim();
 
   if (!safeValue) {
@@ -204,6 +211,7 @@ const normalizeImageValue = (value) => {
 };
 
 const resolveImagePayload = (value) => {
+  // Return both the full list and the primary image for previews.
   const images = parseStoredImages(value)
     .map(normalizeImageValue)
     .filter(Boolean);
@@ -215,6 +223,7 @@ const resolveImagePayload = (value) => {
 };
 
 const normalizeGenderInput = (value) => {
+  // Map user-entered gender text to the canonical values used by filters.
   const normalized = (value || "")
     .toString()
     .trim()
@@ -306,6 +315,7 @@ const resolveCategoryId = async (categoryName) => {
 };
 
 const getProducts = async (req, res) => {
+  // List products, optionally filtered by category and search text.
   try {
     const vatRate = await getVatRateFromDb(db);
 
@@ -345,6 +355,7 @@ const getProducts = async (req, res) => {
 };
 
 const getProductById = async (req, res) => {
+  // Load one product and return the normalized image payload.
   try {
     const vatRate = await getVatRateFromDb(db);
 
@@ -387,6 +398,7 @@ const getProductById = async (req, res) => {
 };
 
 const createProduct = async (req, res) => {
+  // Create a new product record and save any uploaded images.
   try {
     const {
       name,
@@ -525,6 +537,7 @@ const createProduct = async (req, res) => {
 };
 
 const updateProduct = async (req, res) => {
+  // Update an existing product and refresh its stored images.
   try {
     const [existingRows] = await db.query(
       "SELECT p.id, p.name, p.price, p.stock, p.category_id, p.description, p.gender, p.image_url, p.size, p.board_length, p.board_height, p.height, p.board_volume, p.volume, c.name AS category FROM products p LEFT JOIN categories c ON c.id = p.category_id WHERE p.id = ? LIMIT 1",
@@ -702,6 +715,7 @@ const updateProduct = async (req, res) => {
 };
 
 const deleteProduct = async (req, res) => {
+  // Delete a product from the catalogue.
   try {
     const [result] = await db.query("DELETE FROM products WHERE id = ?", [
       req.params.id,
@@ -719,6 +733,7 @@ const deleteProduct = async (req, res) => {
 
 // Scans the products folder and assigns images to products based on product ID
 const syncImages = async (req, res) => {
+  // Reconcile uploaded images with the stored product rows.
   try {
     const fs = require("fs");
     const path = require("path");
@@ -790,6 +805,7 @@ const syncImages = async (req, res) => {
 };
 
 const recommendBoards = async (req, res) => {
+  // Recommend surfboards based on the user's measurements and preferences.
   try {
     const { weight, height, skillLevel } = req.body;
     let resolvedWeight = weight;

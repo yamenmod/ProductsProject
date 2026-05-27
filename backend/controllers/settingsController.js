@@ -1,7 +1,10 @@
 const db = require("../db/connection");
 
+// Key/value settings store used by the admin panel.
+
 const getSetting = async (req, res) => {
   try {
+    // Read a single setting by key.
     const { key } = req.params;
 
     if (!key) {
@@ -23,6 +26,7 @@ const getSetting = async (req, res) => {
 
 const getAllSettings = async (req, res) => {
   try {
+    // Load every setting and convert the rows into an object.
     const [rows] = await db.query("SELECT key_name, value FROM settings");
 
     const settings = {};
@@ -39,6 +43,7 @@ const getAllSettings = async (req, res) => {
 
 const updateSetting = async (req, res) => {
   try {
+    // Update one setting at a time using an upsert.
     const { key } = req.params;
     const { value } = req.body;
 

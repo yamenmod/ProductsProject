@@ -4,6 +4,7 @@ const db = require("../db/connection");
 // The frontend uses this to render the admin-only customers page.
 const getCustomers = async (req, res) => {
   try {
+    // Alias created_at as createdAt so the frontend can format it consistently.
     const [rows] = await db.query(
       `
         SELECT
@@ -28,6 +29,7 @@ const getCustomers = async (req, res) => {
 // Admin accounts are protected so the current operator cannot remove themselves.
 const deleteCustomer = async (req, res) => {
   try {
+    // Reject missing or self-targeted deletes before touching the database.
     const { userId } = req.params;
 
     if (!userId) {
