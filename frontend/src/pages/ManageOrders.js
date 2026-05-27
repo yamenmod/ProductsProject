@@ -17,6 +17,8 @@ function ManageOrders({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [selectedFilter, setSelectedFilter] = useState(initialFilter || "all");
   const [selectedOrderDetail, setSelectedOrderDetail] = useState(null);
   const [loadingOrderDetail, setLoadingOrderDetail] = useState(false);
@@ -89,8 +91,24 @@ function ManageOrders({
 
   const filteredOrders = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
+    const fromTime = dateFrom ? new Date(`${dateFrom}T00:00:00`).getTime() : null;
+    const toTime = dateTo ? new Date(`${dateTo}T23:59:59.999`).getTime() : null;
 
     return orders.filter((order) => {
+      const createdAt = new Date(order?.createdAt || order?.created_at || 0).getTime();
+
+      if (Number.isNaN(createdAt)) {
+        return false;
+      }
+
+      if (fromTime !== null && createdAt < fromTime) {
+        return false;
+      }
+
+      if (toTime !== null && createdAt > toTime) {
+        return false;
+      }
+
       const matchesSearch = !normalizedSearch
         ? true
         : [order.id, order.username, order.email]
@@ -101,7 +119,7 @@ function ManageOrders({
 
       return matchesSearch && matchesFilter;
     });
-  }, [orders, searchTerm, selectedFilter, getOrderBucket]);
+  }, [orders, searchTerm, selectedFilter, getOrderBucket, dateFrom, dateTo]);
 
   const summary = useMemo(() => {
     const counts = { successful: 0, failed: 0, pending: 0 };
@@ -131,7 +149,15 @@ function ManageOrders({
     }
 
     const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? "-" : date.toLocaleString();
+    return Number.isNaN(date.getTime())
+      ? "-"
+      : date.toLocaleString("en-US", {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+        });
   };
 
   const getFilterButtonStyle = (itemKey) => {
@@ -224,11 +250,56 @@ function ManageOrders({
       <main className="ps-main" style={{ padding: "70px 0" }}>
         <div className="ps-shell">
           <div style={{ marginBottom: "24px" }}>
-            <p className="ps-pill" style={{ marginBottom: "12px" }}>Admin dashboard</p>
-            <h1 className="ps-title" style={{ marginBottom: "10px" }}>Manage orders</h1>
+            <h1 className="ps-title" style={{ marginBottom: "8px", fontSize: "clamp(30px, 4vw, 46px)" }}>Manage orders</h1>
             <p className="ps-lead" style={{ maxWidth: "760px" }}>
               Review every checkout and quickly spot whether the payment ended up successful, failed, or still pending.
             </p>
+          </div>
+
+          <div
+            className="ps-surface"
+            style={{
+              padding: "18px 20px",
+              marginBottom: "18px",
+              display: "flex",
+              flexWrap: "wrap",
+              gap: "12px",
+              alignItems: "end",
+            }}
+          >
+            <div style={{ minWidth: "180px", flex: "1 1 180px" }}>
+              <div style={{ color: "#65574d", fontSize: "12px", fontWeight: 800, letterSpacing: "1px", textTransform: "uppercase", marginBottom: "6px" }}>
+                From
+              </div>
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(event) => setDateFrom(event.target.value)}
+                style={{ width: "100%", padding: "11px 12px", borderRadius: "12px", border: "1px solid rgba(31, 24, 19, 0.14)", background: "rgba(255, 250, 242, 0.95)", fontSize: "14px" }}
+              />
+            </div>
+            <div style={{ minWidth: "180px", flex: "1 1 180px" }}>
+              <div style={{ color: "#65574d", fontSize: "12px", fontWeight: 800, letterSpacing: "1px", textTransform: "uppercase", marginBottom: "6px" }}>
+                To
+              </div>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(event) => setDateTo(event.target.value)}
+                style={{ width: "100%", padding: "11px 12px", borderRadius: "12px", border: "1px solid rgba(31, 24, 19, 0.14)", background: "rgba(255, 250, 242, 0.95)", fontSize: "14px" }}
+              />
+            </div>
+            <button
+              type="button"
+              className="ps-btn ps-btn-secondary"
+              onClick={() => {
+                setDateFrom("");
+                setDateTo("");
+              }}
+              style={{ height: "44px" }}
+            >
+              Clear range
+            </button>
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "16px", marginBottom: "24px" }}>

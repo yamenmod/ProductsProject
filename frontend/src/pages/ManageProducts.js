@@ -556,7 +556,7 @@ function ManageProducts({
               style={{
                 color: "#1f1813",
                 fontFamily: "'Bebas Neue', Impact, sans-serif",
-                fontSize: "54px",
+                fontSize: "44px",
                 margin: "0 0 8px 0",
                 letterSpacing: "1px",
                 lineHeight: 0.9,

@@ -516,26 +516,26 @@ function Home({
                           ${(product.price ?? 0).toFixed(2)}
                         </span>
                       </div>
+                      <button
+                        type="button"
+                        className="ps-btn ps-btn-primary"
+                        style={{
+                          width: "100%",
+                          fontSize: "12px",
+                          marginTop: "12px",
+                        }}
+                        onClick={() =>
+                          isWetsuitProduct(product)
+                            ? openPreview(product)
+                            : handleCardAddToCart(product)
+                        }
+                        disabled={(product.stock ?? 0) < 1}
+                      >
+                        {(product.stock ?? 0) < 1
+                          ? "Out of Stock"
+                          : "Add to Cart"}
+                      </button>
                     </div>
-                    <div></div>
-                    <button
-                      type="button"
-                      className="ps-btn ps-btn-primary"
-                      style={{
-                        width: "100%",
-                        fontSize: "12px",
-                      }}
-                      onClick={() =>
-                        isWetsuitProduct(product)
-                          ? openPreview(product)
-                          : handleCardAddToCart(product)
-                      }
-                      disabled={(product.stock ?? 0) < 1}
-                    >
-                      {(product.stock ?? 0) < 1
-                        ? "Out of Stock"
-                        : "Add to Cart"}
-                    </button>
                   </article>
                 );
               })

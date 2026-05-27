@@ -55,6 +55,22 @@ function ManageCustomers({
     );
   });
 
+  const formatJoinedDate = (value) => {
+    if (!value) {
+      return "-";
+    }
+
+    const date = new Date(value);
+
+    return Number.isNaN(date.getTime())
+      ? "-"
+      : date.toLocaleDateString("en-US", {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        });
+  };
+
   const handleDelete = async (userId) => {
     if (userId === session.user.id) {
       setActionMessage("You cannot delete your own admin account.");
@@ -93,10 +109,7 @@ function ManageCustomers({
       <main className="ps-main" style={{ padding: "70px 0" }}>
         <div className="ps-shell">
           <div style={{ marginBottom: "20px" }}>
-            <p className="ps-pill" style={{ marginBottom: "12px" }}>
-              Customer management
-            </p>
-            <h1 className="ps-title" style={{ marginBottom: "10px" }}>
+            <h1 className="ps-title" style={{ marginBottom: "10px", fontSize: "clamp(28px, 4vw, 40px)" }}>
               Manage customers
             </h1>
             <p className="ps-lead" style={{ maxWidth: "760px" }}>
@@ -163,7 +176,7 @@ function ManageCustomers({
                       <td style={{ padding: "14px 10px", color: "#65574d" }}>{user.email}</td>
                       <td style={{ padding: "14px 10px", color: "#1f1813" }}>{user.role}</td>
                       <td style={{ padding: "14px 10px", color: "#65574d" }}>
-                        {new Date(user.created_at).toLocaleDateString()}
+                        {formatJoinedDate(user.createdAt || user.created_at)}
                       </td>
                       <td style={{ padding: "14px 10px", textAlign: "right" }}>
                         <button
