@@ -25,6 +25,23 @@ const FRONTEND_BASE_URL = (
   process.env.FRONTEND_BASE_URL || "http://localhost:3000"
 ).trim();
 
+const ORDER_STATUS = {
+  PENDING: "PENDING",
+  SUCCESS: "SUCCESS",
+  UNSUCCESSFUL: "UNSUCCESSFUL",
+  CANCELLED: "CANCELLED",
+};
+
+const normalizeOrderStatusFromCapture = (captureStatus) => {
+  return String(captureStatus || "").toUpperCase() === "COMPLETED"
+    ? ORDER_STATUS.SUCCESS
+    : ORDER_STATUS.UNSUCCESSFUL;
+};
+
+const logPayPalFlow = (step, details = {}) => {
+  console.log(`[paypal:flow] ${step}`, details);
+};
+
 const getPayPalAccessToken = async () => {
   // Exchange PayPal client credentials for a short-lived access token.
   if (!PAYPAL_CLIENT_ID || !PAYPAL_CLIENT_SECRET) {
@@ -751,8 +768,12 @@ const createPaypalConfig = async (req, res) => {
 // Starts a PayPal order using the current cart total.
 const createPaypalOrder = async (req, res) => {
   try {
+    logPayPalFlow("checkout-start", {
+      userId: req.user?.id || null,
+    });
+
     const [users] = await db.query(
-      "SELECT id FROM users WHERE id = ? LIMIT 1",
+      "SELECT id, username, email FROM users WHERE id = ? LIMIT 1",
       [req.user.id],
     );
 
@@ -797,11 +818,77 @@ const createPaypalOrder = async (req, res) => {
       return res.status(500).json({ message: "PayPal order creation failed" });
     }
 
-    return res.status(200).json({
-      orderID: response.data.id,
-      total: total.toFixed(2),
-      currency: PAYPAL_CURRENCY,
-    });
+    const userRecord = users[0];
+    const paypalOrderId = response.data.id;
+    const connection = await db.getConnection();
+
+    try {
+      await connection.beginTransaction();
+
+      const [orderResult] = await connection.query(
+        "INSERT INTO orders (user_id, total, customer_email, status, created_at) VALUES (?, ?, ?, ?, NOW())",
+        [
+          req.user.id,
+          total,
+          userRecord?.email || null,
+          ORDER_STATUS.PENDING,
+        ],
+      );
+
+      for (const item of items) {
+        await connection.query(
+          "INSERT INTO order_items (order_id, product_id, name, price, quantity) VALUES (?, ?, ?, ?, ?)",
+          [
+            orderResult.insertId,
+            item.id,
+            item.displayName || item.name,
+            item.pricing.finalPrice,
+            Number(item.quantity),
+          ],
+        );
+      }
+
+      await connection.query(
+        "INSERT INTO payments (user_id, order_id, paypal_order_id, status, amount, currency, raw_response) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        [
+          req.user.id,
+          orderResult.insertId,
+          paypalOrderId,
+          ORDER_STATUS.PENDING,
+          Number(total),
+          PAYPAL_CURRENCY,
+          JSON.stringify(response.data),
+        ],
+      );
+
+      await connection.commit();
+      connection.release();
+
+      logPayPalFlow("final-status-assigned", {
+        userId: req.user?.id || null,
+        orderId: orderResult.insertId,
+        paypalOrderId,
+        finalStatus: ORDER_STATUS.PENDING,
+      });
+
+      return res.status(200).json({
+        orderID: paypalOrderId,
+        orderId: orderResult.insertId,
+        total: total.toFixed(2),
+        currency: PAYPAL_CURRENCY,
+        status: ORDER_STATUS.PENDING,
+      });
+    } catch (transactionError) {
+      await connection.rollback();
+      connection.release();
+      console.error("[paypal:create-order] transaction failed", {
+        userId: req.user?.id || null,
+        error: transactionError.message,
+      });
+      return res.status(500).json({
+        message: "Unable to persist pending PayPal order",
+      });
+    }
   } catch (error) {
     console.error("[paypal:create-order]", error.message || error);
     return res.status(500).json({
@@ -822,7 +909,7 @@ const capturePaypalOrder = async (req, res) => {
       return res.status(400).json({ message: "PayPal order ID is required" });
     }
 
-    console.log("[paypal:capture] starting capture", {
+    logPayPalFlow("paypal-approved", {
       orderId: orderID,
       userId: req.user?.id,
     });
@@ -837,6 +924,11 @@ const capturePaypalOrder = async (req, res) => {
     }
 
     const accessToken = await getPayPalAccessToken();
+
+    logPayPalFlow("capture-called", {
+      orderId: orderID,
+      userId: req.user?.id,
+    });
 
     const response = await axios.post(
       `${PAYPAL_BASE_URL}/v2/checkout/orders/${orderID}/capture`,
@@ -856,31 +948,15 @@ const capturePaypalOrder = async (req, res) => {
       status: captureStatus,
       userId: req.user?.id,
     });
+    const finalOrderStatus = normalizeOrderStatusFromCapture(captureStatus);
     const captureUnit =
       captureData.purchase_units?.[0]?.payments?.captures?.[0] || null;
     const amountValue = captureUnit?.amount?.value || "0.00";
     const currencyCode = captureUnit?.amount?.currency_code || PAYPAL_CURRENCY;
-    const buyerName =
-      captureData?.payer?.name?.given_name ||
-      captureData?.payer?.name?.surname ||
-      captureData?.payer?.email_address ||
-      "Surfer";
-
     const connection = await db.getConnection();
 
     try {
       await connection.beginTransaction();
-
-      const [orderTableColumns] = await connection.query(
-        `
-          SELECT COUNT(*) AS total
-          FROM information_schema.columns
-          WHERE table_schema = DATABASE()
-            AND table_name = 'orders'
-            AND column_name = 'customer_email'
-        `,
-      );
-      const hasCustomerEmailColumn = Number(orderTableColumns?.[0]?.total || 0) > 0;
 
       const [users] = await connection.query(
         "SELECT id, username, email FROM users WHERE id = ? LIMIT 1",
@@ -895,79 +971,131 @@ const capturePaypalOrder = async (req, res) => {
         return res.status(404).json({ message: "User not found" });
       }
 
-      const { total, items } = await calculateCartTotal(req.user.id);
+      const [existingPayments] = await connection.query(
+        `
+          SELECT id, order_id, status
+          FROM payments
+          WHERE paypal_order_id = ? AND user_id = ?
+          ORDER BY id DESC
+          LIMIT 1
+        `,
+        [orderID, req.user.id],
+      );
 
-      const orderInsertSql = hasCustomerEmailColumn
-        ? "INSERT INTO orders (user_id, total, customer_email, status, created_at) VALUES (?, ?, ?, ?, NOW())"
-        : "INSERT INTO orders (user_id, total, status, created_at) VALUES (?, ?, ?, NOW())";
-      const orderInsertParams = hasCustomerEmailColumn
-        ? [
+      let orderId = existingPayments[0]?.order_id || null;
+
+      if (!orderId) {
+        const { total, items } = await calculateCartTotal(req.user.id);
+
+        const [orderResult] = await connection.query(
+          "INSERT INTO orders (user_id, total, customer_email, status, created_at) VALUES (?, ?, ?, ?, NOW())",
+          [
             req.user.id,
             total,
             userRecord.email || captureData?.payer?.email_address || null,
-            captureStatus === "COMPLETED" ? "paid" : "pending",
-          ]
-        : [
-            req.user.id,
-            total,
-            captureStatus === "COMPLETED" ? "paid" : "pending",
-          ];
-
-      const [orderResult] = await connection.query(orderInsertSql, orderInsertParams);
-
-      for (const item of items) {
-        await connection.query(
-          "INSERT INTO order_items (order_id, product_id, name, price, quantity) VALUES (?, ?, ?, ?, ?)",
-          [
-            orderResult.insertId,
-            item.id,
-            item.displayName || item.name,
-            item.pricing.finalPrice,
-            item.quantity,
+            ORDER_STATUS.PENDING,
           ],
         );
 
+        orderId = orderResult.insertId;
+
+        for (const item of items) {
+          await connection.query(
+            "INSERT INTO order_items (order_id, product_id, name, price, quantity) VALUES (?, ?, ?, ?, ?)",
+            [
+              orderId,
+              item.id,
+              item.displayName || item.name,
+              item.pricing.finalPrice,
+              Number(item.quantity),
+            ],
+          );
+        }
+
         await connection.query(
-          "UPDATE products SET stock = stock - ?, updated_at = NOW() WHERE id = ?",
-          [Number(item.quantity), item.id],
+          "INSERT INTO payments (user_id, order_id, paypal_order_id, status, amount, currency, raw_response) VALUES (?, ?, ?, ?, ?, ?, ?)",
+          [
+            req.user.id,
+            orderId,
+            orderID,
+            ORDER_STATUS.PENDING,
+            Number(amountValue),
+            currencyCode,
+            JSON.stringify(captureData),
+          ],
         );
       }
 
-      await connection.query("DELETE FROM cart_items WHERE user_id = ?", [
-        req.user.id,
-      ]);
+      await connection.query(
+        "UPDATE orders SET status = ?, total = ?, customer_email = COALESCE(?, customer_email), created_at = created_at WHERE id = ?",
+        [
+          finalOrderStatus,
+          Number(amountValue),
+          userRecord.email || captureData?.payer?.email_address || null,
+          orderId,
+        ],
+      );
 
       await connection.query(
-        "INSERT INTO payments (user_id, order_id, paypal_order_id, status, amount, currency, raw_response) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        "UPDATE payments SET status = ?, amount = ?, currency = ?, raw_response = ? WHERE paypal_order_id = ? AND user_id = ?",
         [
-          req.user.id,
-          orderResult.insertId,
-          orderID,
-          captureStatus,
+          finalOrderStatus,
           Number(amountValue),
           currencyCode,
           JSON.stringify(captureData),
+          orderID,
+          req.user.id,
         ],
       );
+
+      if (finalOrderStatus === ORDER_STATUS.SUCCESS) {
+        const [cartRows] = await connection.query(
+          `
+            SELECT p.id, p.stock, ci.quantity
+            FROM cart_items ci
+            JOIN products p ON p.id = ci.product_id
+            WHERE ci.user_id = ?
+          `,
+          [req.user.id],
+        );
+
+        for (const item of cartRows) {
+          await connection.query(
+            "UPDATE products SET stock = stock - ?, updated_at = NOW() WHERE id = ?",
+            [Number(item.quantity), item.id],
+          );
+        }
+
+        await connection.query("DELETE FROM cart_items WHERE user_id = ?", [
+          req.user.id,
+        ]);
+      }
 
       await connection.commit();
       connection.release();
 
-      if (captureStatus === "COMPLETED") {
+      logPayPalFlow("final-status-assigned", {
+        orderId,
+        paypalOrderId: orderID,
+        userId: req.user?.id,
+        finalStatus: finalOrderStatus,
+      });
+
+      if (finalOrderStatus === ORDER_STATUS.SUCCESS) {
         try {
           console.log("[paypal:invoice] sending invoice email", {
-            orderId: orderResult.insertId,
+            orderId,
             paypalOrderId: orderID,
             userId: req.user.id,
             customerEmail: userRecord.email || captureData?.payer?.email_address || null,
           });
           await sendInvoiceEmail({
-            orderId: orderResult.insertId,
+            orderId,
             userId: req.user.id,
             paypalOrderId: orderID,
           });
           console.log("[paypal:invoice] invoice email sent", {
-            orderId: orderResult.insertId,
+            orderId,
             paypalOrderId: orderID,
             userId: req.user.id,
           });
@@ -982,13 +1110,13 @@ const capturePaypalOrder = async (req, res) => {
       return res.status(200).json({
         message: "Payment captured and order persisted successfully",
         order: {
-          id: orderResult.insertId,
+          id: orderId,
           total: Number(amountValue),
-          status: captureStatus === "COMPLETED" ? "paid" : "pending",
+          status: finalOrderStatus,
         },
         payment: {
           paypalOrderId: orderID,
-          status: captureStatus,
+          status: finalOrderStatus,
           amount: Number(amountValue),
           currency: currencyCode,
         },
@@ -1006,11 +1134,99 @@ const capturePaypalOrder = async (req, res) => {
     }
   } catch (error) {
     console.error("[paypal:capture]", error.message || error);
+
+    if (req.body?.orderID && req.user?.id) {
+      try {
+        await db.query(
+          "UPDATE payments SET status = ?, raw_response = ? WHERE paypal_order_id = ? AND user_id = ?",
+          [
+            ORDER_STATUS.UNSUCCESSFUL,
+            JSON.stringify({
+              error: error?.response?.data || error.message || "Capture failed",
+              failedAt: new Date().toISOString(),
+            }),
+            req.body.orderID,
+            req.user.id,
+          ],
+        );
+        await db.query(
+          `
+            UPDATE orders o
+            JOIN payments p ON p.order_id = o.id
+            SET o.status = ?
+            WHERE p.paypal_order_id = ? AND p.user_id = ?
+          `,
+          [ORDER_STATUS.UNSUCCESSFUL, req.body.orderID, req.user.id],
+        );
+
+        logPayPalFlow("final-status-assigned", {
+          orderId: null,
+          paypalOrderId: req.body.orderID,
+          userId: req.user.id,
+          finalStatus: ORDER_STATUS.UNSUCCESSFUL,
+          reason: "capture-error",
+        });
+      } catch (statusUpdateError) {
+        console.error("[paypal:capture] failed to mark unsuccessful", {
+          orderId: req.body.orderID,
+          userId: req.user.id,
+          error: statusUpdateError.message,
+        });
+      }
+    }
+
     return res.status(500).json({
       message:
         error?.response?.data?.details?.[0]?.description ||
         error?.response?.data?.message ||
         "Unable to capture PayPal order",
+    });
+  }
+};
+
+const cancelPaypalOrder = async (req, res) => {
+  try {
+    const { orderID } = req.body;
+
+    if (!orderID) {
+      return res.status(400).json({ message: "PayPal order ID is required" });
+    }
+
+    logPayPalFlow("checkout-cancelled", {
+      paypalOrderId: orderID,
+      userId: req.user?.id || null,
+    });
+
+    const [result] = await db.query(
+      `
+        UPDATE orders o
+        JOIN payments p ON p.order_id = o.id
+        SET o.status = ?, p.status = ?
+        WHERE p.paypal_order_id = ? AND p.user_id = ?
+      `,
+      [ORDER_STATUS.CANCELLED, ORDER_STATUS.CANCELLED, orderID, req.user.id],
+    );
+
+    if (!result.affectedRows) {
+      return res.status(404).json({
+        message: "Pending PayPal order not found for cancellation",
+      });
+    }
+
+    logPayPalFlow("final-status-assigned", {
+      paypalOrderId: orderID,
+      userId: req.user?.id || null,
+      finalStatus: ORDER_STATUS.CANCELLED,
+    });
+
+    return res.status(200).json({
+      message: "PayPal order marked as cancelled",
+      status: ORDER_STATUS.CANCELLED,
+    });
+  } catch (error) {
+    console.error("[paypal:cancel]", error.message || error);
+    return res.status(500).json({
+      message: "Unable to mark PayPal order as cancelled",
     });
   }
 };
@@ -1066,8 +1282,9 @@ const getOrderItems = async (req, res) => {
     // First, verify the order exists and admin has access
     const [orders] = await db.query(
       `
-        SELECT o.id, o.user_id, o.total, o.status, o.created_at
+        SELECT o.id, o.user_id, o.total, o.status, o.created_at, o.customer_email, u.username, u.email
         FROM orders o
+        JOIN users u ON u.id = o.user_id
         WHERE o.id = ?
         LIMIT 1
       `,
@@ -1085,11 +1302,27 @@ const getOrderItems = async (req, res) => {
           oi.id,
           oi.product_id,
           oi.name,
+          oi.price,
           oi.quantity,
-          oi.price
+          p.size,
+          p.category_id,
+          c.name AS category_name
         FROM order_items oi
+        LEFT JOIN products p ON p.id = oi.product_id
+        LEFT JOIN categories c ON c.id = p.category_id
         WHERE oi.order_id = ?
         ORDER BY oi.id ASC
+      `,
+      [orderId],
+    );
+
+    const [payments] = await db.query(
+      `
+        SELECT paypal_order_id, status AS payment_status, amount, currency, created_at
+        FROM payments
+        WHERE order_id = ?
+        ORDER BY id DESC
+        LIMIT 1
       `,
       [orderId],
     );
@@ -1102,9 +1335,20 @@ const getOrderItems = async (req, res) => {
       order: {
         id: order.id,
         userId: order.user_id,
+        username: order.username,
+        email: order.customer_email || order.email,
         total: Number(order.total),
         status: order.status,
         createdAt: order.created_at,
+        payment: payments[0]
+          ? {
+              paypalOrderId: payments[0].paypal_order_id,
+              status: payments[0].payment_status,
+              amount: Number(payments[0].amount),
+              currency: payments[0].currency,
+              createdAt: payments[0].created_at,
+            }
+          : null,
         pricing: {
           basePrice: roundMoney(pricing.basePrice),
           vatAmount: roundMoney(pricing.vatAmount),
@@ -1115,6 +1359,8 @@ const getOrderItems = async (req, res) => {
         id: item.id,
         productId: item.product_id,
         name: item.name,
+        size: item.size || "",
+        category: item.category_name || "",
         quantity: Number(item.quantity),
         price: Number(item.price),
         subtotal: roundMoney(Number(item.price) * Number(item.quantity)),
@@ -1136,6 +1382,7 @@ module.exports = {
   createPaypalConfig,
   createPaypalOrder,
   capturePaypalOrder,
+  cancelPaypalOrder,
   getAdminOrders,
   getOrderItems,
 };

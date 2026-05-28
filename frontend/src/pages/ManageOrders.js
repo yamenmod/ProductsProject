@@ -17,8 +17,28 @@ function ManageOrders({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const getTodayInputValue = () => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, "0");
+    const day = String(today.getDate()).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
+  };
+
+  const getLastMonthInputValue = () => {
+    const lastMonth = new Date();
+    lastMonth.setMonth(lastMonth.getMonth() - 1);
+
+    const year = lastMonth.getFullYear();
+    const month = String(lastMonth.getMonth() + 1).padStart(2, "0");
+    const day = String(lastMonth.getDate()).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
+  };
+
+  const [dateFrom, setDateFrom] = useState(getLastMonthInputValue);
+  const [dateTo, setDateTo] = useState(getTodayInputValue);
   const [selectedFilter, setSelectedFilter] = useState(initialFilter || "all");
   const [selectedOrderDetail, setSelectedOrderDetail] = useState(null);
   const [loadingOrderDetail, setLoadingOrderDetail] = useState(false);
@@ -40,7 +60,7 @@ function ManageOrders({
       return "pending";
     }
 
-    return "failed";
+    return "unsuccessful";
   }, []);
 
   useEffect(() => {
@@ -122,7 +142,7 @@ function ManageOrders({
   }, [orders, searchTerm, selectedFilter, getOrderBucket, dateFrom, dateTo]);
 
   const summary = useMemo(() => {
-    const counts = { successful: 0, failed: 0, pending: 0 };
+    const counts = { successful: 0, unsuccessful: 0, pending: 0 };
 
     orders.forEach((order) => {
       counts[getOrderBucket(order)] += 1;
@@ -136,7 +156,7 @@ function ManageOrders({
       return { background: "rgba(36, 88, 96, 0.12)", color: "#245860" };
     }
 
-    if (bucket === "failed") {
+    if (bucket === "unsuccessful") {
       return { background: "rgba(168, 63, 52, 0.12)", color: "#a83f34" };
     }
 
@@ -166,7 +186,7 @@ function ManageOrders({
     const activeBackground = {
       all: "linear-gradient(135deg,#245860,#2f747d)",
       successful: "linear-gradient(135deg,#16515e,#1f5d74)",
-      failed: "linear-gradient(135deg,#7b2f27,#a83f34)",
+      unsuccessful: "linear-gradient(135deg,#7b2f27,#a83f34)",
       pending: "linear-gradient(135deg,#4b5b6b,#1f2937)",
     };
 
@@ -198,7 +218,7 @@ function ManageOrders({
 
     const selectedBackground = {
       successful: "linear-gradient(135deg,#16515e,#1f5d74)",
-      failed: "linear-gradient(135deg,#7b2f27,#a83f34)",
+      unsuccessful: "linear-gradient(135deg,#7b2f27,#a83f34)",
       pending: "linear-gradient(135deg,#4b5b6b,#1f2937)",
     };
 
@@ -250,9 +270,9 @@ function ManageOrders({
       <main className="ps-main" style={{ padding: "70px 0" }}>
         <div className="ps-shell">
           <div style={{ marginBottom: "24px" }}>
-            <h1 className="ps-title" style={{ marginBottom: "8px", fontSize: "clamp(30px, 4vw, 46px)" }}>Manage orders</h1>
+            <h1 className="ps-title" style={{ marginBottom: "8px", fontSize: "clamp(24px, 3vw, 34px)" }}>Manage orders</h1>
             <p className="ps-lead" style={{ maxWidth: "760px" }}>
-              Review every checkout and quickly spot whether the payment ended up successful, failed, or still pending.
+              Review every checkout and quickly spot whether the payment ended up successful, unsuccessful, or still pending.
             </p>
           </div>
 
@@ -275,7 +295,7 @@ function ManageOrders({
                 type="date"
                 value={dateFrom}
                 onChange={(event) => setDateFrom(event.target.value)}
-                style={{ width: "100%", padding: "11px 12px", borderRadius: "12px", border: "1px solid rgba(31, 24, 19, 0.14)", background: "rgba(255, 250, 242, 0.95)", fontSize: "14px" }}
+                style={{ width: "100%", padding: "11px 12px", borderRadius: "12px", border: "1px solid rgba(31, 24, 19, 0.14)", background: "rgba(255, 250, 242, 0.95)", fontSize: "13px" }}
               />
             </div>
             <div style={{ minWidth: "180px", flex: "1 1 180px" }}>
@@ -286,7 +306,7 @@ function ManageOrders({
                 type="date"
                 value={dateTo}
                 onChange={(event) => setDateTo(event.target.value)}
-                style={{ width: "100%", padding: "11px 12px", borderRadius: "12px", border: "1px solid rgba(31, 24, 19, 0.14)", background: "rgba(255, 250, 242, 0.95)", fontSize: "14px" }}
+                style={{ width: "100%", padding: "11px 12px", borderRadius: "12px", border: "1px solid rgba(31, 24, 19, 0.14)", background: "rgba(255, 250, 242, 0.95)", fontSize: "13px" }}
               />
             </div>
             <button
@@ -305,7 +325,7 @@ function ManageOrders({
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "16px", marginBottom: "24px" }}>
             {[
               { label: "Successful", value: summary.successful, bucket: "successful" },
-              { label: "Failed", value: summary.failed, bucket: "failed" },
+              { label: "Unsuccessful", value: summary.unsuccessful, bucket: "unsuccessful" },
               { label: "Pending", value: summary.pending, bucket: "pending" },
             ].map((item) => (
               <button
@@ -338,14 +358,14 @@ function ManageOrders({
                 borderRadius: "12px",
                 border: "1px solid rgba(31, 24, 19, 0.14)",
                 background: "rgba(255, 250, 242, 0.95)",
-                fontSize: "14px",
+                fontSize: "13px",
               }}
             />
 
             {[
               { key: "all", label: "All" },
               { key: "successful", label: "Successful" },
-              { key: "failed", label: "Failed" },
+              { key: "unsuccessful", label: "Unsuccessful" },
               { key: "pending", label: "Pending" },
             ].map((item) => (
               <button
@@ -368,7 +388,7 @@ function ManageOrders({
             ) : filteredOrders.length ? (
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
-                  <tr style={{ textAlign: "left", color: "#65574d", fontSize: "12px", textTransform: "uppercase", letterSpacing: "1.2px" }}>
+                  <tr style={{ textAlign: "left", color: "#65574d", fontSize: "11px", textTransform: "uppercase", letterSpacing: "1.2px" }}>
                     <th style={{ padding: "12px 10px" }}>Order</th>
                     <th style={{ padding: "12px 10px" }}>Customer</th>
                     <th style={{ padding: "12px 10px" }}>Email</th>
@@ -399,17 +419,17 @@ function ManageOrders({
                           e.currentTarget.style.backgroundColor = "transparent";
                         }}
                       >
-                        <td style={{ padding: "14px 10px", fontWeight: 700 }}>#{order.id}</td>
-                        <td style={{ padding: "14px 10px" }}>{order.username || "-"}</td>
-                        <td style={{ padding: "14px 10px", color: "#65574d" }}>{order.email || "-"}</td>
-                        <td style={{ padding: "14px 10px" }}>{order.itemCount ?? 0}</td>
-                        <td style={{ padding: "14px 10px" }}>${Number(order.total ?? 0).toFixed(2)}</td>
+                        <td style={{ padding: "14px 10px", fontWeight: 700, fontSize: "13px" }}>#{order.id}</td>
+                        <td style={{ padding: "14px 10px", fontSize: "13px" }}>{order.username || "-"}</td>
+                        <td style={{ padding: "14px 10px", color: "#65574d", fontSize: "13px" }}>{order.email || "-"}</td>
+                        <td style={{ padding: "14px 10px", fontSize: "13px" }}>{order.itemCount ?? 0}</td>
+                        <td style={{ padding: "14px 10px", fontSize: "13px" }}>${Number(order.total ?? 0).toFixed(2)}</td>
                         <td style={{ padding: "14px 10px" }}>
-                          <span style={{ display: "inline-flex", padding: "6px 10px", borderRadius: "999px", fontSize: "12px", fontWeight: 800, textTransform: "capitalize", background: tone.background, color: tone.color }}>
+                          <span style={{ display: "inline-flex", padding: "6px 10px", borderRadius: "999px", fontSize: "11px", fontWeight: 800, textTransform: "capitalize", background: tone.background, color: tone.color }}>
                             {bucket}
                           </span>
                         </td>
-                        <td style={{ padding: "14px 10px", color: "#65574d" }}>{formatDate(order.createdAt || order.created_at)}</td>
+                        <td style={{ padding: "14px 10px", color: "#65574d", fontSize: "13px" }}>{formatDate(order.createdAt || order.created_at)}</td>
                       </tr>
                     );
                   })}
@@ -502,7 +522,7 @@ function ManageOrders({
                       <h2 className="ps-subtitle" style={{ marginBottom: "8px" }}>
                         Order #{selectedOrderDetail.order.id}
                       </h2>
-                      <p style={{ color: "#65574d", fontSize: "13px", margin: 0 }}>
+                      <p style={{ color: "#65574d", fontSize: "12px", margin: 0 }}>
                         {formatDate(selectedOrderDetail.order.createdAt)}
                       </p>
                     </div>
@@ -511,7 +531,7 @@ function ManageOrders({
                     <div
                       style={{
                         display: "grid",
-                        gridTemplateColumns: "1fr 1fr",
+                        gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
                         gap: "20px",
                         marginBottom: "32px",
                         padding: "20px",
@@ -520,7 +540,7 @@ function ManageOrders({
                       }}
                     >
                       <div>
-                        <p style={{ color: "#65574d", fontSize: "12px", textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.8px", margin: "0 0 6px 0" }}>
+                        <p style={{ color: "#65574d", fontSize: "11px", textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.8px", margin: "0 0 6px 0" }}>
                           Status
                         </p>
                         <span
@@ -528,7 +548,7 @@ function ManageOrders({
                             display: "inline-flex",
                             padding: "6px 10px",
                             borderRadius: "999px",
-                            fontSize: "12px",
+                            fontSize: "11px",
                             fontWeight: 800,
                             textTransform: "capitalize",
                             background: statusTone(getOrderBucket(selectedOrderDetail.order)).background,
@@ -540,29 +560,59 @@ function ManageOrders({
                       </div>
 
                       <div>
-                        <p style={{ color: "#65574d", fontSize: "12px", textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.8px", margin: "0 0 6px 0" }}>
+                        <p style={{ color: "#65574d", fontSize: "11px", textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.8px", margin: "0 0 6px 0" }}>
                           Total Amount
                         </p>
-                        <p style={{ fontSize: "18px", fontWeight: 700, margin: 0, color: "#1f1813" }}>
+                        <p style={{ fontSize: "16px", fontWeight: 700, margin: 0, color: "#1f1813" }}>
                           ${selectedOrderDetail.order.total.toFixed(2)}
+                        </p>
+                      </div>
+
+                      <div>
+                        <p style={{ color: "#65574d", fontSize: "11px", textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.8px", margin: "0 0 6px 0" }}>
+                          Customer name
+                        </p>
+                        <p style={{ fontSize: "15px", fontWeight: 700, margin: 0, color: "#1f1813" }}>
+                          {selectedOrderDetail.order.username || `User #${selectedOrderDetail.order.userId}`}
+                        </p>
+                      </div>
+
+                      <div>
+                        <p style={{ color: "#65574d", fontSize: "11px", textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.8px", margin: "0 0 6px 0" }}>
+                          Customer email
+                        </p>
+                        <p style={{ fontSize: "15px", fontWeight: 700, margin: 0, color: "#1f1813", wordBreak: "break-word" }}>
+                          {selectedOrderDetail.order.email || "No email available"}
+                        </p>
+                      </div>
+
+                      <div>
+                        <p style={{ color: "#65574d", fontSize: "11px", textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.8px", margin: "0 0 6px 0" }}>
+                          Payment
+                        </p>
+                        <p style={{ fontSize: "15px", fontWeight: 700, margin: 0, color: "#1f1813" }}>
+                          {selectedOrderDetail.order.payment?.status || selectedOrderDetail.order.status}
+                        </p>
+                        <p style={{ fontSize: "12px", margin: "4px 0 0", color: "#65574d" }}>
+                          {selectedOrderDetail.order.payment?.paypalOrderId
+                            ? `PayPal ${selectedOrderDetail.order.payment.paypalOrderId}`
+                            : "No PayPal reference"}
                         </p>
                       </div>
                     </div>
 
                     {/* Order Items */}
                     <div style={{ marginBottom: "24px" }}>
-                      <h3 style={{ fontSize: "14px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.2px", color: "#65574d", marginBottom: "16px" }}>
+                      <h3 style={{ fontSize: "13px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.2px", color: "#65574d", marginBottom: "16px" }}>
                         Order Items
                       </h3>
 
                       <div style={{ overflowX: "auto" }}>
                         <table style={{ width: "100%", borderCollapse: "collapse" }}>
                           <thead>
-                            <tr style={{ textAlign: "left", color: "#65574d", fontSize: "12px", textTransform: "uppercase", letterSpacing: "1.2px", borderBottom: "1px solid rgba(31, 24, 19, 0.08)" }}>
+                            <tr style={{ textAlign: "left", color: "#65574d", fontSize: "11px", textTransform: "uppercase", letterSpacing: "1.2px", borderBottom: "1px solid rgba(31, 24, 19, 0.08)" }}>
                               <th style={{ padding: "10px 0", fontWeight: 700 }}>Product</th>
                               <th style={{ padding: "10px 0", fontWeight: 700, textAlign: "right" }}>Quantity</th>
-                              <th style={{ padding: "10px 0", fontWeight: 700, textAlign: "right" }}>Price</th>
-                              <th style={{ padding: "10px 0", fontWeight: 700, textAlign: "right" }}>Subtotal</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -574,15 +624,9 @@ function ManageOrders({
                                   textAlign: "left",
                                 }}
                               >
-                                <td style={{ padding: "12px 0" }}>{item.name}</td>
+                                <td style={{ padding: "12px 0", fontSize: "13px" }}>{item.name}</td>
                                 <td style={{ padding: "12px 0", textAlign: "right", color: "#65574d" }}>
                                   {item.quantity}
-                                </td>
-                                <td style={{ padding: "12px 0", textAlign: "right", color: "#65574d" }}>
-                                  ${item.price.toFixed(2)}
-                                </td>
-                                <td style={{ padding: "12px 0", textAlign: "right", fontWeight: 700 }}>
-                                  ${item.subtotal.toFixed(2)}
                                 </td>
                               </tr>
                             ))}
@@ -628,7 +672,7 @@ function ManageOrders({
                           justifyContent: "space-between",
                           paddingTop: "12px",
                           borderTop: "1px solid rgba(31, 24, 19, 0.12)",
-                          fontSize: "16px",
+                          fontSize: "15px",
                           fontWeight: 700,
                           color: "#1f1813",
                         }}

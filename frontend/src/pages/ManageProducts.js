@@ -573,6 +573,7 @@ function ManageProducts({
             borderRadius: "22px",
             boxShadow: "0 18px 42px rgba(67, 48, 33, 0.12)",
             fontFamily: "Manrope, 'Segoe UI', sans-serif",
+            fontSize: "13px",
           }}
         >
           <div
@@ -586,7 +587,7 @@ function ManageProducts({
               style={{
                 color: "#1f1813",
                 fontFamily: "'Bebas Neue', Impact, sans-serif",
-                fontSize: "44px",
+                fontSize: "36px",
                 margin: "0 0 8px 0",
                 letterSpacing: "1px",
                 lineHeight: 0.9,
@@ -660,7 +661,7 @@ function ManageProducts({
                 border: "1px solid #d9c3ad",
                 borderRadius: "12px",
                 background: "#fffdf8",
-                fontSize: "14px",
+                fontSize: "13px",
               }}
             />
 
@@ -673,7 +674,7 @@ function ManageProducts({
                 border: "1px solid #d9c3ad",
                 borderRadius: "12px",
                 background: "#fffdf8",
-                fontSize: "14px",
+                fontSize: "13px",
                 cursor: "pointer",
               }}
             >
@@ -745,7 +746,7 @@ function ManageProducts({
                       padding: "10px 12px",
                       border: "1px solid #d9c3ad",
                       borderRadius: "8px",
-                      fontSize: "14px",
+                      fontSize: "13px",
                       fontFamily: "inherit",
                       transition: "all 0.2s ease",
                       background: "#fffdf8",
@@ -774,7 +775,7 @@ function ManageProducts({
                       padding: "10px 12px",
                       border: "1px solid #d9c3ad",
                       borderRadius: "8px",
-                      fontSize: "14px",
+                      fontSize: "13px",
                       fontFamily: "inherit",
                       transition: "all 0.2s ease",
                       background: "#fffdf8",
@@ -799,7 +800,7 @@ function ManageProducts({
                       padding: "10px 12px",
                       border: "1px solid #d9c3ad",
                       borderRadius: "8px",
-                      fontSize: "14px",
+                      fontSize: "13px",
                       fontFamily: "inherit",
                       background: "#fffdf8",
                       cursor: "pointer",
@@ -822,7 +823,7 @@ function ManageProducts({
                       padding: "10px 12px",
                       border: "1px solid #d9c3ad",
                       borderRadius: "8px",
-                      fontSize: "14px",
+                      fontSize: "13px",
                       fontFamily: "inherit",
                       background: "#fffdf8",
                       cursor: "pointer",
@@ -846,7 +847,7 @@ function ManageProducts({
                       padding: "10px 12px",
                       border: "1px solid #d9c3ad",
                       borderRadius: "8px",
-                      fontSize: "14px",
+                      fontSize: "13px",
                       fontFamily: "inherit",
                       transition: "all 0.2s ease",
                       background: "#fffdf8",
@@ -888,7 +889,7 @@ function ManageProducts({
                         padding: "10px 12px",
                         border: "1px solid #d9c3ad",
                         borderRadius: "8px",
-                        fontSize: "14px",
+                        fontSize: "13px",
                         fontFamily: "inherit",
                         transition: "all 0.2s ease",
                         background: "#fffdf8",

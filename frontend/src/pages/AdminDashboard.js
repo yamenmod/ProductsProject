@@ -15,8 +15,28 @@ function AdminDashboard({
 }) {
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const getTodayInputValue = () => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, "0");
+    const day = String(today.getDate()).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
+  };
+
+  const getLastMonthInputValue = () => {
+    const lastMonth = new Date();
+    lastMonth.setMonth(lastMonth.getMonth() - 1);
+
+    const year = lastMonth.getFullYear();
+    const month = String(lastMonth.getMonth() + 1).padStart(2, "0");
+    const day = String(lastMonth.getDate()).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
+  };
+
+  const [dateFrom, setDateFrom] = useState(getLastMonthInputValue);
+  const [dateTo, setDateTo] = useState(getTodayInputValue);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -33,7 +53,7 @@ function AdminDashboard({
       return "pending";
     }
 
-    return "failed";
+    return "unsuccessful";
   };
 
   const filteredOrders = useMemo(() => {
@@ -60,14 +80,38 @@ function AdminDashboard({
   }, [orders, dateFrom, dateTo]);
 
   const filteredSummary = useMemo(() => {
-    const summary = { successful: 0, failed: 0, pending: 0 };
+    const summary = { successful: 0, unsuccessful: 0, pending: 0 };
 
     filteredOrders.forEach((order) => {
       summary[getOrderBucket(order)] += 1;
     });
 
-    return summary;
+    return { successful: summary.successful, unsuccessful: summary.unsuccessful, pending: summary.pending };
   }, [filteredOrders]);
+
+  const statusChartData = useMemo(
+    () => [
+      {
+        key: "successful",
+        label: "Successful",
+        value: filteredSummary.successful,
+        color: "#79b64a",
+      },
+      {
+        key: "unsuccessful",
+        label: "Unsuccessful",
+        value: filteredSummary.unsuccessful,
+        color: "#f07c2e",
+      },
+      {
+        key: "pending",
+        label: "Pending",
+        value: filteredSummary.pending,
+        color: "#ffbf24",
+      },
+    ],
+    [filteredSummary],
+  );
 
   const orderTrend = useMemo(() => {
     const grouped = new Map();
@@ -148,9 +192,8 @@ function AdminDashboard({
 
   const cards = [
     { key: "successful", label: "Successful", value: filteredSummary.successful, tone: "success", filter: "successful" },
-    { key: "failed", label: "Failed", value: filteredSummary.failed, tone: "danger", filter: "failed" },
+    { key: "unsuccessful", label: "Unsuccessful", value: filteredSummary.unsuccessful, tone: "danger", filter: "unsuccessful" },
     { key: "pending", label: "Pending", value: filteredSummary.pending, tone: "muted", filter: "pending" },
-    { key: "range", label: "In range", value: filteredOrders.length, tone: "muted", filter: "all" },
   ];
 
   if (session?.user?.role !== "admin") {
@@ -193,7 +236,7 @@ function AdminDashboard({
       <main className="ps-main" style={{ padding: "70px 0" }}>
         <div className="ps-shell">
           <div style={{ marginBottom: "24px" }}>
-            <h1 className="ps-title" style={{ marginBottom: "8px", fontSize: "clamp(30px, 4vw, 46px)" }}>Welcome, admin</h1>
+            <h1 className="ps-title" style={{ marginBottom: "8px", fontSize: "clamp(24px, 3vw, 34px)" }}>Welcome, admin</h1>
             <p className="ps-lead" style={{ maxWidth: "760px" }}>
               Track order health at a glance and watch products that are close to running out of stock.
             </p>
@@ -218,7 +261,7 @@ function AdminDashboard({
                 type="date"
                 value={dateFrom}
                 onChange={(event) => setDateFrom(event.target.value)}
-                style={{ width: "100%", padding: "11px 12px", borderRadius: "12px", border: "1px solid rgba(31, 24, 19, 0.14)", background: "rgba(255, 250, 242, 0.95)", fontSize: "14px" }}
+                style={{ width: "100%", padding: "11px 12px", borderRadius: "12px", border: "1px solid rgba(31, 24, 19, 0.14)", background: "rgba(255, 250, 242, 0.95)", fontSize: "13px" }}
               />
             </div>
             <div style={{ minWidth: "180px", flex: "1 1 180px" }}>
@@ -229,7 +272,7 @@ function AdminDashboard({
                 type="date"
                 value={dateTo}
                 onChange={(event) => setDateTo(event.target.value)}
-                style={{ width: "100%", padding: "11px 12px", borderRadius: "12px", border: "1px solid rgba(31, 24, 19, 0.14)", background: "rgba(255, 250, 242, 0.95)", fontSize: "14px" }}
+                style={{ width: "100%", padding: "11px 12px", borderRadius: "12px", border: "1px solid rgba(31, 24, 19, 0.14)", background: "rgba(255, 250, 242, 0.95)", fontSize: "13px" }}
               />
             </div>
             <button
@@ -331,34 +374,46 @@ function AdminDashboard({
             <div className="ps-surface" style={{ padding: "22px" }}>
               <h2 style={{ margin: "0 0 10px", fontSize: "24px" }}>Orders graph</h2>
               <p style={{ margin: "0 0 18px", color: "#5e5148" }}>
-                Orders shown by day for the selected date range.
+                Orders shown by status for the selected date range.
               </p>
 
-              {orderTrend.length ? (
-                <div style={{ display: "flex", alignItems: "end", gap: "12px", minHeight: "240px", paddingTop: "10px" }}>
-                  {orderTrend.map((point) => {
-                    const maxValue = Math.max(...orderTrend.map((entry) => entry.value), 1);
-                    const barHeight = Math.max(24, (point.value / maxValue) * 180);
+              {statusChartData.some((item) => item.value > 0) ? (
+                <div style={{ display: "grid", gridTemplateColumns: "minmax(220px, 280px) 1fr", gap: "18px", alignItems: "center", paddingTop: "10px" }}>
+                  <div style={{ display: "flex", justifyContent: "center" }}>
+                    <div
+                      style={{
+                        width: "220px",
+                        height: "220px",
+                        borderRadius: "50%",
+                        background: `conic-gradient(${statusChartData
+                          .map((item, index) => {
+                            const total = statusChartData.reduce((sum, entry) => sum + entry.value, 0) || 1;
+                            const start = statusChartData
+                              .slice(0, index)
+                              .reduce((sum, entry) => sum + entry.value, 0);
+                            const end = start + item.value;
+                            return `${item.color} ${(start / total) * 100}% ${(end / total) * 100}%`;
+                          })
+                          .join(", ")})`,
+                        boxShadow: "0 18px 36px rgba(31, 24, 19, 0.14)",
+                        border: "10px solid rgba(255, 250, 242, 0.95)",
+                      }}
+                    />
+                  </div>
 
-                    return (
-                      <div key={point.label} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: "10px" }}>
-                        <div style={{ width: "100%", display: "flex", justifyContent: "center", alignItems: "end", minHeight: "180px" }}>
-                          <div
-                            style={{
-                              width: "100%",
-                              maxWidth: "56px",
-                              height: `${barHeight}px`,
-                              borderRadius: "16px 16px 10px 10px",
-                              background: "linear-gradient(180deg, #245860 0%, #2f747d 100%)",
-                              boxShadow: "0 14px 28px rgba(36, 88, 96, 0.24)",
-                            }}
-                          />
+                  <div style={{ display: "grid", gap: "12px" }}>
+                    {statusChartData.map((item) => (
+                      <div key={item.key} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", padding: "12px 14px", borderRadius: "14px", background: "rgba(255, 250, 242, 0.9)", border: "1px solid rgba(31, 24, 19, 0.08)" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                          <span style={{ width: "12px", height: "12px", borderRadius: "999px", background: item.color, display: "inline-block" }} />
+                          <span style={{ fontSize: "13px", fontWeight: 700, color: "#1f1813" }}>{item.label}</span>
                         </div>
-                        <div style={{ fontSize: "12px", fontWeight: 800, color: "#65574d", textAlign: "center" }}>{point.label}</div>
-                        <div style={{ fontSize: "13px", fontWeight: 700, color: "#1f1813" }}>{point.value}</div>
+                        <div style={{ fontSize: "20px", fontWeight: 800, color: item.color, lineHeight: 1 }}>
+                          {item.value}
+                        </div>
                       </div>
-                    );
-                  })}
+                    ))}
+                  </div>
                 </div>
               ) : (
                 <p className="ps-lead">No orders found for the selected dates.</p>
