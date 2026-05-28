@@ -166,11 +166,29 @@ const initDatabase = async () => {
       id INT AUTO_INCREMENT PRIMARY KEY,
       user_id INT NOT NULL,
       total DECIMAL(10, 2) NOT NULL DEFAULT 0,
+      customer_email VARCHAR(255) NULL DEFAULT NULL,
       status VARCHAR(50) NOT NULL DEFAULT 'paid',
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     )
   `);
+
+    const [orderCustomerEmailColumnRows] = await db.query(
+      `
+      SELECT COUNT(*) AS total
+      FROM information_schema.columns
+      WHERE table_schema = DATABASE()
+        AND table_name = 'orders'
+        AND column_name = 'customer_email'
+    `,
+    );
+
+    if (orderCustomerEmailColumnRows[0]?.total === 0) {
+      await db.query(`
+      ALTER TABLE orders
+      ADD COLUMN customer_email VARCHAR(255) NULL DEFAULT NULL AFTER total
+    `);
+    }
 
     await db.query(`
     CREATE TABLE IF NOT EXISTS order_items (
@@ -348,6 +366,23 @@ const initDatabase = async () => {
         await db.query(`
         ALTER TABLE products
         ADD COLUMN size VARCHAR(10) NULL DEFAULT NULL
+      `);
+      }
+
+      const [sizeStockColumnRows] = await db.query(
+        `
+        SELECT COUNT(*) AS total
+        FROM information_schema.columns
+        WHERE table_schema = DATABASE()
+          AND table_name = 'products'
+          AND column_name = 'size_stock'
+      `,
+      );
+
+      if (sizeStockColumnRows[0]?.total === 0) {
+        await db.query(`
+        ALTER TABLE products
+        ADD COLUMN size_stock LONGTEXT NULL DEFAULT NULL
       `);
       }
     }

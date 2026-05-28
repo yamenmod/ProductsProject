@@ -2,6 +2,12 @@ const axios = require("axios");
 const db = require("../db/connection");
 const { sendInvoiceEmail } = require("../utils/sendInvoiceEmail");
 const {
+  getAvailableStock,
+  getSizeStockTotal,
+  normalizeSizeStockMap,
+  serializeSizeStock,
+} = require("../utils/sizeStock");
+const {
   calculateVatPricing,
   roundMoney,
   getVatRateFromDb,
@@ -52,9 +58,10 @@ const calculateCartTotal = async (userId) => {
   // Load the current cart and calculate the VAT-inclusive total.
   const [cartRows] = await db.query(
     `
-      SELECT p.id, p.name, p.price, p.stock, ci.size, ci.quantity
+      SELECT p.id, p.name, p.price, p.stock, p.size_stock, c.name AS category, ci.size, ci.quantity
       FROM cart_items ci
       JOIN products p ON p.id = ci.product_id
+      LEFT JOIN categories c ON c.id = p.category_id
       WHERE ci.user_id = ?
     `,
     [userId],
@@ -169,16 +176,20 @@ const resolvePrimaryImage = (value) => {
 // Purchases one product immediately without adding it to the cart.
 const quickCheckout = async (req, res) => {
   try {
-    const { productId, quantity } = req.body;
+    const { productId, quantity, size } = req.body;
 
     if (!productId) {
       return res.status(400).json({ message: "Product ID is required" });
     }
 
     const qty = Number(quantity) > 0 ? Number(quantity) : 1;
+    const normalizedSize = (size || "").toString().trim().toUpperCase();
 
     const [products] = await db.query(
-      "SELECT id, name, price, stock FROM products WHERE id = ? LIMIT 1",
+      `SELECT p.id, p.name, p.price, p.stock, p.size_stock, c.name AS category
+       FROM products p
+       LEFT JOIN categories c ON c.id = p.category_id
+       WHERE p.id = ? LIMIT 1`,
       [productId],
     );
 
@@ -187,8 +198,13 @@ const quickCheckout = async (req, res) => {
     }
 
     const product = products[0];
+    const isWetsuit = (product.category || "").toString().trim().toLowerCase().includes("wetsuit");
 
-    if (Number(product.stock) < qty) {
+    if (isWetsuit && !normalizedSize) {
+      return res.status(400).json({ message: "Size is required for wetsuits" });
+    }
+
+    if (getAvailableStock(product, normalizedSize) < qty) {
       return res
         .status(400)
         .json({ message: `Not enough stock for ${product.name}` });
@@ -199,10 +215,25 @@ const quickCheckout = async (req, res) => {
     try {
       await connection.beginTransaction();
 
-      await connection.query(
-        "UPDATE products SET stock = stock - ?, updated_at = NOW() WHERE id = ?",
-        [qty, productId],
-      );
+      const currentSizeStock = normalizeSizeStockMap(product.size_stock);
+
+      if (isWetsuit && currentSizeStock) {
+        const nextSizeStock = {
+          ...currentSizeStock,
+        };
+        nextSizeStock[normalizedSize] =
+          Number(nextSizeStock[normalizedSize] || 0) - qty;
+
+        await connection.query(
+          "UPDATE products SET stock = ?, size_stock = ?, updated_at = NOW() WHERE id = ?",
+          [getSizeStockTotal(nextSizeStock), serializeSizeStock(nextSizeStock), productId],
+        );
+      } else {
+        await connection.query(
+          "UPDATE products SET stock = stock - ?, updated_at = NOW() WHERE id = ?",
+          [qty, productId],
+        );
+      }
 
       const pricing = calculateVatPricing(product.price);
       const subtotal = roundMoney(pricing.finalPrice * qty);
@@ -353,7 +384,7 @@ const addToCart = async (req, res) => {
     }
 
     const [users] = await db.query(
-      "SELECT id FROM users WHERE id = ? LIMIT 1",
+      "SELECT id, email FROM users WHERE id = ? LIMIT 1",
       [req.user.id],
     );
     if (!users.length) {
@@ -488,7 +519,10 @@ const updateCartQuantity = async (req, res) => {
       );
     } else {
       const [products] = await db.query(
-        "SELECT stock FROM products WHERE id = ? LIMIT 1",
+        `SELECT p.stock, p.size_stock, c.name AS category
+         FROM products p
+         LEFT JOIN categories c ON c.id = p.category_id
+         WHERE p.id = ? LIMIT 1`,
         [productId],
       );
 
@@ -496,7 +530,18 @@ const updateCartQuantity = async (req, res) => {
         return res.status(404).json({ message: "Product not found" });
       }
 
-      const stock = Number(products[0].stock) || 0;
+      const product = products[0];
+      const isWetsuit = (product.category || "")
+        .toString()
+        .trim()
+        .toLowerCase()
+        .includes("wetsuit");
+
+      if (isWetsuit && !normalizedSize) {
+        return res.status(400).json({ message: "Size is required for wetsuits" });
+      }
+
+      const stock = getAvailableStock(product, normalizedSize);
       if (nextQuantity > stock) {
         return res.status(400).json({
           message: `Only ${stock} item${stock === 1 ? "" : "s"} available in stock`,
@@ -550,7 +595,7 @@ const updateCartQuantity = async (req, res) => {
 const checkout = async (req, res) => {
   try {
     const [users] = await db.query(
-      "SELECT id FROM users WHERE id = ? LIMIT 1",
+      "SELECT id, email FROM users WHERE id = ? LIMIT 1",
       [req.user.id],
     );
 
@@ -565,10 +610,13 @@ const checkout = async (req, res) => {
           p.name,
           p.price,
           p.stock,
+          p.size_stock,
+          c.name AS category,
           ci.size,
           ci.quantity
         FROM cart_items ci
         JOIN products p ON p.id = ci.product_id
+        LEFT JOIN categories c ON c.id = p.category_id
         WHERE ci.user_id = ?
       `,
       [req.user.id],
@@ -587,7 +635,7 @@ const checkout = async (req, res) => {
       await connection.beginTransaction();
 
       for (const item of cartRows) {
-        if (Number(item.stock) < Number(item.quantity)) {
+        if (getAvailableStock(item, item.size) < Number(item.quantity)) {
           await connection.rollback();
           connection.release();
           return res.status(400).json({
@@ -595,10 +643,27 @@ const checkout = async (req, res) => {
           });
         }
 
-        await connection.query(
-          "UPDATE products SET stock = stock - ?, updated_at = NOW() WHERE id = ?",
-          [Number(item.quantity), item.id],
-        );
+        const currentSizeStock = normalizeSizeStockMap(item.size_stock);
+
+        if (currentSizeStock && item.size) {
+          const nextSizeStock = { ...currentSizeStock };
+          nextSizeStock[item.size] =
+            Number(nextSizeStock[item.size] || 0) - Number(item.quantity);
+
+          await connection.query(
+            "UPDATE products SET stock = ?, size_stock = ?, updated_at = NOW() WHERE id = ?",
+            [
+              getSizeStockTotal(nextSizeStock),
+              serializeSizeStock(nextSizeStock),
+              item.id,
+            ],
+          );
+        } else {
+          await connection.query(
+            "UPDATE products SET stock = stock - ?, updated_at = NOW() WHERE id = ?",
+            [Number(item.quantity), item.id],
+          );
+        }
 
         const pricing = calculateVatPricing(item.price);
         const subtotal = roundMoney(pricing.finalPrice * Number(item.quantity));
@@ -619,8 +684,8 @@ const checkout = async (req, res) => {
       }
 
       const [orderResult] = await connection.query(
-        "INSERT INTO orders (user_id, total, status, created_at) VALUES (?, ?, 'paid', NOW())",
-        [req.user.id, total],
+        "INSERT INTO orders (user_id, total, customer_email, status, created_at) VALUES (?, ?, ?, 'paid', NOW())",
+        [req.user.id, total, users[0]?.email || null],
       );
 
       for (const item of items) {
@@ -806,6 +871,17 @@ const capturePaypalOrder = async (req, res) => {
     try {
       await connection.beginTransaction();
 
+      const [orderTableColumns] = await connection.query(
+        `
+          SELECT COUNT(*) AS total
+          FROM information_schema.columns
+          WHERE table_schema = DATABASE()
+            AND table_name = 'orders'
+            AND column_name = 'customer_email'
+        `,
+      );
+      const hasCustomerEmailColumn = Number(orderTableColumns?.[0]?.total || 0) > 0;
+
       const [users] = await connection.query(
         "SELECT id, username, email FROM users WHERE id = ? LIMIT 1",
         [req.user.id],
@@ -821,14 +897,23 @@ const capturePaypalOrder = async (req, res) => {
 
       const { total, items } = await calculateCartTotal(req.user.id);
 
-      const [orderResult] = await connection.query(
-        "INSERT INTO orders (user_id, total, status, created_at) VALUES (?, ?, ?, NOW())",
-        [
-          req.user.id,
-          total,
-          captureStatus === "COMPLETED" ? "paid" : "pending",
-        ],
-      );
+      const orderInsertSql = hasCustomerEmailColumn
+        ? "INSERT INTO orders (user_id, total, customer_email, status, created_at) VALUES (?, ?, ?, ?, NOW())"
+        : "INSERT INTO orders (user_id, total, status, created_at) VALUES (?, ?, ?, NOW())";
+      const orderInsertParams = hasCustomerEmailColumn
+        ? [
+            req.user.id,
+            total,
+            userRecord.email || captureData?.payer?.email_address || null,
+            captureStatus === "COMPLETED" ? "paid" : "pending",
+          ]
+        : [
+            req.user.id,
+            total,
+            captureStatus === "COMPLETED" ? "paid" : "pending",
+          ];
+
+      const [orderResult] = await connection.query(orderInsertSql, orderInsertParams);
 
       for (const item of items) {
         await connection.query(
@@ -874,6 +959,7 @@ const capturePaypalOrder = async (req, res) => {
             orderId: orderResult.insertId,
             paypalOrderId: orderID,
             userId: req.user.id,
+            customerEmail: userRecord.email || captureData?.payer?.email_address || null,
           });
           await sendInvoiceEmail({
             orderId: orderResult.insertId,

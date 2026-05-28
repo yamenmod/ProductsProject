@@ -5,6 +5,12 @@ const {
   roundMoney,
   getVatRateFromDb,
 } = require("../utils/pricing");
+const {
+  getSizeStockTotal,
+  parseSizeStockInput,
+  serializeSizeStock,
+  normalizeSizeStockMap,
+} = require("../utils/sizeStock");
 
 // Product catalogue, image normalization, and board recommendation logic.
 
@@ -267,6 +273,11 @@ const normalizeProduct = (row, vatRate = 0.18) => {
         ? Number(row.volume)
         : null;
 
+  const normalizedSizeStock = normalizeSizeStockMap(row.size_stock);
+  const normalizedStock = normalizedSizeStock
+    ? getSizeStockTotal(normalizedSizeStock)
+    : Number(row.stock);
+
   return {
     _id: row.id,
     id: row.id,
@@ -274,11 +285,13 @@ const normalizeProduct = (row, vatRate = 0.18) => {
     description: row.description,
     price: roundMoney(row.price),
     ...calculateVatPricing(row.price, vatRate),
-    stock: Number(row.stock),
+    stock: normalizedStock,
     category_id: row.category_id,
     category: row.category || "",
     gender: normalizeGenderInput(row.gender),
     size: row.size || "",
+    sizeStock: normalizedSizeStock,
+    size_stock: normalizedSizeStock,
     image: resolveImagePayload(row.image_url).imageUrl,
     image_url: resolveImagePayload(row.image_url).imageUrl,
     image_urls: resolveImagePayload(row.image_url).imageUrls,
@@ -409,6 +422,7 @@ const createProduct = async (req, res) => {
       image,
       images,
       stock,
+      sizeStock,
       boardLength,
       height,
       boardHeight,
@@ -429,6 +443,14 @@ const createProduct = async (req, res) => {
           ? volume
           : null;
     const nextSize = isWetsuitCategory(category) ? size || null : null;
+    const nextSizeStock = isWetsuitCategory(category)
+      ? parseSizeStockInput(sizeStock)
+      : null;
+    const nextStock = isWetsuitCategory(category)
+      ? getSizeStockTotal(nextSizeStock)
+      : stock === undefined
+        ? 0
+        : Number(stock);
     const uploadedImagePaths = Array.isArray(req.files)
       ? req.files
           .filter(
@@ -465,6 +487,7 @@ const createProduct = async (req, res) => {
           gender,
           image_url,
           size,
+          size_stock,
           board_length,
           board_height,
           height,
@@ -478,11 +501,12 @@ const createProduct = async (req, res) => {
         name.trim(),
         description || "",
         calculateVatPricing(price).basePrice,
-        stock === undefined ? 0 : Number(stock),
+        nextStock,
         categoryId,
         nextGender,
         storedImageValue,
         nextSize,
+        serializeSizeStock(nextSizeStock),
         boardLength === undefined ? null : Number(boardLength),
         nextBoardHeight === undefined || nextBoardHeight === null
           ? null
@@ -511,6 +535,7 @@ const createProduct = async (req, res) => {
           p.gender,
           p.image_url,
           p.size,
+          p.size_stock,
           p.board_length,
           p.board_height,
           p.height,
@@ -564,6 +589,7 @@ const updateProduct = async (req, res) => {
       volume,
       boardVolume,
       size,
+      sizeStock,
     } = req.body;
     const nextBoardHeight =
       boardHeight !== undefined
@@ -587,6 +613,25 @@ const updateProduct = async (req, res) => {
             ? size || null
             : existingProduct.size || null
           : null;
+    const nextSizeStock =
+      category !== undefined
+        ? isWetsuitCategory(category)
+          ? sizeStock !== undefined
+            ? parseSizeStockInput(sizeStock)
+            : normalizeSizeStockMap(existingProduct.size_stock)
+          : null
+        : isWetsuitCategory(existingProduct.category)
+          ? sizeStock !== undefined
+            ? parseSizeStockInput(sizeStock)
+            : normalizeSizeStockMap(existingProduct.size_stock)
+          : null;
+    const nextStock = isWetsuitCategory(
+      category !== undefined ? category : existingProduct.category,
+    )
+      ? getSizeStockTotal(nextSizeStock)
+      : stock !== undefined
+        ? Number(stock)
+        : Number(existingProduct.stock);
     const uploadedImagePaths = Array.isArray(req.files)
       ? req.files
           .filter(
@@ -641,6 +686,7 @@ const updateProduct = async (req, res) => {
           gender = ?,
           image_url = ?,
           size = ?,
+          size_stock = ?,
           board_length = ?,
           board_height = ?,
           height = ?,
@@ -653,11 +699,12 @@ const updateProduct = async (req, res) => {
         nextName,
         description !== undefined ? description : existingProduct.description,
         nextPrice,
-        stock !== undefined ? Number(stock) : Number(existingProduct.stock),
+        nextStock,
         nextCategoryId,
         nextGender,
         storedImageValue,
         nextSize,
+        serializeSizeStock(nextSizeStock),
         boardLength !== undefined
           ? Number(boardLength)
           : existingProduct.board_length,
@@ -689,6 +736,7 @@ const updateProduct = async (req, res) => {
           p.gender,
           p.image_url,
           p.size,
+          p.size_stock,
           p.board_length,
           p.board_height,
           p.height,

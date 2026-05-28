@@ -56,7 +56,7 @@ const sendInvoiceEmail = async (order) => {
 
   const [orderRows] = await db.query(
     `
-      SELECT o.id, o.total, o.status, o.created_at, u.username, u.email
+      SELECT o.id, o.total, o.status, o.created_at, o.customer_email, u.username, u.email
       FROM orders o
       JOIN users u ON u.id = o.user_id
       WHERE o.id = ? AND o.user_id = ?
@@ -77,14 +77,36 @@ const sendInvoiceEmail = async (order) => {
     throw new Error("Order not found for invoice email");
   }
 
+  const customerEmail = (
+    orderRecord.customer_email ||
+    orderRecord.email ||
+    process.env.EMAIL_USER ||
+    ""
+  ).trim();
+
   console.log("[invoice] fetching customer email", {
     orderId,
     userId,
-    email: orderRecord.email || null,
+    email: customerEmail || null,
   });
 
-  if (!orderRecord.email) {
+  if (!customerEmail) {
     throw new Error("Customer email not found for invoice email");
+  }
+
+  try {
+    await transporter.verify();
+    console.log("[invoice] SMTP transporter verified", {
+      host: process.env.EMAIL_HOST || "smtp.gmail.com",
+      port: Number(process.env.EMAIL_PORT || 587),
+      to: customerEmail,
+    });
+  } catch (verifyError) {
+    console.error("[invoice] SMTP verification failed", {
+      error: verifyError.message,
+      stack: verifyError.stack,
+    });
+    throw verifyError;
   }
 
   const [itemRows] = await db.query(
@@ -139,7 +161,7 @@ const sendInvoiceEmail = async (order) => {
   try {
     const info = await transporter.sendMail({
       from: getFromAddress(),
-      to: orderRecord.email,
+      to: customerEmail,
       subject: `Invoice for order #${orderRecord.id} | Plage Surf`,
       html,
       text: [
@@ -153,7 +175,7 @@ const sendInvoiceEmail = async (order) => {
 
     console.log("[invoice] email sent successfully", {
       orderId,
-      to: orderRecord.email,
+      to: customerEmail,
       messageId: info.messageId,
     });
 
@@ -164,7 +186,7 @@ const sendInvoiceEmail = async (order) => {
   } catch (emailError) {
     console.error("[invoice] email send failed", {
       orderId,
-      to: orderRecord.email,
+      to: customerEmail,
       error: emailError.message,
       stack: emailError.stack,
     });

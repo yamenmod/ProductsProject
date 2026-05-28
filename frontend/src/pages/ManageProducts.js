@@ -24,6 +24,7 @@ function ManageProducts({
     image: "",
     image_urls: [],
     stock: "",
+    sizeStock: "",
     boardHeight: "",
     boardVolume: "",
   });
@@ -61,6 +62,24 @@ function ManageProducts({
   }
 
   const sizeOptions = ["XS", "S", "M", "L", "XL"];
+
+  const formatSizeStock = (value) => {
+    if (!value) {
+      return "";
+    }
+
+    if (typeof value === "string") {
+      return value;
+    }
+
+    if (typeof value === "object") {
+      return Object.entries(value)
+        .map(([size, stock]) => `${size}:${stock}`)
+        .join(", ");
+    }
+
+    return "";
+  };
 
   const isWetsuitCategory = (value) =>
     (value || "").toString().trim().toLowerCase().includes("wetsuit");
@@ -205,6 +224,7 @@ function ManageProducts({
       image: "",
       image_urls: [],
       stock: "",
+      sizeStock: "",
       boardHeight: "",
       boardVolume: "",
     });
@@ -244,6 +264,11 @@ function ManageProducts({
       }
     }
 
+    if (isWetsuitCategory(form.category) && !form.sizeStock.trim()) {
+      setError("Add size stock for wetsuits, for example XS:4, S:6, M:3.");
+      return;
+    }
+
     const payload = new FormData();
     payload.append("name", form.name.trim());
     payload.append("description", form.description.trim());
@@ -254,6 +279,10 @@ function ManageProducts({
 
     if (isWetsuitCategory(form.category) && form.size) {
       payload.append("size", form.size);
+    }
+
+    if (isWetsuitCategory(form.category)) {
+      payload.append("sizeStock", form.sizeStock.trim());
     }
 
     // Add surfboard-specific fields if category is Surfboard
@@ -335,6 +364,7 @@ function ManageProducts({
       image: product.image || "",
       image_urls: uniqueExistingImages,
       stock: product.stock ?? 0,
+      sizeStock: formatSizeStock(product.sizeStock || product.size_stock || ""),
       boardHeight: product.boardHeight ?? product.height ?? "",
       boardVolume: product.boardVolume ?? product.volume ?? "",
     });
@@ -808,6 +838,7 @@ function ManageProducts({
                     min="0"
                     placeholder="Stock"
                     value={form.stock}
+                    disabled={isWetsuitCategory(form.category)}
                     onChange={(e) =>
                       setForm({ ...form, stock: e.target.value })
                     }
@@ -819,6 +850,7 @@ function ManageProducts({
                       fontFamily: "inherit",
                       transition: "all 0.2s ease",
                       background: "#fffdf8",
+                      opacity: isWetsuitCategory(form.category) ? 0.7 : 1,
                     }}
                     onFocus={(e) => {
                       e.target.style.borderColor = "#245860";
@@ -830,6 +862,51 @@ function ManageProducts({
                       e.target.style.boxShadow = "none";
                     }}
                   />
+
+                  {isWetsuitCategory(form.category) && (
+                    <div
+                      style={{
+                        gridColumn: "1 / -1",
+                        marginTop: "-6px",
+                        color: "#65574d",
+                        fontSize: "12px",
+                        fontWeight: 600,
+                      }}
+                    >
+                      Stock is derived from the size stock field below.
+                    </div>
+                  )}
+
+                  {isWetsuitCategory(form.category) && (
+                    <textarea
+                      placeholder="Size stock (e.g. XS:4, S:6, M:3, L:2, XL:1)"
+                      value={form.sizeStock}
+                      onChange={(e) =>
+                        setForm({ ...form, sizeStock: e.target.value })
+                      }
+                      style={{
+                        padding: "10px 12px",
+                        border: "1px solid #d9c3ad",
+                        borderRadius: "8px",
+                        fontSize: "14px",
+                        fontFamily: "inherit",
+                        transition: "all 0.2s ease",
+                        background: "#fffdf8",
+                        width: "100%",
+                        minHeight: "72px",
+                        gridColumn: "1 / -1",
+                      }}
+                      onFocus={(e) => {
+                        e.target.style.borderColor = "#245860";
+                        e.target.style.boxShadow =
+                          "0 0 0 3px rgba(36, 88, 96, 0.12)";
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.borderColor = "#d9c3ad";
+                        e.target.style.boxShadow = "none";
+                      }}
+                    />
+                  )}
 
                   {isWetsuitCategory(form.category) && (
                     <select
