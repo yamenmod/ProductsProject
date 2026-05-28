@@ -123,6 +123,29 @@ function App() {
     try {
       const params = new URLSearchParams(window.location.search);
       const token = params.get("token");
+      const isPaypalCancel = params.has("paypalCancel");
+      const paypalSuccess = params.has("paypalSuccess");
+      const paypalUnsuccessful = params.has("paypalUnsuccessful");
+      const returnedOrderId = params.get("orderId");
+
+      if (paypalSuccess) {
+        setPaymentSuccess({
+          title: "Thank you for ordering from Plage Surf",
+          message:
+            "Your payment has been captured successfully. Your order is being prepared now.",
+          orderId: returnedOrderId || "-",
+        });
+      }
+
+      if (paypalUnsuccessful) {
+        setPaymentSuccess({
+          title: "Payment could not be completed",
+          message:
+            "Your PayPal checkout was not completed. The order was marked as unsuccessful.",
+          orderId: returnedOrderId || token || "-",
+        });
+      }
+
       if (token) {
         // If user is signed in, attempt capture immediately
         const sessionStr = localStorage.getItem("session");
@@ -132,27 +155,42 @@ function App() {
         } else {
           (async () => {
             try {
-              const resp = await axios.post(
-                "/api/cart/paypal/capture",
-                { orderID: token },
-                { headers: { Authorization: `Bearer ${saved.token}` } },
-              );
+              if (isPaypalCancel) {
+                await axios.post(
+                  "/api/cart/paypal/cancel",
+                  { orderID: token },
+                  { headers: { Authorization: `Bearer ${saved.token}` } },
+                );
 
-              setPaymentSuccess({
-                title: "Thank you for ordering from Plage Surf",
-                message:
-                  "Your payment has been captured successfully. Your order is being prepared now.",
-                orderId: resp.data?.order?.id || token,
-              });
-              // refresh cart items after capture
-              const refreshed = await axios.get("/api/cart", {
-                headers: { Authorization: `Bearer ${saved.token}` },
-              });
-              setCartItems(normalizeCartItems(refreshed.data));
+                setPaymentSuccess({
+                  title: "Checkout cancelled",
+                  message:
+                    "You cancelled PayPal checkout before payment was completed.",
+                  orderId: token,
+                });
+              } else {
+                const resp = await axios.post(
+                  "/api/cart/paypal/capture",
+                  { orderID: token },
+                  { headers: { Authorization: `Bearer ${saved.token}` } },
+                );
+
+                setPaymentSuccess({
+                  title: "Thank you for ordering from Plage Surf",
+                  message:
+                    "Your payment has been captured successfully. Your order is being prepared now.",
+                  orderId: resp.data?.order?.id || token,
+                });
+                // refresh cart items after capture
+                const refreshed = await axios.get("/api/cart", {
+                  headers: { Authorization: `Bearer ${saved.token}` },
+                });
+                setCartItems(normalizeCartItems(refreshed.data));
+              }
             } catch (err) {
-              console.error("PayPal capture failed:", err?.response || err);
+              console.error("PayPal return handling error:", err?.response || err);
               setPaymentSuccess({
-                title: "Payment could not be completed",
+                title: isPaypalCancel ? "Checkout cancelled" : "Payment could not be completed",
                 message:
                   err?.response?.data?.message ||
                   "Please try again or contact support if the issue continues.",
@@ -161,8 +199,9 @@ function App() {
             }
           })();
         }
+      }
 
-        // Clean URL
+      if (token || isPaypalCancel || paypalSuccess || paypalUnsuccessful) {
         window.history.replaceState(null, "", window.location.pathname);
       }
     } catch (e) {
@@ -222,7 +261,7 @@ function App() {
     } else {
       setSelectedProductToEdit(null);
     }
-
+ ////////
     if (
       isAdmin &&
       ["home", "shop", "size-charts", "contact", "products", "cart"].includes(

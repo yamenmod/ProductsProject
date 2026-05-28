@@ -21,21 +21,34 @@ const PAYPAL_BASE_URL = (
   process.env.PAYPAL_BASE_URL || "https://api-m.sandbox.paypal.com"
 ).trim();
 const PAYPAL_CURRENCY = (process.env.PAYPAL_CURRENCY || "USD").trim();
+const BACKEND_BASE_URL = (
+  process.env.BACKEND_BASE_URL || "http://localhost:5000"
+).trim();
 const FRONTEND_BASE_URL = (
   process.env.FRONTEND_BASE_URL || "http://localhost:3000"
 ).trim();
 
 const ORDER_STATUS = {
-  PENDING: "PENDING",
-  SUCCESS: "SUCCESS",
-  UNSUCCESSFUL: "UNSUCCESSFUL",
-  CANCELLED: "CANCELLED",
+  PENDING: "pending",
+  SUCCESS: "success",
+  UNSUCCESSFUL: "unsuccessful",
 };
 
 const normalizeOrderStatusFromCapture = (captureStatus) => {
   return String(captureStatus || "").toUpperCase() === "COMPLETED"
     ? ORDER_STATUS.SUCCESS
     : ORDER_STATUS.UNSUCCESSFUL;
+};
+
+const isPayerNotApprovedError = (error) => {
+  const description = String(
+    error?.response?.data?.details?.[0]?.description ||
+      error?.response?.data?.message ||
+      error?.message ||
+      "",
+  ).toLowerCase();
+
+  return description.includes("payer has not yet approved the order for payment");
 };
 
 const logPayPalFlow = (step, details = {}) => {
@@ -453,7 +466,7 @@ const addToCart = async (req, res) => {
 
     return res.status(200).json(mapCartRows(rows, vatRate));
   } catch (error) {
-    console.error(`[cart:add] failed: ${error.message}`);
+    console.error(`[cart:add] error: ${error.message}`);
     return res.status(500).json({ message: "Server error" });
   }
 };
@@ -802,8 +815,8 @@ const createPaypalOrder = async (req, res) => {
           },
         ],
         application_context: {
-          return_url: `${FRONTEND_BASE_URL}/?paypalReturn=1`,
-          cancel_url: `${FRONTEND_BASE_URL}/?paypalCancel=1`,
+          return_url: `${BACKEND_BASE_URL}/api/cart/paypal/success`,
+          cancel_url: `${BACKEND_BASE_URL}/api/cart/paypal/cancel`,
         },
       },
       {
@@ -815,7 +828,7 @@ const createPaypalOrder = async (req, res) => {
     );
 
     if (!response.data || !response.data.id) {
-      return res.status(500).json({ message: "PayPal order creation failed" });
+      return res.status(500).json({ message: "PayPal order creation error" });
     }
 
     const userRecord = users[0];
@@ -864,6 +877,19 @@ const createPaypalOrder = async (req, res) => {
       await connection.commit();
       connection.release();
 
+      logPayPalFlow("order-created", {
+        userId: req.user?.id || null,
+        orderId: orderResult.insertId,
+        paypalOrderId,
+        status: ORDER_STATUS.PENDING,
+      });
+
+      logPayPalFlow("user-redirected-to-paypal", {
+        userId: req.user?.id || null,
+        orderId: orderResult.insertId,
+        paypalOrderId,
+      });
+
       logPayPalFlow("final-status-assigned", {
         userId: req.user?.id || null,
         orderId: orderResult.insertId,
@@ -881,7 +907,7 @@ const createPaypalOrder = async (req, res) => {
     } catch (transactionError) {
       await connection.rollback();
       connection.release();
-      console.error("[paypal:create-order] transaction failed", {
+      console.error("[paypal:create-order] transaction error", {
         userId: req.user?.id || null,
         error: transactionError.message,
       });
@@ -909,7 +935,7 @@ const capturePaypalOrder = async (req, res) => {
       return res.status(400).json({ message: "PayPal order ID is required" });
     }
 
-    logPayPalFlow("paypal-approved", {
+    logPayPalFlow("paypal-approval-success", {
       orderId: orderID,
       userId: req.user?.id,
     });
@@ -1074,6 +1100,13 @@ const capturePaypalOrder = async (req, res) => {
       await connection.commit();
       connection.release();
 
+      logPayPalFlow("capture-success", {
+        orderId,
+        paypalOrderId: orderID,
+        userId: req.user?.id,
+        captureStatus,
+      });
+
       logPayPalFlow("final-status-assigned", {
         orderId,
         paypalOrderId: orderID,
@@ -1101,7 +1134,7 @@ const capturePaypalOrder = async (req, res) => {
           });
         } catch (invoiceError) {
           console.error(
-            "[paypal:invoice] email send failed",
+            "[paypal:invoice] email send error",
             invoiceError.message || invoiceError,
           );
         }
@@ -1125,7 +1158,7 @@ const capturePaypalOrder = async (req, res) => {
       await connection.rollback();
       connection.release();
       console.error(
-        "[paypal:capture] transaction failed",
+        "[paypal:capture] transaction error",
         transactionError.message,
       );
       return res
@@ -1135,15 +1168,28 @@ const capturePaypalOrder = async (req, res) => {
   } catch (error) {
     console.error("[paypal:capture]", error.message || error);
 
+    const finalUnsuccessfulStatus = ORDER_STATUS.UNSUCCESSFUL;
+
+    logPayPalFlow("capture-unsuccessful", {
+      paypalOrderId: req.body?.orderID || null,
+      userId: req.user?.id || null,
+      reason:
+        error?.response?.data?.details?.[0]?.description ||
+        error?.response?.data?.message ||
+        error.message ||
+        "capture-error",
+      finalStatus: finalUnsuccessfulStatus,
+    });
+
     if (req.body?.orderID && req.user?.id) {
       try {
         await db.query(
           "UPDATE payments SET status = ?, raw_response = ? WHERE paypal_order_id = ? AND user_id = ?",
           [
-            ORDER_STATUS.UNSUCCESSFUL,
+            finalUnsuccessfulStatus,
             JSON.stringify({
-              error: error?.response?.data || error.message || "Capture failed",
-              failedAt: new Date().toISOString(),
+              error: error?.response?.data || error.message || "Capture unsuccessful",
+              markedAt: new Date().toISOString(),
             }),
             req.body.orderID,
             req.user.id,
@@ -1156,18 +1202,18 @@ const capturePaypalOrder = async (req, res) => {
             SET o.status = ?
             WHERE p.paypal_order_id = ? AND p.user_id = ?
           `,
-          [ORDER_STATUS.UNSUCCESSFUL, req.body.orderID, req.user.id],
+          [finalUnsuccessfulStatus, req.body.orderID, req.user.id],
         );
 
         logPayPalFlow("final-status-assigned", {
           orderId: null,
           paypalOrderId: req.body.orderID,
           userId: req.user.id,
-          finalStatus: ORDER_STATUS.UNSUCCESSFUL,
+          finalStatus: finalUnsuccessfulStatus,
           reason: "capture-error",
         });
       } catch (statusUpdateError) {
-        console.error("[paypal:capture] failed to mark unsuccessful", {
+        console.error("[paypal:capture] unable to mark unsuccessful", {
           orderId: req.body.orderID,
           userId: req.user.id,
           error: statusUpdateError.message,
@@ -1184,6 +1230,156 @@ const capturePaypalOrder = async (req, res) => {
   }
 };
 
+const markPaypalOrderAsUnsuccessful = async ({ orderID, userId = null, reason = "paypal-cancel" }) => {
+  if (!orderID) {
+    return { updated: false, orderId: null };
+  }
+
+  let whereClause = "p.paypal_order_id = ?";
+  const whereParams = [orderID];
+  if (userId) {
+    whereClause += " AND p.user_id = ?";
+    whereParams.push(userId);
+  }
+
+  const rawResponse = JSON.stringify({ reason, markedAt: new Date().toISOString() });
+
+  const [result] = await db.query(
+    `
+      UPDATE orders o
+      JOIN payments p ON p.order_id = o.id
+      SET
+        o.status = CASE WHEN o.status = ? THEN o.status ELSE ? END,
+        p.status = CASE WHEN p.status = ? THEN p.status ELSE ? END,
+        p.raw_response = ?
+      WHERE ${whereClause}
+    `,
+    [
+      ORDER_STATUS.SUCCESS,
+      ORDER_STATUS.UNSUCCESSFUL,
+      ORDER_STATUS.SUCCESS,
+      ORDER_STATUS.UNSUCCESSFUL,
+      rawResponse,
+      ...whereParams,
+    ],
+  );
+
+  const [paymentRows] = await db.query(
+    `
+      SELECT order_id
+      FROM payments
+      WHERE paypal_order_id = ?
+      ${userId ? "AND user_id = ?" : ""}
+      ORDER BY id DESC
+      LIMIT 1
+    `,
+    userId ? [orderID, userId] : [orderID],
+  );
+
+  return {
+    updated: Number(result?.affectedRows || 0) > 0,
+    orderId: paymentRows[0]?.order_id || null,
+  };
+};
+
+const handlePaypalSuccessReturn = async (req, res) => {
+  const orderID = (req.query.token || req.query.orderID || "").toString().trim();
+
+  if (!orderID) {
+    return res.redirect(`${FRONTEND_BASE_URL}/?paypalUnsuccessful=1&reason=missingToken`);
+  }
+
+  try {
+    const [paymentRows] = await db.query(
+      `
+        SELECT user_id
+        FROM payments
+        WHERE paypal_order_id = ?
+        ORDER BY id DESC
+        LIMIT 1
+      `,
+      [orderID],
+    );
+
+    if (!paymentRows.length) {
+      logPayPalFlow("capture-unsuccessful", {
+        paypalOrderId: orderID,
+        reason: "payment-row-not-found",
+      });
+      return res.redirect(`${FRONTEND_BASE_URL}/?paypalUnsuccessful=1&token=${encodeURIComponent(orderID)}`);
+    }
+
+    const userId = Number(paymentRows[0].user_id);
+
+    const fakeReq = {
+      body: { orderID },
+      user: { id: userId },
+    };
+
+    const fakeRes = {
+      statusCode: 200,
+      payload: null,
+      status(code) {
+        this.statusCode = code;
+        return this;
+      },
+      json(data) {
+        this.payload = data;
+        return this;
+      },
+    };
+
+    await capturePaypalOrder(fakeReq, fakeRes);
+
+    if (fakeRes.statusCode >= 400) {
+      return res.redirect(`${FRONTEND_BASE_URL}/?paypalUnsuccessful=1&token=${encodeURIComponent(orderID)}`);
+    }
+
+    const resolvedOrderId = fakeRes.payload?.order?.id || "";
+    return res.redirect(
+      `${FRONTEND_BASE_URL}/?paypalSuccess=1&orderId=${encodeURIComponent(resolvedOrderId || orderID)}`,
+    );
+  } catch (error) {
+    console.error("[paypal:success-return]", error.message || error);
+    return res.redirect(`${FRONTEND_BASE_URL}/?paypalUnsuccessful=1&token=${encodeURIComponent(orderID)}`);
+  }
+};
+
+const handlePaypalCancelReturn = async (req, res) => {
+  const orderID = (req.query.token || req.query.orderID || "").toString().trim();
+
+  if (!orderID) {
+    return res.redirect(`${FRONTEND_BASE_URL}/?paypalUnsuccessful=1&reason=missingToken`);
+  }
+
+  try {
+    logPayPalFlow("user-cancelled-paypal", {
+      paypalOrderId: orderID,
+      source: "paypal-cancel-return",
+    });
+
+    const update = await markPaypalOrderAsUnsuccessful({
+      orderID,
+      reason: "paypal-cancel-return",
+    });
+
+    if (update.updated) {
+      logPayPalFlow("final-status-assigned", {
+        paypalOrderId: orderID,
+        orderId: update.orderId,
+        finalStatus: ORDER_STATUS.UNSUCCESSFUL,
+      });
+    }
+
+    return res.redirect(
+      `${FRONTEND_BASE_URL}/?paypalUnsuccessful=1&orderId=${encodeURIComponent(update.orderId || orderID)}`,
+    );
+  } catch (error) {
+    console.error("[paypal:cancel-return]", error.message || error);
+    return res.redirect(`${FRONTEND_BASE_URL}/?paypalUnsuccessful=1&token=${encodeURIComponent(orderID)}`);
+  }
+};
+
 const cancelPaypalOrder = async (req, res) => {
   try {
     const { orderID } = req.body;
@@ -1192,22 +1388,18 @@ const cancelPaypalOrder = async (req, res) => {
       return res.status(400).json({ message: "PayPal order ID is required" });
     }
 
-    logPayPalFlow("checkout-cancelled", {
+    logPayPalFlow("user-cancelled-paypal", {
       paypalOrderId: orderID,
       userId: req.user?.id || null,
     });
 
-    const [result] = await db.query(
-      `
-        UPDATE orders o
-        JOIN payments p ON p.order_id = o.id
-        SET o.status = ?, p.status = ?
-        WHERE p.paypal_order_id = ? AND p.user_id = ?
-      `,
-      [ORDER_STATUS.CANCELLED, ORDER_STATUS.CANCELLED, orderID, req.user.id],
-    );
+    const update = await markPaypalOrderAsUnsuccessful({
+      orderID,
+      userId: req.user.id,
+      reason: "frontend-cancel",
+    });
 
-    if (!result.affectedRows) {
+    if (!update.updated) {
       return res.status(404).json({
         message: "Pending PayPal order not found for cancellation",
       });
@@ -1216,17 +1408,18 @@ const cancelPaypalOrder = async (req, res) => {
     logPayPalFlow("final-status-assigned", {
       paypalOrderId: orderID,
       userId: req.user?.id || null,
-      finalStatus: ORDER_STATUS.CANCELLED,
+      orderId: update.orderId,
+      finalStatus: ORDER_STATUS.UNSUCCESSFUL,
     });
 
     return res.status(200).json({
-      message: "PayPal order marked as cancelled",
-      status: ORDER_STATUS.CANCELLED,
+      message: "PayPal order marked as unsuccessful",
+      status: ORDER_STATUS.UNSUCCESSFUL,
     });
   } catch (error) {
     console.error("[paypal:cancel]", error.message || error);
     return res.status(500).json({
-      message: "Unable to mark PayPal order as cancelled",
+      message: "Unable to mark PayPal order as unsuccessful",
     });
   }
 };
@@ -1382,6 +1575,8 @@ module.exports = {
   createPaypalConfig,
   createPaypalOrder,
   capturePaypalOrder,
+  handlePaypalSuccessReturn,
+  handlePaypalCancelReturn,
   cancelPaypalOrder,
   getAdminOrders,
   getOrderItems,

@@ -53,7 +53,7 @@ function ManageOrders({
     const status = normalizeStatus(order?.status);
 
     if (["paid", "success", "successful", "completed"].includes(status)) {
-      return "successful";
+      return "success";
     }
 
     if (["pending", "processing", "awaiting_payment", "open", "draft"].includes(status)) {
@@ -77,7 +77,7 @@ function ManageOrders({
 
         setOrders(Array.isArray(response.data) ? response.data : []);
       } catch (requestError) {
-        setError(requestError.response?.data?.message || "Failed to load orders");
+        setError(requestError.response?.data?.message || "Unable to load orders");
       } finally {
         setLoading(false);
       }
@@ -98,7 +98,7 @@ function ManageOrders({
 
       setSelectedOrderDetail(response.data);
     } catch (requestError) {
-      console.error("Failed to load order details:", requestError);
+      console.error("Unable to load order details:", requestError);
       setSelectedOrderDetail(null);
     } finally {
       setLoadingOrderDetail(false);
@@ -142,7 +142,7 @@ function ManageOrders({
   }, [orders, searchTerm, selectedFilter, getOrderBucket, dateFrom, dateTo]);
 
   const summary = useMemo(() => {
-    const counts = { successful: 0, unsuccessful: 0, pending: 0 };
+    const counts = { success: 0, unsuccessful: 0, pending: 0 };
 
     orders.forEach((order) => {
       counts[getOrderBucket(order)] += 1;
@@ -152,7 +152,7 @@ function ManageOrders({
   }, [orders, getOrderBucket]);
 
   const statusTone = (bucket) => {
-    if (bucket === "successful") {
+    if (bucket === "success") {
       return { background: "rgba(36, 88, 96, 0.12)", color: "#245860" };
     }
 
@@ -185,7 +185,7 @@ function ManageOrders({
 
     const activeBackground = {
       all: "linear-gradient(135deg,#245860,#2f747d)",
-      successful: "linear-gradient(135deg,#16515e,#1f5d74)",
+      success: "linear-gradient(135deg,#16515e,#1f5d74)",
       unsuccessful: "linear-gradient(135deg,#7b2f27,#a83f34)",
       pending: "linear-gradient(135deg,#4b5b6b,#1f2937)",
     };
@@ -217,7 +217,7 @@ function ManageOrders({
     }
 
     const selectedBackground = {
-      successful: "linear-gradient(135deg,#16515e,#1f5d74)",
+      success: "linear-gradient(135deg,#16515e,#1f5d74)",
       unsuccessful: "linear-gradient(135deg,#7b2f27,#a83f34)",
       pending: "linear-gradient(135deg,#4b5b6b,#1f2937)",
     };
@@ -272,7 +272,7 @@ function ManageOrders({
           <div style={{ marginBottom: "24px" }}>
             <h1 className="ps-title" style={{ marginBottom: "8px", fontSize: "clamp(24px, 3vw, 34px)" }}>Manage orders</h1>
             <p className="ps-lead" style={{ maxWidth: "760px" }}>
-              Review every checkout and quickly spot whether the payment ended up successful, unsuccessful, or still pending.
+              Review every checkout and quickly spot whether the payment ended up success, unsuccessful, or still pending.
             </p>
           </div>
 
@@ -324,7 +324,7 @@ function ManageOrders({
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "16px", marginBottom: "24px" }}>
             {[
-              { label: "Successful", value: summary.successful, bucket: "successful" },
+              { label: "Success", value: summary.success, bucket: "success" },
               { label: "Unsuccessful", value: summary.unsuccessful, bucket: "unsuccessful" },
               { label: "Pending", value: summary.pending, bucket: "pending" },
             ].map((item) => (
@@ -364,7 +364,7 @@ function ManageOrders({
 
             {[
               { key: "all", label: "All" },
-              { key: "successful", label: "Successful" },
+              { key: "success", label: "Success" },
               { key: "unsuccessful", label: "Unsuccessful" },
               { key: "pending", label: "Pending" },
             ].map((item) => (

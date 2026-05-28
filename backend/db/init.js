@@ -167,7 +167,7 @@ const initDatabase = async () => {
       user_id INT NOT NULL,
       total DECIMAL(10, 2) NOT NULL DEFAULT 0,
       customer_email VARCHAR(255) NULL DEFAULT NULL,
-      status VARCHAR(50) NOT NULL DEFAULT 'paid',
+      status VARCHAR(50) NOT NULL DEFAULT 'pending',
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     )
@@ -191,6 +191,20 @@ const initDatabase = async () => {
     }
 
     await db.query(`
+      ALTER TABLE orders
+      MODIFY COLUMN status VARCHAR(50) NOT NULL DEFAULT 'pending'
+    `);
+
+    await db.query(`
+      UPDATE orders
+      SET status = CASE
+        WHEN LOWER(TRIM(status)) IN ('paid', 'completed', 'success', 'successful') THEN 'success'
+        WHEN LOWER(TRIM(status)) IN ('pending', 'processing', 'awaiting_payment', 'open', 'draft') THEN 'pending'
+        ELSE 'unsuccessful'
+      END
+    `);
+
+    await db.query(`
     CREATE TABLE IF NOT EXISTS order_items (
       id INT AUTO_INCREMENT PRIMARY KEY,
       order_id INT NOT NULL,
@@ -202,6 +216,15 @@ const initDatabase = async () => {
       FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE RESTRICT
     )
   `);
+
+    await db.query(`
+      UPDATE payments
+      SET status = CASE
+        WHEN LOWER(TRIM(status)) IN ('paid', 'completed', 'success', 'successful') THEN 'success'
+        WHEN LOWER(TRIM(status)) IN ('pending', 'processing', 'awaiting_payment', 'open', 'draft') THEN 'pending'
+        ELSE 'unsuccessful'
+      END
+    `);
 
     await db.query(`
     CREATE TABLE IF NOT EXISTS payments (

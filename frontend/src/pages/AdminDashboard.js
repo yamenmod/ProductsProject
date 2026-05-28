@@ -39,6 +39,10 @@ function AdminDashboard({
   const [dateTo, setDateTo] = useState(getTodayInputValue);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [vatRatePercent, setVatRatePercent] = useState(18);
+  const [vatInput, setVatInput] = useState("18");
+  const [vatMessage, setVatMessage] = useState("");
+  const [savingVat, setSavingVat] = useState(false);
 
   const normalizeStatus = (value) => (value || "").toString().trim().toLowerCase();
 
@@ -46,7 +50,7 @@ function AdminDashboard({
     const status = normalizeStatus(order?.status);
 
     if (["paid", "success", "successful", "completed"].includes(status)) {
-      return "successful";
+      return "success";
     }
 
     if (["pending", "processing", "awaiting_payment", "open", "draft"].includes(status)) {
@@ -80,21 +84,25 @@ function AdminDashboard({
   }, [orders, dateFrom, dateTo]);
 
   const filteredSummary = useMemo(() => {
-    const summary = { successful: 0, unsuccessful: 0, pending: 0 };
+    const summary = { success: 0, unsuccessful: 0, pending: 0 };
 
     filteredOrders.forEach((order) => {
       summary[getOrderBucket(order)] += 1;
     });
 
-    return { successful: summary.successful, unsuccessful: summary.unsuccessful, pending: summary.pending };
+    return {
+      success: summary.success,
+      unsuccessful: summary.unsuccessful,
+      pending: summary.pending,
+    };
   }, [filteredOrders]);
 
   const statusChartData = useMemo(
     () => [
       {
-        key: "successful",
+        key: "success",
         label: "Successful",
-        value: filteredSummary.successful,
+        value: filteredSummary.success,
         color: "#79b64a",
       },
       {
@@ -177,6 +185,61 @@ function AdminDashboard({
     loadStats();
   }, [session?.token]);
 
+  useEffect(() => {
+    const loadVat = async () => {
+      if (!session?.token) {
+        return;
+      }
+
+      try {
+        const response = await axios.get("/api/admin/settings/vat_rate", {
+          headers: { Authorization: `Bearer ${session.token}` },
+        });
+
+        const storedDecimal = Number(response.data?.value || 0.18);
+        const percent = Math.round(storedDecimal * 100);
+        setVatRatePercent(percent);
+        setVatInput(String(percent));
+      } catch (vatError) {
+        console.error("Unable to load VAT rate:", vatError.message);
+      }
+    };
+
+    loadVat();
+  }, [session?.token]);
+
+  const saveVatRate = async () => {
+    const parsedPercent = Number(vatInput);
+
+    if (!Number.isFinite(parsedPercent) || parsedPercent < 1 || parsedPercent > 99) {
+      setVatMessage("VAT must be between 1% and 99%.");
+      return;
+    }
+
+    try {
+      setSavingVat(true);
+      setVatMessage("");
+
+      const response = await axios.put(
+        "/api/admin/settings/vat_rate",
+        { value: parsedPercent },
+        {
+          headers: { Authorization: `Bearer ${session.token}` },
+        },
+      );
+
+      const storedDecimal = Number(response.data?.value || parsedPercent / 100);
+      const savedPercent = Math.round(storedDecimal * 100);
+      setVatRatePercent(savedPercent);
+      setVatInput(String(savedPercent));
+      setVatMessage(`VAT updated to ${savedPercent}%.`);
+    } catch (saveError) {
+      setVatMessage(saveError.response?.data?.error || "Unable to update VAT.");
+    } finally {
+      setSavingVat(false);
+    }
+  };
+
   const openOrders = (filter) => {
     if (typeof onOpenOrders === "function") {
       onOpenOrders(filter);
@@ -191,7 +254,7 @@ function AdminDashboard({
   };
 
   const cards = [
-    { key: "successful", label: "Successful", value: filteredSummary.successful, tone: "success", filter: "successful" },
+    { key: "success", label: "Successful", value: filteredSummary.success, tone: "success", filter: "success" },
     { key: "unsuccessful", label: "Unsuccessful", value: filteredSummary.unsuccessful, tone: "danger", filter: "unsuccessful" },
     { key: "pending", label: "Pending", value: filteredSummary.pending, tone: "muted", filter: "pending" },
   ];
@@ -286,6 +349,33 @@ function AdminDashboard({
             >
               Clear range
             </button>
+            <div style={{ minWidth: "220px", flex: "1 1 220px" }}>
+              <div style={{ color: "#65574d", fontSize: "12px", fontWeight: 800, letterSpacing: "1px", textTransform: "uppercase", marginBottom: "6px" }}>
+                VAT (%)
+              </div>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <input
+                  type="number"
+                  min="1"
+                  max="99"
+                  value={vatInput}
+                  onChange={(event) => setVatInput(event.target.value)}
+                  style={{ width: "100%", padding: "11px 12px", borderRadius: "12px", border: "1px solid rgba(31, 24, 19, 0.14)", background: "rgba(255, 250, 242, 0.95)", fontSize: "13px" }}
+                />
+                <button
+                  type="button"
+                  className="ps-btn ps-btn-primary"
+                  onClick={saveVatRate}
+                  disabled={savingVat}
+                  style={{ height: "44px", minWidth: "88px" }}
+                >
+                  {savingVat ? "Saving" : "Save"}
+                </button>
+              </div>
+              <div style={{ fontSize: "12px", color: vatMessage ? (vatMessage.includes("updated") ? "#245860" : "#a83f34") : "#65574d", marginTop: "6px" }}>
+                {vatMessage || `Current VAT: ${vatRatePercent}%`}
+              </div>
+            </div>
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px", marginBottom: "24px" }}>

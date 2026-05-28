@@ -10,6 +10,9 @@ const {
   createPaypalConfig,
   createPaypalOrder,
   capturePaypalOrder,
+  handlePaypalSuccessReturn,
+  handlePaypalCancelReturn,
+  cancelPaypalOrder,
   getOrderItems,
 } = require("../controllers/cartController");
 const authMiddleware = require("../middleware/authMiddleware");
@@ -25,9 +28,12 @@ router.delete("/:productId", authMiddleware, removeFromCart);
 router.patch("/:productId", authMiddleware, updateCartQuantity);
 router.post("/checkout", authMiddleware, checkout);
 router.post("/quick", authMiddleware, quickCheckout);
+router.get("/paypal/success", handlePaypalSuccessReturn);
+router.get("/paypal/cancel", handlePaypalCancelReturn);
 router.get("/paypal/config", authMiddleware, createPaypalConfig);
 router.post("/paypal/create-order", authMiddleware, createPaypalOrder);
 router.post("/paypal/capture", authMiddleware, capturePaypalOrder);
+router.post("/paypal/cancel", authMiddleware, cancelPaypalOrder);
 
 // Admin-only order listing used by the Manage orders page.
 // The admin middleware blocks everyone except users with the admin role.

@@ -58,9 +58,24 @@ const updateSetting = async (req, res) => {
     // Validate VAT rate if updating it
     if (key === "vat_rate") {
       const numValue = parseFloat(value);
-      if (isNaN(numValue) || numValue < 0 || numValue > 1) {
-        return res.status(400).json({ error: "VAT rate must be a number between 0 and 1" });
+      if (isNaN(numValue)) {
+        return res.status(400).json({ error: "VAT rate must be a valid number" });
       }
+
+      // Accept either decimal (0.01-0.99) or percentage (1-99).
+      const normalizedRate = numValue > 1 ? numValue / 100 : numValue;
+
+      if (normalizedRate < 0.01 || normalizedRate > 0.99) {
+        return res.status(400).json({ error: "VAT rate must be between 1% and 99%" });
+      }
+
+      const storedRate = normalizedRate.toFixed(4);
+      await db.query(
+        "INSERT INTO settings (key_name, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value = ?",
+        [key, storedRate, storedRate]
+      );
+
+      return res.json({ key, value: storedRate });
     }
 
     await db.query(
