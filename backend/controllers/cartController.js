@@ -1,16 +1,11 @@
 const axios = require("axios");
 const db = require("../db/connection");
-const {
-  createMailTransporter,
-  getMailFromAddress,
-} = require("../utils/mailer");
-const { buildOrderEmailHtml } = require("../utils/emailTemplates");
+const { sendInvoiceEmail } = require("../utils/sendInvoiceEmail");
 const {
   calculateVatPricing,
   roundMoney,
   getVatRateFromDb,
 } = require("../utils/pricing");
-const { sendOrderEmail } = require("../utils/email");
 
 // Cart, checkout, payment, and admin order reporting endpoints.
 
@@ -762,6 +757,11 @@ const capturePaypalOrder = async (req, res) => {
       return res.status(400).json({ message: "PayPal order ID is required" });
     }
 
+    console.log("[paypal:capture] starting capture", {
+      orderId: orderID,
+      userId: req.user?.id,
+    });
+
     const [users] = await db.query(
       "SELECT id FROM users WHERE id = ? LIMIT 1",
       [req.user.id],
@@ -786,6 +786,11 @@ const capturePaypalOrder = async (req, res) => {
 
     const captureData = response.data;
     const captureStatus = captureData.status;
+    console.log("[paypal:capture] payment captured", {
+      orderId: orderID,
+      status: captureStatus,
+      userId: req.user?.id,
+    });
     const captureUnit =
       captureData.purchase_units?.[0]?.payments?.captures?.[0] || null;
     const amountValue = captureUnit?.amount?.value || "0.00";
@@ -862,6 +867,31 @@ const capturePaypalOrder = async (req, res) => {
 
       await connection.commit();
       connection.release();
+
+      if (captureStatus === "COMPLETED") {
+        try {
+          console.log("[paypal:invoice] sending invoice email", {
+            orderId: orderResult.insertId,
+            paypalOrderId: orderID,
+            userId: req.user.id,
+          });
+          await sendInvoiceEmail({
+            orderId: orderResult.insertId,
+            userId: req.user.id,
+            paypalOrderId: orderID,
+          });
+          console.log("[paypal:invoice] invoice email sent", {
+            orderId: orderResult.insertId,
+            paypalOrderId: orderID,
+            userId: req.user.id,
+          });
+        } catch (invoiceError) {
+          console.error(
+            "[paypal:invoice] email send failed",
+            invoiceError.message || invoiceError,
+          );
+        }
+      }
 
       return res.status(200).json({
         message: "Payment captured and order persisted successfully",
