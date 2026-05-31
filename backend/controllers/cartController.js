@@ -49,7 +49,9 @@ const isPayerNotApprovedError = (error) => {
       "",
   ).toLowerCase();
 
-  return description.includes("payer has not yet approved the order for payment");
+  return description.includes(
+    "payer has not yet approved the order for payment",
+  );
 };
 
 const logPayPalFlow = (step, details = {}) => {
@@ -229,7 +231,11 @@ const quickCheckout = async (req, res) => {
     }
 
     const product = products[0];
-    const isWetsuit = (product.category || "").toString().trim().toLowerCase().includes("wetsuit");
+    const isWetsuit = (product.category || "")
+      .toString()
+      .trim()
+      .toLowerCase()
+      .includes("wetsuit");
 
     if (isWetsuit && !normalizedSize) {
       return res.status(400).json({ message: "Size is required for wetsuits" });
@@ -257,7 +263,11 @@ const quickCheckout = async (req, res) => {
 
         await connection.query(
           "UPDATE products SET stock = ?, size_stock = ?, updated_at = NOW() WHERE id = ?",
-          [getSizeStockTotal(nextSizeStock), serializeSizeStock(nextSizeStock), productId],
+          [
+            getSizeStockTotal(nextSizeStock),
+            serializeSizeStock(nextSizeStock),
+            productId,
+          ],
         );
       } else {
         await connection.query(
@@ -289,19 +299,19 @@ const quickCheckout = async (req, res) => {
       await connection.commit();
       connection.release();
 
-        // Send order confirmation email. If this fails we still return success to the user.
+        // Send order confirmation email. If email sending fails, do not roll back the order.
         try {
           await emailService.sendOrderConfirmation({ orderId: orderResult.insertId, userId: req.user.id });
         } catch (emailErr) {
           console.error('[checkout] order confirmation email failed', emailErr.message || emailErr);
         }
 
-        // Send order confirmation email asynchronously. Don't block or rollback on failures.
-        try {
-          await emailService.sendOrderConfirmation({ orderId: orderResult.insertId, userId: req.user.id });
-        } catch (emailErr) {
-          console.error('[quickCheckout] order confirmation email failed', emailErr.message || emailErr);
-        }
+      // Send order confirmation email asynchronously. Don't block or rollback on failures.
+      try {
+        await emailService.sendOrderConfirmation({ orderId: orderResult.insertId, userId: req.user.id });
+      } catch (emailErr) {
+        console.error('[quickCheckout] order confirmation email failed', emailErr.message || emailErr);
+      }
 
       return res.status(200).json({
         message: "Purchase completed successfully",
@@ -334,7 +344,7 @@ const quickCheckout = async (req, res) => {
 
 // Converts raw cart rows into the shape the frontend already expects.
 // This keeps the API response consistent across cart actions.
-const mapCartRows = (rows, vatRate = 0.18) =>
+const mapCartRows = (rows, vatRate = 0) =>
   rows.map((row) => ({
     product: {
       _id: row.id,
@@ -583,7 +593,9 @@ const updateCartQuantity = async (req, res) => {
         .includes("wetsuit");
 
       if (isWetsuit && !normalizedSize) {
-        return res.status(400).json({ message: "Size is required for wetsuits" });
+        return res
+          .status(400)
+          .json({ message: "Size is required for wetsuits" });
       }
 
       const stock = getAvailableStock(product, normalizedSize);
@@ -855,12 +867,7 @@ const createPaypalOrder = async (req, res) => {
 
       const [orderResult] = await connection.query(
         "INSERT INTO orders (user_id, total, customer_email, status, created_at) VALUES (?, ?, ?, ?, NOW())",
-        [
-          req.user.id,
-          total,
-          userRecord?.email || null,
-          ORDER_STATUS.PENDING,
-        ],
+        [req.user.id, total, userRecord?.email || null, ORDER_STATUS.PENDING],
       );
 
       for (const item of items) {
@@ -1135,7 +1142,8 @@ const capturePaypalOrder = async (req, res) => {
             orderId,
             paypalOrderId: orderID,
             userId: req.user.id,
-            customerEmail: userRecord.email || captureData?.payer?.email_address || null,
+            customerEmail:
+              userRecord.email || captureData?.payer?.email_address || null,
           });
 
           await emailService.sendOrderConfirmation({
@@ -1205,7 +1213,10 @@ const capturePaypalOrder = async (req, res) => {
           [
             finalUnsuccessfulStatus,
             JSON.stringify({
-              error: error?.response?.data || error.message || "Capture unsuccessful",
+              error:
+                error?.response?.data ||
+                error.message ||
+                "Capture unsuccessful",
               markedAt: new Date().toISOString(),
             }),
             req.body.orderID,
@@ -1262,7 +1273,10 @@ const markPaypalOrderAsUnsuccessful = async ({ orderID, userId = null, reason = 
     whereParams.push(userId);
   }
 
-  const rawResponse = JSON.stringify({ reason, markedAt: new Date().toISOString() });
+  const rawResponse = JSON.stringify({
+    reason,
+    markedAt: new Date().toISOString(),
+  });
 
   const [result] = await db.query(
     `
@@ -1303,10 +1317,14 @@ const markPaypalOrderAsUnsuccessful = async ({ orderID, userId = null, reason = 
 };
 
 const handlePaypalSuccessReturn = async (req, res) => {
-  const orderID = (req.query.token || req.query.orderID || "").toString().trim();
+  const orderID = (req.query.token || req.query.orderID || "")
+    .toString()
+    .trim();
 
   if (!orderID) {
-    return res.redirect(`${FRONTEND_BASE_URL}/?paypalUnsuccessful=1&reason=missingToken`);
+    return res.redirect(
+      `${FRONTEND_BASE_URL}/?paypalUnsuccessful=1&reason=missingToken`,
+    );
   }
 
   try {
@@ -1326,7 +1344,9 @@ const handlePaypalSuccessReturn = async (req, res) => {
         paypalOrderId: orderID,
         reason: "payment-row-not-found",
       });
-      return res.redirect(`${FRONTEND_BASE_URL}/?paypalUnsuccessful=1&token=${encodeURIComponent(orderID)}`);
+      return res.redirect(
+        `${FRONTEND_BASE_URL}/?paypalUnsuccessful=1&token=${encodeURIComponent(orderID)}`,
+      );
     }
 
     const userId = Number(paymentRows[0].user_id);
@@ -1352,7 +1372,9 @@ const handlePaypalSuccessReturn = async (req, res) => {
     await capturePaypalOrder(fakeReq, fakeRes);
 
     if (fakeRes.statusCode >= 400) {
-      return res.redirect(`${FRONTEND_BASE_URL}/?paypalUnsuccessful=1&token=${encodeURIComponent(orderID)}`);
+      return res.redirect(
+        `${FRONTEND_BASE_URL}/?paypalUnsuccessful=1&token=${encodeURIComponent(orderID)}`,
+      );
     }
 
     const resolvedOrderId = fakeRes.payload?.order?.id || "";
@@ -1361,15 +1383,21 @@ const handlePaypalSuccessReturn = async (req, res) => {
     );
   } catch (error) {
     console.error("[paypal:success-return]", error.message || error);
-    return res.redirect(`${FRONTEND_BASE_URL}/?paypalUnsuccessful=1&token=${encodeURIComponent(orderID)}`);
+    return res.redirect(
+      `${FRONTEND_BASE_URL}/?paypalUnsuccessful=1&token=${encodeURIComponent(orderID)}`,
+    );
   }
 };
 
 const handlePaypalCancelReturn = async (req, res) => {
-  const orderID = (req.query.token || req.query.orderID || "").toString().trim();
+  const orderID = (req.query.token || req.query.orderID || "")
+    .toString()
+    .trim();
 
   if (!orderID) {
-    return res.redirect(`${FRONTEND_BASE_URL}/?paypalUnsuccessful=1&reason=missingToken`);
+    return res.redirect(
+      `${FRONTEND_BASE_URL}/?paypalUnsuccessful=1&reason=missingToken`,
+    );
   }
 
   try {
@@ -1396,7 +1424,9 @@ const handlePaypalCancelReturn = async (req, res) => {
     );
   } catch (error) {
     console.error("[paypal:cancel-return]", error.message || error);
-    return res.redirect(`${FRONTEND_BASE_URL}/?paypalUnsuccessful=1&token=${encodeURIComponent(orderID)}`);
+    return res.redirect(
+      `${FRONTEND_BASE_URL}/?paypalUnsuccessful=1&token=${encodeURIComponent(orderID)}`,
+    );
   }
 };
 
@@ -1566,6 +1596,7 @@ const getOrderItems = async (req, res) => {
           basePrice: roundMoney(pricing.basePrice),
           vatAmount: roundMoney(pricing.vatAmount),
           finalPrice: roundMoney(pricing.finalPrice),
+          vatRate: roundMoney(pricing.vatRate),
         },
       },
       items: items.map((item) => ({

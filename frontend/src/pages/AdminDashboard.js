@@ -2,6 +2,8 @@
 import axios from "axios";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
+import { STATUS_COLORS } from "../utils/statusColors";
+import { resetVatRateCache } from "../utils/pricing";
 
 function AdminDashboard({
   session,
@@ -39,21 +41,23 @@ function AdminDashboard({
   const [dateTo, setDateTo] = useState(getTodayInputValue);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [vatRatePercent, setVatRatePercent] = useState(18);
-  const [vatInput, setVatInput] = useState("18");
+  const [vatRatePercent, setVatRatePercent] = useState(0);
+  const [vatInput, setVatInput] = useState("0");
   const [vatMessage, setVatMessage] = useState("");
   const [savingVat, setSavingVat] = useState(false);
+  const statusColors = STATUS_COLORS;
 
-  const normalizeStatus = (value) => (value || "").toString().trim().toLowerCase();
+  const normalizeStatus = (value) =>
+    (value || "").toString().trim().toLowerCase();
 
   const getOrderBucket = (order) => {
     const status = normalizeStatus(order?.status);
 
-    if (["paid", "success", "successful", "completed"].includes(status)) {
-      return "success";
-    }
-
-    if (["pending"].includes(status)) {
+    if (
+      ["pending", "processing", "awaiting_payment", "open", "draft"].includes(
+        status,
+      )
+    ) {
       return "pending";
     }
 
@@ -66,11 +70,15 @@ function AdminDashboard({
   };
 
   const filteredOrders = useMemo(() => {
-    const fromTime = dateFrom ? new Date(`${dateFrom}T00:00:00`).getTime() : null;
+    const fromTime = dateFrom
+      ? new Date(`${dateFrom}T00:00:00`).getTime()
+      : null;
     const toTime = dateTo ? new Date(`${dateTo}T23:59:59.999`).getTime() : null;
 
     return orders.filter((order) => {
-      const createdAt = new Date(order?.createdAt || order?.created_at || 0).getTime();
+      const createdAt = new Date(
+        order?.createdAt || order?.created_at || 0,
+      ).getTime();
 
       if (Number.isNaN(createdAt)) {
         return false;
@@ -108,19 +116,19 @@ function AdminDashboard({
         key: "success",
         label: "Successful",
         value: filteredSummary.success,
-        color: "#79b64a",
+        color: statusColors.success,
       },
       {
         key: "unsuccessful",
         label: "Unsuccessful",
         value: filteredSummary.unsuccessful,
-        color: "#f07c2e",
+        color: statusColors.unsuccessful,
       },
       {
         key: "pending",
         label: "Pending",
         value: filteredSummary.pending,
-        color: "#ffbf24",
+        color: statusColors.pending,
       },
     ],
     [filteredSummary],
@@ -156,7 +164,9 @@ function AdminDashboard({
           const stock = Number(product?.stock ?? 0);
           return stock >= 0 && stock <= 4;
         })
-        .sort((left, right) => Number(left?.stock ?? 0) - Number(right?.stock ?? 0)),
+        .sort(
+          (left, right) => Number(left?.stock ?? 0) - Number(right?.stock ?? 0),
+        ),
     [products],
   );
 
@@ -201,8 +211,11 @@ function AdminDashboard({
           headers: { Authorization: `Bearer ${session.token}` },
         });
 
-        const storedDecimal = Number(response.data?.value || 0.18);
+        console.log("[vat:settings-response]", response.data);
+
+        const storedDecimal = Number(response.data?.value || 0);
         const percent = Math.round(storedDecimal * 100);
+        console.log("[vat:dashboard-state]", { storedDecimal, percent });
         setVatRatePercent(percent);
         setVatInput(String(percent));
       } catch (vatError) {
@@ -216,7 +229,11 @@ function AdminDashboard({
   const saveVatRate = async () => {
     const parsedPercent = Number(vatInput);
 
-    if (!Number.isFinite(parsedPercent) || parsedPercent < 1 || parsedPercent > 99) {
+    if (
+      !Number.isFinite(parsedPercent) ||
+      parsedPercent < 1 ||
+      parsedPercent > 99
+    ) {
       setVatMessage("VAT must be between 1% and 99%.");
       return;
     }
@@ -235,8 +252,10 @@ function AdminDashboard({
 
       const storedDecimal = Number(response.data?.value || parsedPercent / 100);
       const savedPercent = Math.round(storedDecimal * 100);
+      console.log("[vat:dashboard-save]", { storedDecimal, savedPercent });
       setVatRatePercent(savedPercent);
       setVatInput(String(savedPercent));
+      resetVatRateCache();
       setVatMessage(`VAT updated to ${savedPercent}%.`);
     } catch (saveError) {
       setVatMessage(saveError.response?.data?.error || "Unable to update VAT.");
@@ -259,9 +278,27 @@ function AdminDashboard({
   };
 
   const cards = [
-    { key: "success", label: "Successful", value: filteredSummary.success, tone: "success", filter: "success" },
-    { key: "unsuccessful", label: "Unsuccessful", value: filteredSummary.unsuccessful, tone: "danger", filter: "unsuccessful" },
-    { key: "pending", label: "Pending", value: filteredSummary.pending, tone: "muted", filter: "pending" },
+    {
+      key: "success",
+      label: "Successful",
+      value: filteredSummary.success,
+      color: statusColors.success,
+      filter: "success",
+    },
+    {
+      key: "unsuccessful",
+      label: "Unsuccessful",
+      value: filteredSummary.unsuccessful,
+      color: statusColors.unsuccessful,
+      filter: "unsuccessful",
+    },
+    {
+      key: "pending",
+      label: "Pending",
+      value: filteredSummary.pending,
+      color: statusColors.pending,
+      filter: "pending",
+    },
   ];
 
   if (session?.user?.role !== "admin") {
@@ -279,8 +316,12 @@ function AdminDashboard({
         <main className="ps-main" style={{ padding: "70px 0" }}>
           <div className="ps-shell">
             <div className="ps-surface" style={{ padding: "30px" }}>
-              <h1 className="ps-title" style={{ marginBottom: "10px" }}>Access restricted</h1>
-              <p className="ps-lead">This section is available to admin accounts only.</p>
+              <h1 className="ps-title" style={{ marginBottom: "10px" }}>
+                Access restricted
+              </h1>
+              <p className="ps-lead">
+                This section is available to admin accounts only.
+              </p>
             </div>
           </div>
         </main>
@@ -304,9 +345,18 @@ function AdminDashboard({
       <main className="ps-main" style={{ padding: "70px 0" }}>
         <div className="ps-shell">
           <div style={{ marginBottom: "24px" }}>
-            <h1 className="ps-title" style={{ marginBottom: "8px", fontSize: "clamp(24px, 3vw, 34px)" }}>Welcome, admin</h1>
+            <h1
+              className="ps-title"
+              style={{
+                marginBottom: "8px",
+                fontSize: "clamp(24px, 3vw, 34px)",
+              }}
+            >
+              Welcome, admin
+            </h1>
             <p className="ps-lead" style={{ maxWidth: "760px" }}>
-              Track order health at a glance and watch products that are close to running out of stock.
+              Track order health at a glance and watch products that are close
+              to running out of stock.
             </p>
           </div>
 
@@ -322,25 +372,57 @@ function AdminDashboard({
             }}
           >
             <div style={{ minWidth: "180px", flex: "1 1 180px" }}>
-              <div style={{ color: "#65574d", fontSize: "12px", fontWeight: 800, letterSpacing: "1px", textTransform: "uppercase", marginBottom: "6px" }}>
+              <div
+                style={{
+                  color: "#65574d",
+                  fontSize: "12px",
+                  fontWeight: 800,
+                  letterSpacing: "1px",
+                  textTransform: "uppercase",
+                  marginBottom: "6px",
+                }}
+              >
                 From
               </div>
               <input
                 type="date"
                 value={dateFrom}
                 onChange={(event) => setDateFrom(event.target.value)}
-                style={{ width: "100%", padding: "11px 12px", borderRadius: "12px", border: "1px solid rgba(31, 24, 19, 0.14)", background: "rgba(255, 250, 242, 0.95)", fontSize: "13px" }}
+                style={{
+                  width: "100%",
+                  padding: "11px 12px",
+                  borderRadius: "12px",
+                  border: "1px solid rgba(31, 24, 19, 0.14)",
+                  background: "rgba(255, 250, 242, 0.95)",
+                  fontSize: "13px",
+                }}
               />
             </div>
             <div style={{ minWidth: "180px", flex: "1 1 180px" }}>
-              <div style={{ color: "#65574d", fontSize: "12px", fontWeight: 800, letterSpacing: "1px", textTransform: "uppercase", marginBottom: "6px" }}>
+              <div
+                style={{
+                  color: "#65574d",
+                  fontSize: "12px",
+                  fontWeight: 800,
+                  letterSpacing: "1px",
+                  textTransform: "uppercase",
+                  marginBottom: "6px",
+                }}
+              >
                 To
               </div>
               <input
                 type="date"
                 value={dateTo}
                 onChange={(event) => setDateTo(event.target.value)}
-                style={{ width: "100%", padding: "11px 12px", borderRadius: "12px", border: "1px solid rgba(31, 24, 19, 0.14)", background: "rgba(255, 250, 242, 0.95)", fontSize: "13px" }}
+                style={{
+                  width: "100%",
+                  padding: "11px 12px",
+                  borderRadius: "12px",
+                  border: "1px solid rgba(31, 24, 19, 0.14)",
+                  background: "rgba(255, 250, 242, 0.95)",
+                  fontSize: "13px",
+                }}
               />
             </div>
             <button
@@ -355,7 +437,16 @@ function AdminDashboard({
               Clear range
             </button>
             <div style={{ minWidth: "220px", flex: "1 1 220px" }}>
-              <div style={{ color: "#65574d", fontSize: "12px", fontWeight: 800, letterSpacing: "1px", textTransform: "uppercase", marginBottom: "6px" }}>
+              <div
+                style={{
+                  color: "#65574d",
+                  fontSize: "12px",
+                  fontWeight: 800,
+                  letterSpacing: "1px",
+                  textTransform: "uppercase",
+                  marginBottom: "6px",
+                }}
+              >
                 VAT (%)
               </div>
               <div style={{ display: "flex", gap: "8px" }}>
@@ -365,7 +456,14 @@ function AdminDashboard({
                   max="99"
                   value={vatInput}
                   onChange={(event) => setVatInput(event.target.value)}
-                  style={{ width: "100%", padding: "11px 12px", borderRadius: "12px", border: "1px solid rgba(31, 24, 19, 0.14)", background: "rgba(255, 250, 242, 0.95)", fontSize: "13px" }}
+                  style={{
+                    width: "100%",
+                    padding: "11px 12px",
+                    borderRadius: "12px",
+                    border: "1px solid rgba(31, 24, 19, 0.14)",
+                    background: "rgba(255, 250, 242, 0.95)",
+                    fontSize: "13px",
+                  }}
                 />
                 <button
                   type="button"
@@ -377,13 +475,30 @@ function AdminDashboard({
                   {savingVat ? "Saving" : "Save"}
                 </button>
               </div>
-              <div style={{ fontSize: "12px", color: vatMessage ? (vatMessage.includes("updated") ? "#245860" : "#a83f34") : "#65574d", marginTop: "6px" }}>
+              <div
+                style={{
+                  fontSize: "12px",
+                  color: vatMessage
+                    ? vatMessage.includes("updated")
+                      ? "#245860"
+                      : "#a83f34"
+                    : "#65574d",
+                  marginTop: "6px",
+                }}
+              >
                 {vatMessage || `Current VAT: ${vatRatePercent}%`}
               </div>
             </div>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px", marginBottom: "24px" }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              gap: "16px",
+              marginBottom: "24px",
+            }}
+          >
             {cards.map((item) => (
               <button
                 key={item.key}
@@ -392,24 +507,43 @@ function AdminDashboard({
                 onClick={() => openOrders(item.filter)}
                 style={{
                   padding: "18px 20px",
-                  border: "1px solid rgba(31, 24, 19, 0.08)",
+                  border: `1px solid ${item.color}33`,
                   textAlign: "left",
                   cursor: "pointer",
-                  background:
-                    item.tone === "success"
-                      ? "rgba(36, 88, 96, 0.08)"
-                      : item.tone === "danger"
-                        ? "rgba(168, 63, 52, 0.08)"
-                        : "rgba(31, 24, 19, 0.05)",
+                  background: `${item.color}14`,
+                  boxShadow: `0 14px 28px ${item.color}10`,
                 }}
               >
-                <div style={{ color: "#65574d", fontSize: "13px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.2px" }}>
+                <div
+                  style={{
+                    color: "#65574d",
+                    fontSize: "13px",
+                    fontWeight: 700,
+                    textTransform: "uppercase",
+                    letterSpacing: "1.2px",
+                  }}
+                >
                   {item.label}
                 </div>
-                <div style={{ fontFamily: "'Bebas Neue', Impact, sans-serif", fontSize: "52px", lineHeight: 1, marginTop: "8px" }}>
+                <div
+                  style={{
+                    fontFamily: "'Bebas Neue', Impact, sans-serif",
+                    fontSize: "52px",
+                    lineHeight: 1,
+                    marginTop: "8px",
+                    color: item.color,
+                  }}
+                >
                   {loading ? "..." : item.value}
                 </div>
-                <div style={{ color: "#5e5148", fontSize: "13px", marginTop: "6px" }}>
+                <div
+                  style={{
+                    color: item.color,
+                    fontSize: "13px",
+                    marginTop: "6px",
+                    fontWeight: 700,
+                  }}
+                >
                   {item.key === "range"
                     ? "Orders between the selected dates"
                     : "Tap to open the matching orders"}
@@ -418,14 +552,38 @@ function AdminDashboard({
             ))}
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.6fr) minmax(320px, 0.9fr)", gap: "16px" }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "minmax(0, 1.6fr) minmax(320px, 0.9fr)",
+              gap: "16px",
+            }}
+          >
             <div className="ps-surface" style={{ padding: "22px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", marginBottom: "18px" }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  gap: "12px",
+                  marginBottom: "18px",
+                }}
+              >
                 <div>
-                  <h2 style={{ margin: "0 0 8px", fontSize: "24px" }}>Stock watchlist</h2>
-                  <p style={{ margin: 0, color: "#5e5148" }}>Out of stock products first, then products with 1 to 4 units remaining.</p>
+                  <h2 style={{ margin: "0 0 8px", fontSize: "24px" }}>
+                    Stock watchlist
+                  </h2>
+                  <p style={{ margin: 0, color: "#5e5148" }}>
+                    Out of stock products first, then products with 1 to 4 units
+                    remaining.
+                  </p>
                 </div>
-                <button type="button" className="ps-btn ps-btn-primary" onClick={() => onNavigate("manage-products")}>Open products</button>
+                <button
+                  type="button"
+                  className="ps-btn ps-btn-primary"
+                  onClick={() => onNavigate("manage-products")}
+                >
+                  Open products
+                </button>
               </div>
 
               {loading ? (
@@ -434,18 +592,51 @@ function AdminDashboard({
                 <div style={{ display: "grid", gap: "10px" }}>
                   {lowStockProducts.map((product) => {
                     const stock = Number(product.stock ?? 0);
-                    const statusLabel = stock === 0 ? "Out of stock" : "Low stock";
+                    const statusLabel =
+                      stock === 0 ? "Out of stock" : "Low stock";
                     const statusColor = stock === 0 ? "#a83f34" : "#245860";
 
                     return (
-                      <div key={product.id || product._id} style={{ padding: "12px 14px", borderRadius: "14px", background: "rgba(36, 88, 96, 0.06)", border: "1px solid rgba(36, 88, 96, 0.12)" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", gap: "10px" }}>
+                      <div
+                        key={product.id || product._id}
+                        style={{
+                          padding: "12px 14px",
+                          borderRadius: "14px",
+                          background: "rgba(36, 88, 96, 0.06)",
+                          border: "1px solid rgba(36, 88, 96, 0.12)",
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            gap: "10px",
+                          }}
+                        >
                           <strong>{product.name}</strong>
-                          <span style={{ color: statusColor, fontWeight: 800 }}>{statusLabel}</span>
+                          <span style={{ color: statusColor, fontWeight: 800 }}>
+                            {statusLabel}
+                          </span>
                         </div>
-                        <div style={{ display: "flex", justifyContent: "space-between", gap: "10px", marginTop: "6px", alignItems: "center" }}>
-                          <div style={{ color: "#5e5148", fontSize: "13px" }}>{product.category || "Uncategorized"}</div>
-                          <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            gap: "10px",
+                            marginTop: "6px",
+                            alignItems: "center",
+                          }}
+                        >
+                          <div style={{ color: "#5e5148", fontSize: "13px" }}>
+                            {product.category || "Uncategorized"}
+                          </div>
+                          <div
+                            style={{
+                              display: "flex",
+                              gap: "10px",
+                              alignItems: "center",
+                            }}
+                          >
                             <button
                               type="button"
                               className="ps-btn ps-btn-secondary"
@@ -454,7 +645,9 @@ function AdminDashboard({
                             >
                               Edit
                             </button>
-                            <span style={{ color: "#245860", fontWeight: 700 }}>Stock {stock}</span>
+                            <span style={{ color: "#245860", fontWeight: 700 }}>
+                              Stock {stock}
+                            </span>
                           </div>
                         </div>
                       </div>
@@ -462,18 +655,31 @@ function AdminDashboard({
                   })}
                 </div>
               ) : (
-                <p className="ps-lead">No products are currently out of stock or low on stock (1-4 units).</p>
+                <p className="ps-lead">
+                  No products are currently out of stock or low on stock (1-4
+                  units).
+                </p>
               )}
             </div>
 
             <div className="ps-surface" style={{ padding: "22px" }}>
-              <h2 style={{ margin: "0 0 10px", fontSize: "24px" }}>Orders graph</h2>
+              <h2 style={{ margin: "0 0 10px", fontSize: "24px" }}>
+                Orders graph
+              </h2>
               <p style={{ margin: "0 0 18px", color: "#5e5148" }}>
                 Orders shown by status for the selected date range.
               </p>
 
               {statusChartData.some((item) => item.value > 0) ? (
-                <div style={{ display: "grid", gridTemplateColumns: "minmax(220px, 280px) 1fr", gap: "18px", alignItems: "center", paddingTop: "10px" }}>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "minmax(220px, 280px) 1fr",
+                    gap: "18px",
+                    alignItems: "center",
+                    paddingTop: "10px",
+                  }}
+                >
                   <div style={{ display: "flex", justifyContent: "center" }}>
                     <div
                       style={{
@@ -482,7 +688,11 @@ function AdminDashboard({
                         borderRadius: "50%",
                         background: `conic-gradient(${statusChartData
                           .map((item, index) => {
-                            const total = statusChartData.reduce((sum, entry) => sum + entry.value, 0) || 1;
+                            const total =
+                              statusChartData.reduce(
+                                (sum, entry) => sum + entry.value,
+                                0,
+                              ) || 1;
                             const start = statusChartData
                               .slice(0, index)
                               .reduce((sum, entry) => sum + entry.value, 0);
@@ -498,12 +708,53 @@ function AdminDashboard({
 
                   <div style={{ display: "grid", gap: "12px" }}>
                     {statusChartData.map((item) => (
-                      <div key={item.key} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", padding: "12px 14px", borderRadius: "14px", background: "rgba(255, 250, 242, 0.9)", border: "1px solid rgba(31, 24, 19, 0.08)" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                          <span style={{ width: "12px", height: "12px", borderRadius: "999px", background: item.color, display: "inline-block" }} />
-                          <span style={{ fontSize: "13px", fontWeight: 700, color: "#1f1813" }}>{item.label}</span>
+                      <div
+                        key={item.key}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          gap: "12px",
+                          padding: "12px 14px",
+                          borderRadius: "14px",
+                          background: "rgba(255, 250, 242, 0.9)",
+                          border: "1px solid rgba(31, 24, 19, 0.08)",
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "10px",
+                          }}
+                        >
+                          <span
+                            style={{
+                              width: "12px",
+                              height: "12px",
+                              borderRadius: "999px",
+                              background: item.color,
+                              display: "inline-block",
+                            }}
+                          />
+                          <span
+                            style={{
+                              fontSize: "13px",
+                              fontWeight: 700,
+                              color: "#1f1813",
+                            }}
+                          >
+                            {item.label}
+                          </span>
                         </div>
-                        <div style={{ fontSize: "20px", fontWeight: 800, color: item.color, lineHeight: 1 }}>
+                        <div
+                          style={{
+                            fontSize: "20px",
+                            fontWeight: 800,
+                            color: item.color,
+                            lineHeight: 1,
+                          }}
+                        >
                           {item.value}
                         </div>
                       </div>
@@ -511,11 +762,16 @@ function AdminDashboard({
                   </div>
                 </div>
               ) : (
-                <p className="ps-lead">No orders found for the selected dates.</p>
+                <p className="ps-lead">
+                  No orders found for the selected dates.
+                </p>
               )}
 
               {error ? (
-                <div className="ps-surface" style={{ marginTop: "18px", padding: "16px 18px" }}>
+                <div
+                  className="ps-surface"
+                  style={{ marginTop: "18px", padding: "16px 18px" }}
+                >
                   <p style={{ margin: 0, color: "#991b1b" }}>{error}</p>
                 </div>
               ) : null}

@@ -258,7 +258,7 @@ const normalizeGenderInput = (value) => {
 const isWetsuitCategory = (value) =>
   (value || "").toString().trim().toLowerCase().includes("wetsuit");
 
-const normalizeProduct = (row, vatRate = 0.18) => {
+const normalizeProduct = (row, vatRate = 0) => {
   const normalizedBoardHeight =
     row.board_height !== undefined && row.board_height !== null
       ? Number(row.board_height)
