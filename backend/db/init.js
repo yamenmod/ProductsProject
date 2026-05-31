@@ -426,8 +426,10 @@ const initDatabase = async () => {
     );
 
     if (!existingVat || existingVat.length === 0) {
+      const defaultVatRate = Number(process.env.DEFAULT_VAT_RATE || 0);
       await db.query(
-        "INSERT INTO settings (key_name, value) VALUES ('vat_rate', '0.18')",
+        "INSERT INTO settings (key_name, value) VALUES ('vat_rate', ?)",
+        [String(defaultVatRate)],
       );
     }
 

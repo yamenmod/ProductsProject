@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const VAT_RATE = 0.18; // Default, will be fetched from backend
+const DEFAULT_VAT_RATE = Number(process.env.REACT_APP_DEFAULT_VAT_RATE || 0);
 
 const roundMoney = (value) => Number(Number(value || 0).toFixed(2));
 
@@ -20,19 +20,21 @@ const fetchVatRate = async () => {
 
   vatRateFetchPromise = (async () => {
     try {
-      const response = await axios.get("/api/admin/settings/vat_rate");
+      const response = await axios.get("/api/admin/vat-rate");
+      console.log("[vat:settings-response]", response.data);
       if (response.data && response.data.value) {
         const rate = parseFloat(response.data.value);
         if (!isNaN(rate)) {
           cachedVatRate = rate;
+          console.log("[vat:fetchVatRate] assigned", rate);
           return rate;
         }
       }
     } catch (error) {
       console.warn("Failed to fetch VAT rate, using default:", error.message);
     }
-    cachedVatRate = VAT_RATE;
-    return VAT_RATE;
+    cachedVatRate = DEFAULT_VAT_RATE;
+    return DEFAULT_VAT_RATE;
   })();
 
   const result = await vatRateFetchPromise;
@@ -45,16 +47,19 @@ const resetVatRateCache = () => {
   cachedVatRate = null;
 };
 
-const getCurrentVatRate = () => cachedVatRate ?? VAT_RATE;
+const getCurrentVatRate = () => cachedVatRate ?? DEFAULT_VAT_RATE;
 
-const getBasePrice = (product) => roundMoney(product?.basePrice ?? product?.price ?? 0);
+const getBasePrice = (product) =>
+  roundMoney(product?.basePrice ?? product?.price ?? 0);
 
 const getVatAmount = (product) => {
   if (product?.vatAmount !== undefined && product?.vatAmount !== null) {
     return roundMoney(product.vatAmount);
   }
 
-  return roundMoney(getBasePrice(product) * (getCurrentVatRate() || VAT_RATE));
+  return roundMoney(
+    getBasePrice(product) * (getCurrentVatRate() || DEFAULT_VAT_RATE),
+  );
 };
 
 const getDisplayPrice = (product) => {
@@ -70,7 +75,7 @@ const getDisplayPrice = (product) => {
 };
 
 export {
-  VAT_RATE,
+  DEFAULT_VAT_RATE,
   roundMoney,
   getBasePrice,
   getVatAmount,

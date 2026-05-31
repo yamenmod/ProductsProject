@@ -2,7 +2,12 @@ import React, { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
-import { getBasePrice, getDisplayPrice, fetchVatRate } from "../utils/pricing";
+import {
+  getBasePrice,
+  getDisplayPrice,
+  fetchVatRate,
+  resetVatRateCache,
+} from "../utils/pricing";
 
 function Cart({
   session,
@@ -24,6 +29,7 @@ function Cart({
   const [isPayPalModalOpen, setIsPayPalModalOpen] = useState(false);
   const [paypalMessage, setPaypalMessage] = useState("");
   const [isPayPalLoading, setIsPayPalLoading] = useState(false);
+  const [vatRate, setVatRate] = useState(null);
 
   const normalizeCartItems = (items = []) =>
     (Array.isArray(items) ? items : []).map((item) => {
@@ -386,7 +392,10 @@ function Cart({
       }
 
       try {
-        await fetchVatRate();
+        resetVatRateCache();
+        const currentVatRate = await fetchVatRate();
+        console.log("[vat:cart-state]", { currentVatRate });
+        setVatRate(currentVatRate);
         const response = await axios.get("/api/cart", {
           headers: {
             Authorization: `Bearer ${session.token}`,
@@ -402,14 +411,46 @@ function Cart({
     loadCart();
   }, [session?.token]);
 
-  // Calculate cart summary
+  const resolvedVatRate = Number(
+    displayItems?.[0]?.pricing?.vatRate ?? vatRate ?? 0,
+  );
+  const vatPercent = Math.round(resolvedVatRate * 100);
+
   const subtotal = displayItems.reduce(
-    (total, item) =>
-      total + getDisplayPrice(item) * (Number(item.quantity) || 1),
+    (runningTotal, item) =>
+      runningTotal + getBasePrice(item) * (Number(item.quantity) || 1),
     0,
   );
-  const tax = subtotal > 0 ? subtotal - subtotal / 1.18 : 0;
-  const total = Number(subtotal.toFixed(2));
+  const total = displayItems.reduce(
+    (runningTotal, item) =>
+      runningTotal + getDisplayPrice(item) * (Number(item.quantity) || 1),
+    0,
+  );
+  const tax = Math.max(0, total - subtotal);
+
+  useEffect(() => {
+    if (!displayItems.length && vatRate === null) {
+      return;
+    }
+
+    console.log("[vat:cart-calculation]", {
+      displayItemVatRate: displayItems?.[0]?.pricing?.vatRate,
+      stateVatRate: vatRate,
+      resolvedVatRate,
+      vatPercent,
+      subtotal,
+      total,
+      tax,
+    });
+  }, [
+    displayItems,
+    vatRate,
+    resolvedVatRate,
+    vatPercent,
+    subtotal,
+    total,
+    tax,
+  ]);
 
   return (
     <div className="ps-page">
@@ -462,63 +503,60 @@ function Cart({
             </div>
           ) : (
             <div style={{ display: "grid", gap: "24px" }}>
-              {displayItems.map((item) => (
-                <div
-                  key={`${item.id}-${item.size || "default"}`}
-                  className="ps-surface"
-                  style={{
-                    padding: "24px",
-                    display: "grid",
-                    gridTemplateColumns: "120px minmax(0, 1fr) 140px",
-                    gap: "20px",
-                    alignItems: "center",
-                  }}
-                >
-                  <img
-                    src={getProductImages(item)[0]}
-                    alt={item.name || "Cart product"}
-                    onError={(e) => {
-                      try {
-                        if (!e?.target) return;
-                        if (e.target.dataset?.imgerror) return;
-                        e.target.dataset.imgerror = "1";
+              {displayItems.map((item) => {
+                console.log("[vat:product-card-label]", {
+                  itemId: item.id,
+                  size: item.size || "default",
+                  vatPercent,
+                });
 
-                        console.error(
-                          `%c❌ Image failed: ${e.target.src}`,
-                          "color: red; font-weight: bold",
-                        );
-
-                        // Show placeholder on error since backend now assigns images
-                        e.target.src =
-                          "https://via.placeholder.com/120x120?text=No+Image";
-                      } catch (err) {
-                        console.error("Image fallback error:", err);
-                        e.target.src =
-                          "https://via.placeholder.com/120x120?text=No+Image";
-                      }
-                    }}
+                return (
+                  <div
+                    key={`${item.id}-${item.size || "default"}`}
+                    className="ps-surface"
                     style={{
-                      width: "120px",
-                      height: "120px",
-                      objectFit: "cover",
-                      borderRadius: "18px",
-                      background: "#efefef",
+                      padding: "24px",
+                      display: "grid",
+                      gridTemplateColumns: "120px minmax(0, 1fr) 140px",
+                      gap: "20px",
+                      alignItems: "center",
                     }}
-                  />
-                  <div>
-                    <h2 style={{ margin: "0 0 8px", fontSize: "18px" }}>
-                      {item.name || "Product"}
-                    </h2>
-                    <p
-                      style={{
-                        margin: "0 0 8px",
-                        color: "#65574d",
-                        fontSize: "14px",
+                  >
+                    <img
+                      src={getProductImages(item)[0]}
+                      alt={item.name || "Cart product"}
+                      onError={(e) => {
+                        try {
+                          if (!e?.target) return;
+                          if (e.target.dataset?.imgerror) return;
+                          e.target.dataset.imgerror = "1";
+
+                          console.error(
+                            `%c❌ Image failed: ${e.target.src}`,
+                            "color: red; font-weight: bold",
+                          );
+
+                          // Show placeholder on error since backend now assigns images
+                          e.target.src =
+                            "https://via.placeholder.com/120x120?text=No+Image";
+                        } catch (err) {
+                          console.error("Image fallback error:", err);
+                          e.target.src =
+                            "https://via.placeholder.com/120x120?text=No+Image";
+                        }
                       }}
-                    >
-                      {item.category || ""}
-                    </p>
-                    {item.size ? (
+                      style={{
+                        width: "120px",
+                        height: "120px",
+                        objectFit: "cover",
+                        borderRadius: "18px",
+                        background: "#efefef",
+                      }}
+                    />
+                    <div>
+                      <h2 style={{ margin: "0 0 8px", fontSize: "18px" }}>
+                        {item.name || "Product"}
+                      </h2>
                       <p
                         style={{
                           margin: "0 0 8px",
@@ -526,131 +564,142 @@ function Cart({
                           fontSize: "14px",
                         }}
                       >
-                        Size: {item.size}
+                        {item.category || ""}
                       </p>
-                    ) : null}
-                    <div
-                      style={{ margin: 0, color: "#1f1813", fontWeight: 700 }}
-                    >
-                      <span
-                        style={{
-                          display: "block",
-                          fontSize: "14px",
-                          color: "#65574d",
-                          textDecoration: "line-through",
-                        }}
+                      {item.size ? (
+                        <p
+                          style={{
+                            margin: "0 0 8px",
+                            color: "#65574d",
+                            fontSize: "14px",
+                          }}
+                        >
+                          Size: {item.size}
+                        </p>
+                      ) : null}
+                      <div
+                        style={{ margin: 0, color: "#1f1813", fontWeight: 700 }}
                       >
-                        ${getBasePrice(item).toFixed(2)}
-                      </span>
-                      <span
-                        style={{
-                          display: "block",
-                          fontSize: "16px",
-                          fontWeight: 800,
-                          color: "#1f1813",
-                          marginTop: "4px",
-                        }}
-                      >
-                        ${getDisplayPrice(item).toFixed(2)} x{" "}
-                        {item.quantity || 1}
-                      </span>
-                      <span
-                        style={{
-                          display: "block",
-                          fontSize: "12px",
-                          color: "#999",
-                          marginTop: "6px",
-                          fontWeight: 400,
-                        }}
-                      >
-                        VAT included (18%)
-                      </span>
+                        <span
+                          style={{
+                            display: "block",
+                            fontSize: "14px",
+                            color: "#65574d",
+                            textDecoration: "line-through",
+                          }}
+                        >
+                          ${getBasePrice(item).toFixed(2)}
+                        </span>
+                        <span
+                          style={{
+                            display: "block",
+                            fontSize: "16px",
+                            fontWeight: 800,
+                            color: "#1f1813",
+                            marginTop: "4px",
+                          }}
+                        >
+                          ${getDisplayPrice(item).toFixed(2)} x{" "}
+                          {item.quantity || 1}
+                        </span>
+                        <span
+                          style={{
+                            display: "block",
+                            fontSize: "12px",
+                            color: "#999",
+                            marginTop: "6px",
+                            fontWeight: 400,
+                          }}
+                        >
+                          VAT included ({vatPercent}%)
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "flex-end",
-                      gap: "10px",
-                    }}
-                  >
                     <div
                       style={{
                         display: "flex",
-                        alignItems: "center",
-                        gap: "6px",
-                        background: "#f3f1ed",
-                        border: "1px solid #d8d1c8",
-                        borderRadius: "999px",
-                        padding: "4px 8px",
+                        flexDirection: "column",
+                        alignItems: "flex-end",
+                        gap: "10px",
                       }}
                     >
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          background: "#f3f1ed",
+                          border: "1px solid #d8d1c8",
+                          borderRadius: "999px",
+                          padding: "4px 8px",
+                        }}
+                      >
+                        <button
+                          type="button"
+                          className="ps-btn"
+                          style={{
+                            width: "28px",
+                            height: "28px",
+                            padding: 0,
+                            borderRadius: "999px",
+                            border: "1px solid #c6beb4",
+                            background: "#ffffff",
+                            color: "#6c6258",
+                            fontSize: "18px",
+                            fontWeight: 800,
+                            lineHeight: 1,
+                            boxShadow: "none",
+                          }}
+                          onClick={() => handleChangeQuantity(item, -1)}
+                          aria-label={`Decrease quantity of ${item.name || "item"}`}
+                        >
+                          -
+                        </button>
+                        <span
+                          style={{
+                            minWidth: "20px",
+                            textAlign: "center",
+                            fontWeight: 800,
+                            color: "#5f5550",
+                            fontSize: "13px",
+                          }}
+                        >
+                          {item.quantity || 1}
+                        </span>
+                        <button
+                          type="button"
+                          className="ps-btn"
+                          style={{
+                            width: "28px",
+                            height: "28px",
+                            padding: 0,
+                            borderRadius: "999px",
+                            border: "1px solid #c6beb4",
+                            background: "#ffffff",
+                            color: "#6c6258",
+                            fontSize: "18px",
+                            fontWeight: 800,
+                            lineHeight: 1,
+                            boxShadow: "none",
+                          }}
+                          onClick={() => handleChangeQuantity(item, 1)}
+                          aria-label={`Increase quantity of ${item.name || "item"}`}
+                        >
+                          +
+                        </button>
+                      </div>
                       <button
                         type="button"
-                        className="ps-btn"
-                        style={{
-                          width: "28px",
-                          height: "28px",
-                          padding: 0,
-                          borderRadius: "999px",
-                          border: "1px solid #c6beb4",
-                          background: "#ffffff",
-                          color: "#6c6258",
-                          fontSize: "18px",
-                          fontWeight: 800,
-                          lineHeight: 1,
-                          boxShadow: "none",
-                        }}
-                        onClick={() => handleChangeQuantity(item, -1)}
-                        aria-label={`Decrease quantity of ${item.name || "item"}`}
+                        className="ps-btn ps-btn-secondary"
+                        style={{ padding: "9px 16px" }}
+                        onClick={() => handleRemoveClick(item)}
                       >
-                        -
-                      </button>
-                      <span
-                        style={{
-                          minWidth: "20px",
-                          textAlign: "center",
-                          fontWeight: 800,
-                          color: "#5f5550",
-                          fontSize: "13px",
-                        }}
-                      >
-                        {item.quantity || 1}
-                      </span>
-                      <button
-                        type="button"
-                        className="ps-btn"
-                        style={{
-                          width: "28px",
-                          height: "28px",
-                          padding: 0,
-                          borderRadius: "999px",
-                          border: "1px solid #c6beb4",
-                          background: "#ffffff",
-                          color: "#6c6258",
-                          fontSize: "18px",
-                          fontWeight: 800,
-                          lineHeight: 1,
-                          boxShadow: "none",
-                        }}
-                        onClick={() => handleChangeQuantity(item, 1)}
-                        aria-label={`Increase quantity of ${item.name || "item"}`}
-                      >
-                        +
+                        Remove
                       </button>
                     </div>
-                    <button
-                      type="button"
-                      className="ps-btn ps-btn-secondary"
-                      style={{ padding: "9px 16px" }}
-                      onClick={() => handleRemoveClick(item)}
-                    >
-                      Remove
-                    </button>
                   </div>
-                </div>
-              ))}
+                );
+              })}
 
               <div
                 className="ps-surface"
@@ -710,7 +759,7 @@ function Cart({
                         fontSize: "12px",
                       }}
                     >
-                      Tax (18%)
+                      Tax ({vatPercent}%)
                     </p>
                     <p style={{ margin: 0, fontWeight: 700, fontSize: "14px" }}>
                       ${tax.toFixed(2)}

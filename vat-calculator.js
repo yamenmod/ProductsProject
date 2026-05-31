@@ -1,4 +1,4 @@
-const VAT_RATE = 0.18;
+const VAT_RATE = Number(process.env.DEFAULT_VAT_RATE || 0);
 
 function round2(value) {
   return Math.round((value + Number.EPSILON) * 100) / 100;
@@ -39,9 +39,13 @@ function calculateFromFinal(totalPrice) {
 }
 
 function printBreakdown(result) {
-  console.log("\nIsraeli VAT (Ma'am) Calculator - 18%\n");
+  console.log(
+    `\nIsraeli VAT (Ma'am) Calculator - ${Math.round(VAT_RATE * 100)}%\n`,
+  );
   console.log(`Base price (before VAT): ${result.basePrice.toFixed(2)}`);
-  console.log(`VAT (18%):              ${result.vatAmount.toFixed(2)}`);
+  console.log(
+    `VAT (${Math.round(VAT_RATE * 100)}%):              ${result.vatAmount.toFixed(2)}`,
+  );
   console.log(`Total price:            ${result.totalPrice.toFixed(2)}\n`);
 }
 

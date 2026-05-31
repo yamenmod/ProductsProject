@@ -11,11 +11,16 @@ const getSetting = async (req, res) => {
       return res.status(400).json({ error: "Setting key is required" });
     }
 
-    const [rows] = await db.query("SELECT value FROM settings WHERE key_name = ?", [key]);
+    const [rows] = await db.query(
+      "SELECT value FROM settings WHERE key_name = ?",
+      [key],
+    );
 
     if (!rows || rows.length === 0) {
       return res.status(404).json({ error: "Setting not found" });
     }
+
+    console.log("[settings:get]", { key, value: rows[0].value });
 
     res.json({ key, value: rows[0].value });
   } catch (error) {
@@ -59,28 +64,34 @@ const updateSetting = async (req, res) => {
     if (key === "vat_rate") {
       const numValue = parseFloat(value);
       if (isNaN(numValue)) {
-        return res.status(400).json({ error: "VAT rate must be a valid number" });
+        return res
+          .status(400)
+          .json({ error: "VAT rate must be a valid number" });
       }
 
       // Accept either decimal (0.01-0.99) or percentage (1-99).
       const normalizedRate = numValue > 1 ? numValue / 100 : numValue;
 
       if (normalizedRate < 0.01 || normalizedRate > 0.99) {
-        return res.status(400).json({ error: "VAT rate must be between 1% and 99%" });
+        return res
+          .status(400)
+          .json({ error: "VAT rate must be between 1% and 99%" });
       }
 
       const storedRate = normalizedRate.toFixed(4);
       await db.query(
         "INSERT INTO settings (key_name, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value = ?",
-        [key, storedRate, storedRate]
+        [key, storedRate, storedRate],
       );
+
+      console.log("[settings:update]", { key, value: storedRate });
 
       return res.json({ key, value: storedRate });
     }
 
     await db.query(
       "INSERT INTO settings (key_name, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value = ?",
-      [key, value, value]
+      [key, value, value],
     );
 
     res.json({ key, value });
