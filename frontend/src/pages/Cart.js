@@ -411,11 +411,6 @@ function Cart({
     loadCart();
   }, [session?.token]);
 
-  const resolvedVatRate = Number(
-    displayItems?.[0]?.pricing?.vatRate ?? vatRate ?? 0,
-  );
-  const vatPercent = Math.round(resolvedVatRate * 100);
-
   const subtotal = displayItems.reduce(
     (runningTotal, item) =>
       runningTotal + getBasePrice(item) * (Number(item.quantity) || 1),
@@ -427,6 +422,8 @@ function Cart({
     0,
   );
   const tax = Math.max(0, total - subtotal);
+  const vatPercent = subtotal > 0 ? Math.round((tax / subtotal) * 100) : 0;
+  const resolvedVatRate = vatPercent / 100;
 
   useEffect(() => {
     if (!displayItems.length && vatRate === null) {
@@ -436,6 +433,7 @@ function Cart({
     console.log("[vat:cart-calculation]", {
       displayItemVatRate: displayItems?.[0]?.pricing?.vatRate,
       stateVatRate: vatRate,
+      calculatedVatRate: tax / (subtotal || 1),
       resolvedVatRate,
       vatPercent,
       subtotal,
