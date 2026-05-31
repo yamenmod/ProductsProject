@@ -198,9 +198,11 @@ const initDatabase = async () => {
     await db.query(`
       UPDATE orders
       SET status = CASE
-        WHEN LOWER(TRIM(status)) IN ('paid', 'completed', 'success', 'successful') THEN 'success'
+        WHEN LOWER(TRIM(status)) IN ('paid', 'completed', 'success', 'successful') THEN 'successful'
         WHEN LOWER(TRIM(status)) IN ('pending', 'processing', 'awaiting_payment', 'open', 'draft') THEN 'pending'
-        ELSE 'unsuccessful'
+        WHEN LOWER(TRIM(status)) IN ('failed', 'failure', 'error') THEN 'failed'
+        WHEN LOWER(TRIM(status)) IN ('canceled', 'cancelled', 'cancel') THEN 'canceled'
+        ELSE 'failed'
       END
     `);
 
@@ -220,9 +222,11 @@ const initDatabase = async () => {
     await db.query(`
       UPDATE payments
       SET status = CASE
-        WHEN LOWER(TRIM(status)) IN ('paid', 'completed', 'success', 'successful') THEN 'success'
+        WHEN LOWER(TRIM(status)) IN ('paid', 'completed', 'success', 'successful') THEN 'successful'
         WHEN LOWER(TRIM(status)) IN ('pending', 'processing', 'awaiting_payment', 'open', 'draft') THEN 'pending'
-        ELSE 'unsuccessful'
+        WHEN LOWER(TRIM(status)) IN ('failed', 'failure', 'error') THEN 'failed'
+        WHEN LOWER(TRIM(status)) IN ('canceled', 'cancelled', 'cancel') THEN 'canceled'
+        ELSE 'failed'
       END
     `);
 

@@ -53,8 +53,13 @@ function AdminDashboard({
       return "success";
     }
 
-    if (["pending", "processing", "awaiting_payment", "open", "draft"].includes(status)) {
+    if (["pending"].includes(status)) {
       return "pending";
+    }
+
+    // "failed" and "canceled" both go to unsuccessful bucket
+    if (["failed", "canceled", "unsuccessful"].includes(status)) {
+      return "unsuccessful";
     }
 
     return "unsuccessful";

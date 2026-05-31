@@ -1,6 +1,6 @@
 const axios = require("axios");
 const db = require("../db/connection");
-const { sendInvoiceEmail } = require("../utils/sendInvoiceEmail");
+const emailService = require("../services/emailService");
 const {
   getAvailableStock,
   getSizeStockTotal,
@@ -30,14 +30,15 @@ const FRONTEND_BASE_URL = (
 
 const ORDER_STATUS = {
   PENDING: "pending",
-  SUCCESS: "success",
-  UNSUCCESSFUL: "unsuccessful",
+  SUCCESSFUL: "successful",
+  FAILED: "failed",
+  CANCELED: "canceled",
 };
 
 const normalizeOrderStatusFromCapture = (captureStatus) => {
   return String(captureStatus || "").toUpperCase() === "COMPLETED"
-    ? ORDER_STATUS.SUCCESS
-    : ORDER_STATUS.UNSUCCESSFUL;
+    ? ORDER_STATUS.SUCCESSFUL
+    : ORDER_STATUS.FAILED;
 };
 
 const isPayerNotApprovedError = (error) => {
@@ -270,8 +271,8 @@ const quickCheckout = async (req, res) => {
       const total = roundMoney(subtotal);
 
       const [orderResult] = await connection.query(
-        "INSERT INTO orders (user_id, total, status, created_at) VALUES (?, ?, 'paid', NOW())",
-        [req.user.id, total],
+        "INSERT INTO orders (user_id, total, status, created_at) VALUES (?, ?, ?, NOW())",
+        [req.user.id, total, ORDER_STATUS.SUCCESSFUL],
       );
 
       await connection.query(
@@ -287,6 +288,20 @@ const quickCheckout = async (req, res) => {
 
       await connection.commit();
       connection.release();
+
+        // Send order confirmation email. If this fails we still return success to the user.
+        try {
+          await emailService.sendOrderConfirmation({ orderId: orderResult.insertId, userId: req.user.id });
+        } catch (emailErr) {
+          console.error('[checkout] order confirmation email failed', emailErr.message || emailErr);
+        }
+
+        // Send order confirmation email asynchronously. Don't block or rollback on failures.
+        try {
+          await emailService.sendOrderConfirmation({ orderId: orderResult.insertId, userId: req.user.id });
+        } catch (emailErr) {
+          console.error('[quickCheckout] order confirmation email failed', emailErr.message || emailErr);
+        }
 
       return res.status(200).json({
         message: "Purchase completed successfully",
@@ -304,7 +319,7 @@ const quickCheckout = async (req, res) => {
             },
           ],
           total,
-          status: "paid",
+          status: ORDER_STATUS.SUCCESSFUL,
         },
       });
     } catch (transactionError) {
@@ -714,8 +729,8 @@ const checkout = async (req, res) => {
       }
 
       const [orderResult] = await connection.query(
-        "INSERT INTO orders (user_id, total, customer_email, status, created_at) VALUES (?, ?, ?, 'paid', NOW())",
-        [req.user.id, total, users[0]?.email || null],
+        "INSERT INTO orders (user_id, total, customer_email, status, created_at) VALUES (?, ?, ?, ?, NOW())",
+        [req.user.id, total, users[0]?.email || null, ORDER_STATUS.SUCCESSFUL],
       );
 
       for (const item of items) {
@@ -743,7 +758,7 @@ const checkout = async (req, res) => {
           id: orderResult.insertId,
           items,
           total: roundMoney(total),
-          status: "paid",
+          status: ORDER_STATUS.SUCCESSFUL,
         },
       });
     } catch (transactionError) {
@@ -1074,7 +1089,7 @@ const capturePaypalOrder = async (req, res) => {
         ],
       );
 
-      if (finalOrderStatus === ORDER_STATUS.SUCCESS) {
+      if (finalOrderStatus === ORDER_STATUS.SUCCESSFUL) {
         const [cartRows] = await connection.query(
           `
             SELECT p.id, p.stock, ci.quantity
@@ -1114,20 +1129,22 @@ const capturePaypalOrder = async (req, res) => {
         finalStatus: finalOrderStatus,
       });
 
-      if (finalOrderStatus === ORDER_STATUS.SUCCESS) {
+      if (finalOrderStatus === ORDER_STATUS.SUCCESSFUL) {
         try {
-          console.log("[paypal:invoice] sending invoice email", {
+          console.log("[paypal:invoice] sending order confirmation email", {
             orderId,
             paypalOrderId: orderID,
             userId: req.user.id,
             customerEmail: userRecord.email || captureData?.payer?.email_address || null,
           });
-          await sendInvoiceEmail({
+
+          await emailService.sendOrderConfirmation({
             orderId,
             userId: req.user.id,
             paypalOrderId: orderID,
           });
-          console.log("[paypal:invoice] invoice email sent", {
+
+          console.log("[paypal:invoice] order confirmation send attempted", {
             orderId,
             paypalOrderId: orderID,
             userId: req.user.id,
@@ -1168,7 +1185,7 @@ const capturePaypalOrder = async (req, res) => {
   } catch (error) {
     console.error("[paypal:capture]", error.message || error);
 
-    const finalUnsuccessfulStatus = ORDER_STATUS.UNSUCCESSFUL;
+    const finalUnsuccessfulStatus = ORDER_STATUS.FAILED;
 
     logPayPalFlow("capture-unsuccessful", {
       paypalOrderId: req.body?.orderID || null,
@@ -1230,10 +1247,13 @@ const capturePaypalOrder = async (req, res) => {
   }
 };
 
-const markPaypalOrderAsUnsuccessful = async ({ orderID, userId = null, reason = "paypal-cancel" }) => {
+const markPaypalOrderAsUnsuccessful = async ({ orderID, userId = null, reason = "paypal-cancel", status = null }) => {
   if (!orderID) {
     return { updated: false, orderId: null };
   }
+
+  // Determine status based on reason: use CANCELED for cancellations, FAILED for other issues
+  const finalStatus = status || (reason.includes("cancel") ? ORDER_STATUS.CANCELED : ORDER_STATUS.FAILED);
 
   let whereClause = "p.paypal_order_id = ?";
   const whereParams = [orderID];
@@ -1255,10 +1275,10 @@ const markPaypalOrderAsUnsuccessful = async ({ orderID, userId = null, reason = 
       WHERE ${whereClause}
     `,
     [
-      ORDER_STATUS.SUCCESS,
-      ORDER_STATUS.UNSUCCESSFUL,
-      ORDER_STATUS.SUCCESS,
-      ORDER_STATUS.UNSUCCESSFUL,
+      ORDER_STATUS.SUCCESSFUL,
+      finalStatus,
+      ORDER_STATUS.SUCCESSFUL,
+      finalStatus,
       rawResponse,
       ...whereParams,
     ],
@@ -1367,7 +1387,7 @@ const handlePaypalCancelReturn = async (req, res) => {
       logPayPalFlow("final-status-assigned", {
         paypalOrderId: orderID,
         orderId: update.orderId,
-        finalStatus: ORDER_STATUS.UNSUCCESSFUL,
+        finalStatus: ORDER_STATUS.CANCELED,
       });
     }
 
@@ -1409,12 +1429,12 @@ const cancelPaypalOrder = async (req, res) => {
       paypalOrderId: orderID,
       userId: req.user?.id || null,
       orderId: update.orderId,
-      finalStatus: ORDER_STATUS.UNSUCCESSFUL,
+      finalStatus: ORDER_STATUS.CANCELED,
     });
 
     return res.status(200).json({
-      message: "PayPal order marked as unsuccessful",
-      status: ORDER_STATUS.UNSUCCESSFUL,
+      message: "PayPal order marked as canceled",
+      status: ORDER_STATUS.CANCELED,
     });
   } catch (error) {
     console.error("[paypal:cancel]", error.message || error);
