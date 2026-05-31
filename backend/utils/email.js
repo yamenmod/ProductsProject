@@ -1,14 +1,22 @@
-const nodemailer = require('nodemailer');
+const nodemailer = require("nodemailer");
 
 // Create transporter with SMTP configuration
 const createTransporter = () => {
-  return nodemailer.createTransporter({
-    host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-    port: process.env.EMAIL_PORT || 587,
-    secure: false, // true for 465, false for other ports
+  const user = (process.env.EMAIL_USER || "").trim();
+  const pass = (process.env.EMAIL_PASS || "").trim();
+
+  if (!user || !pass) {
+    console.error("[email] EMAIL_USER or EMAIL_PASS is missing");
+    return null;
+  }
+
+  return nodemailer.createTransport({
+    host: (process.env.EMAIL_HOST || "smtp.gmail.com").trim(),
+    port: Number(process.env.EMAIL_PORT || 587),
+    secure: Number(process.env.EMAIL_PORT || 587) === 465,
     auth: {
-      user: process.env.EMAIL_USER || 'waseemyamen1@gmail.com',
-      pass: process.env.EMAIL_PASS, // App password for Gmail
+      user,
+      pass,
     },
   });
 };
@@ -18,8 +26,12 @@ const sendOrderEmail = async (customerEmail, order) => {
   try {
     const transporter = createTransporter();
 
+    if (!transporter) {
+      return { success: false, error: "Email configuration is missing" };
+    }
+
     // Extract buyer name from PayPal order data
-    const buyerName = order.payer?.name?.given_name || 'Surfer';
+    const buyerName = order.payer?.name?.given_name || "Surfer";
 
     // Email content
     const htmlContent = `
@@ -120,17 +132,17 @@ const sendOrderEmail = async (customerEmail, order) => {
     `;
 
     const mailOptions = {
-      from: `"Plage Surf" <${process.env.EMAIL_USER || 'waseemyamen1@gmail.com'}>`,
+      from: `"Plage Surf" <${(process.env.EMAIL_USER || "waseemyamen1@gmail.com").trim()}>`,
       to: customerEmail,
-      subject: 'Thank you for your order 🏄‍♂️ | Plage Surf',
+      subject: "Thank you for your order 🏄‍♂️ | Plage Surf",
       html: htmlContent,
     };
 
     const info = await transporter.sendMail(mailOptions);
-    console.log('[email] Order confirmation sent:', info.messageId);
+    console.log("[email] Order confirmation sent:", info.messageId);
     return { success: true, messageId: info.messageId };
   } catch (error) {
-    console.error('[email] Failed to send order confirmation:', error.message);
+    console.error("[email] Failed to send order confirmation:", error.message);
     // Don't throw error to avoid breaking the payment flow
     return { success: false, error: error.message };
   }
