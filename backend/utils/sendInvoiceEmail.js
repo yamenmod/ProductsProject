@@ -1,6 +1,6 @@
 const nodemailer = require("nodemailer");
 const db = require("../db/connection");
-const { buildOrderEmailHtml, formatMoney } = require("./emailTemplates");
+const { buildOrderEmailHtml, formatMoney } = require("./emailTemplatesClean");
 
 const createGmailTransporter = () => {
   const user = (process.env.EMAIL_USER || "").trim();
@@ -23,7 +23,9 @@ const createGmailTransporter = () => {
 
 const getFromAddress = () => {
   const fromAddress = (
-    process.env.EMAIL_FROM || process.env.EMAIL_USER || ""
+    process.env.EMAIL_FROM ||
+    process.env.EMAIL_USER ||
+    ""
   ).trim();
 
   if (!fromAddress) {
