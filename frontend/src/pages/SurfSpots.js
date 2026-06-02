@@ -206,10 +206,12 @@ function Products({
   const [cardImageIndices, setCardImageIndices] = useState({});
   const swipeStartXRef = useRef(null);
 
-  const sizeOptions = ["XS", "S", "M", "L", "XL"];
+  const sizeOptions = ["S", "M", "L", "XL", "XXL"];
 
-  const isWetsuitProduct = (product) =>
-    normalizeCategoryValue(product?.category).includes("wetsuit");
+  const isClothingProduct = (product) => {
+    const normalized = normalizeCategoryValue(product?.category);
+    return normalized.includes("clothing") || normalized.includes("wetsuit");
+  };
 
   useEffect(() => {
     const loadData = async () => {
@@ -278,7 +280,7 @@ function Products({
       return;
     }
 
-    const selectedSize = isWetsuitProduct(previewProduct) ? previewSize : "";
+    const selectedSize = isClothingProduct(previewProduct) ? previewSize : "";
     await handleAddToCart(previewProduct, selectedSize);
   };
 
@@ -287,7 +289,7 @@ function Products({
       return;
     }
 
-    const selectedSize = isWetsuitProduct(previewProduct) ? previewSize : "";
+    const selectedSize = isClothingProduct(previewProduct) ? previewSize : "";
     await handleAddToCart(previewProduct, selectedSize);
   };
 
@@ -753,12 +755,6 @@ function Products({
                           ${getBasePrice(product).toFixed(2)}
                         </span>
                       </p>
-                      <p style={{ margin: "0 0 6px", color: "#5f5550" }}>
-                        Category: {product.category || "-"}
-                      </p>
-                      <p style={{ margin: "0 0 10px", color: "#5f5550" }}>
-                        Stock: {product.stock ?? 0}
-                      </p>
                       <div className="ps-productCardActions">
                         {(() => {
                           const productId = product._id || product.id;
@@ -775,7 +771,7 @@ function Products({
                                 type="button"
                                 className="ps-btn ps-btn-primary ps-productCardButton"
                                 onClick={() =>
-                                  isWetsuitProduct(product)
+                                  isClothingProduct(product)
                                     ? openPreview(product)
                                     : handleAddToCart(product)
                                 }
@@ -791,7 +787,7 @@ function Products({
                                 type="button"
                                 className="ps-btn ps-btn-dark ps-productCardButton"
                                 onClick={() =>
-                                  isWetsuitProduct(product)
+                                  isClothingProduct(product)
                                     ? openPreview(product)
                                     : handleBuyNow(product)
                                 }
@@ -894,13 +890,6 @@ function Products({
               <h3 className="ps-previewName">
                 {previewProduct.name || "New product"}
               </h3>
-              <p className="ps-previewCategory">
-                {previewProduct.category || "Product"}
-              </p>
-              <p className="ps-previewDescription">
-                {previewProduct.description || "No description available yet."}
-              </p>
-
               <div
                 className="ps-previewPurchaseRow"
                 style={{
@@ -924,12 +913,9 @@ function Products({
                       ${getBasePrice(previewProduct).toFixed(2)}
                     </span>
                   </div>
-                  <p className="ps-previewStock">
-                    Stock: {previewProduct.stock ?? 0}
-                  </p>
                 </div>
 
-                {isWetsuitProduct(previewProduct) && (
+                {isClothingProduct(previewProduct) && (
                   <select
                     value={previewSize}
                     onChange={(event) => setPreviewSize(event.target.value)}
@@ -959,7 +945,7 @@ function Products({
                     onClick={handlePreviewAddToCart}
                     disabled={
                       (previewProduct.stock ?? 0) < 1 ||
-                      (isWetsuitProduct(previewProduct) && !previewSize)
+                      (isClothingProduct(previewProduct) && !previewSize)
                     }
                     style={{ flex: 1 }}
                   >
@@ -973,7 +959,7 @@ function Products({
                     onClick={handlePreviewBuyNow}
                     disabled={
                       (previewProduct.stock ?? 0) < 1 ||
-                      (isWetsuitProduct(previewProduct) && !previewSize)
+                      (isClothingProduct(previewProduct) && !previewSize)
                     }
                     style={{ flex: 1 }}
                   >

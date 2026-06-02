@@ -151,21 +151,21 @@ const buildOrderEmailHtml = ({
 
             <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:6px;">
               <div style="display:flex;justify-content:space-between;color:#475569;font-size:14px;">
-                <span>Subtotal</span>
+                <span>Subtotal: </span>
                 <strong style="color:#06203a;">${formatMoney(subtotal, currency)}</strong>
               </div>
               <div style="display:flex;justify-content:space-between;color:#475569;font-size:14px;">
-                <span>Shipping</span>
+                <span>Shipping: </span>
                 <strong style="color:#06203a;">${formatMoney(shipping, currency)}</strong>
               </div>
               <div style="display:flex;justify-content:space-between;color:#475569;font-size:14px;">
-                <span>Tax</span>
+                <span>Tax: </span>
                 <strong style="color:#06203a;">${formatMoney(tax, currency)}</strong>
               </div>
             </div>
 
             <div style="display:flex;justify-content:space-between;align-items:center;padding-top:12px;border-top:1px solid rgba(3,27,63,0.04);font-size:16px;">
-              <span style="font-weight:900;color:#06203a;">Total</span>
+              <span style="font-weight:900;color:#06203a;">Total: </span>
               <strong style="font-size:20px;color:#003087;">${formatMoney(total, currency)}</strong>
             </div>
 

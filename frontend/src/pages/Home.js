@@ -24,7 +24,7 @@ function Home({
   const wetsuitRailRef = useRef(null);
   const swipeStartXRef = useRef(null);
 
-  const sizeOptions = ["XS", "S", "M", "L", "XL"];
+  const sizeOptions = ["S", "M", "L", "XL", "XXL"];
 
   const normalizeCategoryValue = (value) =>
     (value || "")
@@ -42,8 +42,10 @@ function Home({
       .replace(/[^a-z0-9]+/g, " ")
       .trim();
 
-  const isWetsuitProduct = (product) =>
-    normalizeGenderValue(product?.category).includes("wetsuit");
+  const isClothingProduct = (product) => {
+    const normalized = normalizeGenderValue(product?.category);
+    return normalized.includes("clothing") || normalized.includes("wetsuit");
+  };
 
   const parseImageValue = (value) => {
     if (!value) {
@@ -336,7 +338,7 @@ function Home({
       return;
     }
 
-    const selectedSize = isWetsuitProduct(previewProduct) ? previewSize : "";
+    const selectedSize = isClothingProduct(previewProduct) ? previewSize : "";
     const added = await addProductToCart(previewProduct, selectedSize);
     if (added) {
       onNavigate("cart");
@@ -348,7 +350,7 @@ function Home({
       return;
     }
 
-    const selectedSize = isWetsuitProduct(previewProduct) ? previewSize : "";
+    const selectedSize = isClothingProduct(previewProduct) ? previewSize : "";
     const added = await addProductToCart(previewProduct, selectedSize);
     if (!added) {
       return;
@@ -525,7 +527,7 @@ function Home({
                           marginTop: "12px",
                         }}
                         onClick={() =>
-                          isWetsuitProduct(product)
+                          isClothingProduct(product)
                             ? openPreview(product)
                             : handleCardAddToCart(product)
                         }
@@ -713,13 +715,9 @@ function Home({
               <h3 className="ps-previewName">
                 {previewProduct.name || "New product"}
               </h3>
-              <p className="ps-previewCategory">
-                {previewProduct.category || "Recent surfboard"}
-              </p>
               <p className="ps-previewDescription">
                 {previewProduct.description || "No description available yet."}
               </p>
-
               <div
                 className="ps-previewPurchaseRow"
                 style={{
@@ -743,12 +741,9 @@ function Home({
                       ${(previewProduct.price ?? 0).toFixed(2)}
                     </span>
                   </div>
-                  <p className="ps-previewStock">
-                    Stock: {previewProduct.stock ?? 0}
-                  </p>
                 </div>
 
-                {isWetsuitProduct(previewProduct) && (
+                {isClothingProduct(previewProduct) && (
                   <select
                     value={previewSize}
                     onChange={(event) => setPreviewSize(event.target.value)}
@@ -778,7 +773,7 @@ function Home({
                     onClick={handlePreviewAddToCart}
                     disabled={
                       (previewProduct.stock ?? 0) < 1 ||
-                      (isWetsuitProduct(previewProduct) && !previewSize)
+                      (isClothingProduct(previewProduct) && !previewSize)
                     }
                     style={{ flex: 1 }}
                   >
@@ -792,7 +787,7 @@ function Home({
                     onClick={handlePreviewBuyNow}
                     disabled={
                       (previewProduct.stock ?? 0) < 1 ||
-                      (isWetsuitProduct(previewProduct) && !previewSize)
+                      (isClothingProduct(previewProduct) && !previewSize)
                     }
                     style={{ flex: 1 }}
                   >

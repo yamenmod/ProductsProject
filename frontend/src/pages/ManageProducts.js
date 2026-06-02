@@ -61,7 +61,7 @@ function ManageProducts({
     volumeOptions.push(i.toString());
   }
 
-  const sizeOptions = ["XS", "S", "M", "L", "XL"];
+  const sizeOptions = ["S", "M", "L", "XL", "XXL"];
 
   const formatSizeStock = (value) => {
     if (!value) {
@@ -81,8 +81,10 @@ function ManageProducts({
     return "";
   };
 
-  const isWetsuitCategory = (value) =>
-    (value || "").toString().trim().toLowerCase().includes("wetsuit");
+  const isClothingCategory = (value) => {
+    const normalized = (value || "").toString().trim().toLowerCase();
+    return normalized.includes("clothing") || normalized.includes("wetsuit");
+  };
 
   const normalizeGenderValue = (value) => {
     const normalized = (value || "")
@@ -264,8 +266,10 @@ function ManageProducts({
       }
     }
 
-    if (isWetsuitCategory(form.category) && !form.sizeStock.trim()) {
-      setError("Add size stock for wetsuits, for example XS:4, S:6, M:3.");
+    if (isClothingCategory(form.category) && !form.sizeStock.trim()) {
+      setError(
+        "Add size stock for clothing, for example S:2, M:2, L:2, XL:2, XXL:2.",
+      );
       return;
     }
 
@@ -277,11 +281,11 @@ function ManageProducts({
     payload.append("gender", normalizeGenderValue(form.gender));
     payload.append("stock", form.stock === "" ? 0 : Number(form.stock));
 
-    if (isWetsuitCategory(form.category) && form.size) {
+    if (isClothingCategory(form.category) && form.size) {
       payload.append("size", form.size);
     }
 
-    if (isWetsuitCategory(form.category)) {
+    if (isClothingCategory(form.category)) {
       payload.append("sizeStock", form.sizeStock.trim());
     }
 
@@ -839,7 +843,7 @@ function ManageProducts({
                     min="0"
                     placeholder="Stock"
                     value={form.stock}
-                    disabled={isWetsuitCategory(form.category)}
+                    disabled={isClothingCategory(form.category)}
                     onChange={(e) =>
                       setForm({ ...form, stock: e.target.value })
                     }
@@ -851,7 +855,7 @@ function ManageProducts({
                       fontFamily: "inherit",
                       transition: "all 0.2s ease",
                       background: "#fffdf8",
-                      opacity: isWetsuitCategory(form.category) ? 0.7 : 1,
+                      opacity: isClothingCategory(form.category) ? 0.7 : 1,
                     }}
                     onFocus={(e) => {
                       e.target.style.borderColor = "#245860";
@@ -864,7 +868,7 @@ function ManageProducts({
                     }}
                   />
 
-                  {isWetsuitCategory(form.category) && (
+                  {isClothingCategory(form.category) && (
                     <div
                       style={{
                         gridColumn: "1 / -1",
@@ -878,9 +882,9 @@ function ManageProducts({
                     </div>
                   )}
 
-                  {isWetsuitCategory(form.category) && (
+                  {isClothingCategory(form.category) && (
                     <textarea
-                      placeholder="Size stock (e.g. XS:4, S:6, M:3, L:2, XL:1)"
+                      placeholder="Size stock (e.g. S:2, M:2, L:2, XL:2, XXL:2)"
                       value={form.sizeStock}
                       onChange={(e) =>
                         setForm({ ...form, sizeStock: e.target.value })
@@ -909,7 +913,7 @@ function ManageProducts({
                     />
                   )}
 
-                  {isWetsuitCategory(form.category) && (
+                  {isClothingCategory(form.category) && (
                     <select
                       value={form.size}
                       onChange={(e) =>
@@ -1419,19 +1423,20 @@ function ManageProducts({
                       ${Number(product.price).toFixed(2)}
                     </p>
                     <p style={{ margin: "0 0 6px 0", color: "#5f5550" }}>
-                      Category: {product.category || "-"}
-                    </p>
-                    <p style={{ margin: "0 0 6px 0", color: "#5f5550" }}>
                       Gender: {normalizeGenderValue(product.gender)}
                     </p>
-                    {isWetsuitCategory(product.category) && (
-                      <p style={{ margin: "0 0 6px 0", color: "#5f5550" }}>
-                        Size: {product.size || "-"}
+                    {isClothingCategory(product.category) ? (
+                      <p style={{ margin: "0 0 12px 0", color: "#5f5550" }}>
+                        Size stock:{" "}
+                        {formatSizeStock(
+                          product.sizeStock || product.size_stock || "-",
+                        )}
+                      </p>
+                    ) : (
+                      <p style={{ margin: "0 0 12px 0", color: "#5f5550" }}>
+                        Stock: {product.stock ?? 0}
                       </p>
                     )}
-                    <p style={{ margin: "0 0 12px 0", color: "#5f5550" }}>
-                      Stock: {product.stock ?? 0}
-                    </p>
                     {(product.category || "")
                       .toLowerCase()
                       .includes("surfboard") && (
@@ -1712,9 +1717,20 @@ function ManageProducts({
                           ? `$${Number(previewProduct.price).toFixed(2)}`
                           : "View price"}
                       </p>
-                      <p className="ps-previewStock">
-                        Stock: {previewProduct.stock ?? 0}
-                      </p>
+                      {isClothingCategory(previewProduct.category) ? (
+                        <p className="ps-previewStock">
+                          Size stock:{" "}
+                          {formatSizeStock(
+                            previewProduct.sizeStock ||
+                              previewProduct.size_stock ||
+                              "-",
+                          )}
+                        </p>
+                      ) : (
+                        <p className="ps-previewStock">
+                          Stock: {previewProduct.stock ?? 0}
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>

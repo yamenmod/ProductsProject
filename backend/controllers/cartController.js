@@ -35,6 +35,11 @@ const ORDER_STATUS = {
   CANCELED: "canceled",
 };
 
+const isClothingProduct = (category) => {
+  const normalized = (category || "").toString().trim().toLowerCase();
+  return normalized.includes("clothing") || normalized.includes("wetsuit");
+};
+
 const normalizeOrderStatusFromCapture = (captureStatus) => {
   return String(captureStatus || "").toUpperCase() === "COMPLETED"
     ? ORDER_STATUS.SUCCESSFUL
@@ -231,14 +236,12 @@ const quickCheckout = async (req, res) => {
     }
 
     const product = products[0];
-    const isWetsuit = (product.category || "")
-      .toString()
-      .trim()
-      .toLowerCase()
-      .includes("wetsuit");
+    const isClothing = isClothingProduct(product.category);
 
-    if (isWetsuit && !normalizedSize) {
-      return res.status(400).json({ message: "Size is required for wetsuits" });
+    if (isClothing && !normalizedSize) {
+      return res
+        .status(400)
+        .json({ message: "Size is required for clothing products" });
     }
 
     if (getAvailableStock(product, normalizedSize) < qty) {
@@ -254,7 +257,7 @@ const quickCheckout = async (req, res) => {
 
       const currentSizeStock = normalizeSizeStockMap(product.size_stock);
 
-      if (isWetsuit && currentSizeStock) {
+      if (isClothing && currentSizeStock) {
         const nextSizeStock = {
           ...currentSizeStock,
         };
@@ -299,18 +302,30 @@ const quickCheckout = async (req, res) => {
       await connection.commit();
       connection.release();
 
-        // Send order confirmation email. If email sending fails, do not roll back the order.
-        try {
-          await emailService.sendOrderConfirmation({ orderId: orderResult.insertId, userId: req.user.id });
-        } catch (emailErr) {
-          console.error('[checkout] order confirmation email failed', emailErr.message || emailErr);
-        }
+      // Send order confirmation email. If email sending fails, do not roll back the order.
+      try {
+        await emailService.sendOrderConfirmation({
+          orderId: orderResult.insertId,
+          userId: req.user.id,
+        });
+      } catch (emailErr) {
+        console.error(
+          "[checkout] order confirmation email failed",
+          emailErr.message || emailErr,
+        );
+      }
 
       // Send order confirmation email asynchronously. Don't block or rollback on failures.
       try {
-        await emailService.sendOrderConfirmation({ orderId: orderResult.insertId, userId: req.user.id });
+        await emailService.sendOrderConfirmation({
+          orderId: orderResult.insertId,
+          userId: req.user.id,
+        });
       } catch (emailErr) {
-        console.error('[quickCheckout] order confirmation email failed', emailErr.message || emailErr);
+        console.error(
+          "[quickCheckout] order confirmation email failed",
+          emailErr.message || emailErr,
+        );
       }
 
       return res.status(200).json({
@@ -428,14 +443,12 @@ const addToCart = async (req, res) => {
     }
 
     const normalizedSize = (size || "").toString().trim().toUpperCase();
-    const isWetsuit = (products[0].category || "")
-      .toString()
-      .trim()
-      .toLowerCase()
-      .includes("wetsuit");
+    const isClothing = isClothingProduct(products[0].category);
 
-    if (isWetsuit && !normalizedSize) {
-      return res.status(400).json({ message: "Size is required for wetsuits" });
+    if (isClothing && !normalizedSize) {
+      return res
+        .status(400)
+        .json({ message: "Size is required for clothing products" });
     }
 
     const [users] = await db.query(
@@ -448,7 +461,7 @@ const addToCart = async (req, res) => {
 
     const [existingItems] = await db.query(
       "SELECT id FROM cart_items WHERE user_id = ? AND product_id = ? AND size = ? LIMIT 1",
-      [req.user.id, productId, isWetsuit ? normalizedSize : ""],
+      [req.user.id, productId, isClothing ? normalizedSize : ""],
     );
 
     if (existingItems.length) {
@@ -462,7 +475,7 @@ const addToCart = async (req, res) => {
     } else {
       await db.query(
         "INSERT INTO cart_items (user_id, product_id, size, quantity) VALUES (?, ?, ?, ?)",
-        [req.user.id, productId, isWetsuit ? normalizedSize : "", qty],
+        [req.user.id, productId, isClothing ? normalizedSize : "", qty],
       );
       console.log(
         `[cart:add] inserted new item user=${req.user.id} product=${productId}`,
@@ -586,16 +599,12 @@ const updateCartQuantity = async (req, res) => {
       }
 
       const product = products[0];
-      const isWetsuit = (product.category || "")
-        .toString()
-        .trim()
-        .toLowerCase()
-        .includes("wetsuit");
+      const isClothing = isClothingProduct(product.category);
 
-      if (isWetsuit && !normalizedSize) {
+      if (isClothing && !normalizedSize) {
         return res
           .status(400)
-          .json({ message: "Size is required for wetsuits" });
+          .json({ message: "Size is required for clothing products" });
       }
 
       const stock = getAvailableStock(product, normalizedSize);
@@ -1258,13 +1267,20 @@ const capturePaypalOrder = async (req, res) => {
   }
 };
 
-const markPaypalOrderAsUnsuccessful = async ({ orderID, userId = null, reason = "paypal-cancel", status = null }) => {
+const markPaypalOrderAsUnsuccessful = async ({
+  orderID,
+  userId = null,
+  reason = "paypal-cancel",
+  status = null,
+}) => {
   if (!orderID) {
     return { updated: false, orderId: null };
   }
 
   // Determine status based on reason: use CANCELED for cancellations, FAILED for other issues
-  const finalStatus = status || (reason.includes("cancel") ? ORDER_STATUS.CANCELED : ORDER_STATUS.FAILED);
+  const finalStatus =
+    status ||
+    (reason.includes("cancel") ? ORDER_STATUS.CANCELED : ORDER_STATUS.FAILED);
 
   let whereClause = "p.paypal_order_id = ?";
   const whereParams = [orderID];

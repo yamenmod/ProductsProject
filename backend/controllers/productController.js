@@ -255,8 +255,10 @@ const normalizeGenderInput = (value) => {
   return "unisex";
 };
 
-const isWetsuitCategory = (value) =>
-  (value || "").toString().trim().toLowerCase().includes("wetsuit");
+const isClothingCategory = (value) => {
+  const normalized = (value || "").toString().trim().toLowerCase();
+  return normalized.includes("clothing") || normalized.includes("wetsuit");
+};
 
 const normalizeProduct = (row, vatRate = 0) => {
   const normalizedBoardHeight =
@@ -340,6 +342,7 @@ const getProducts = async (req, res) => {
           p.description,
           p.price,
           p.stock,
+          p.size_stock,
           p.category_id,
           p.gender,
           p.image_url,
@@ -380,6 +383,7 @@ const getProductById = async (req, res) => {
           p.description,
           p.price,
           p.stock,
+          p.size_stock,
           p.category_id,
           p.gender,
           p.image_url,
@@ -442,11 +446,11 @@ const createProduct = async (req, res) => {
         : volume !== undefined
           ? volume
           : null;
-    const nextSize = isWetsuitCategory(category) ? size || null : null;
-    const nextSizeStock = isWetsuitCategory(category)
+    const nextSize = isClothingCategory(category) ? size || null : null;
+    const nextSizeStock = isClothingCategory(category)
       ? parseSizeStockInput(sizeStock)
       : null;
-    const nextStock = isWetsuitCategory(category)
+    const nextStock = isClothingCategory(category)
       ? getSizeStockTotal(nextSizeStock)
       : stock === undefined
         ? 0
@@ -531,6 +535,7 @@ const createProduct = async (req, res) => {
           p.description,
           p.price,
           p.stock,
+          p.size_stock,
           p.category_id,
           p.gender,
           p.image_url,
@@ -605,27 +610,27 @@ const updateProduct = async (req, res) => {
           : null;
     const nextSize =
       category !== undefined
-        ? isWetsuitCategory(category)
+        ? isClothingCategory(category)
           ? size || null
           : null
-        : isWetsuitCategory(existingProduct.category)
+        : isClothingCategory(existingProduct.category)
           ? size !== undefined
             ? size || null
             : existingProduct.size || null
           : null;
     const nextSizeStock =
       category !== undefined
-        ? isWetsuitCategory(category)
+        ? isClothingCategory(category)
           ? sizeStock !== undefined
             ? parseSizeStockInput(sizeStock)
             : normalizeSizeStockMap(existingProduct.size_stock)
           : null
-        : isWetsuitCategory(existingProduct.category)
+        : isClothingCategory(existingProduct.category)
           ? sizeStock !== undefined
             ? parseSizeStockInput(sizeStock)
             : normalizeSizeStockMap(existingProduct.size_stock)
           : null;
-    const nextStock = isWetsuitCategory(
+    const nextStock = isClothingCategory(
       category !== undefined ? category : existingProduct.category,
     )
       ? getSizeStockTotal(nextSizeStock)

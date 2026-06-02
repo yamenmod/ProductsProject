@@ -48,10 +48,12 @@ function SizeCharts({
   const [cardImageIndices, setCardImageIndices] = useState({});
   const swipeStartXRef = useRef(null);
 
-  const sizeOptions = ["XS", "S", "M", "L", "XL"];
+  const sizeOptions = ["S", "M", "L", "XL", "XXL"];
 
-  const isWetsuitProduct = (product) =>
-    (product?.category || "").toString().toLowerCase().includes("wetsuit");
+  const isClothingProduct = (product) => {
+    const normalized = (product?.category || "").toString().toLowerCase();
+    return normalized.includes("clothing") || normalized.includes("wetsuit");
+  };
 
   const normalizeGenderValue = (value) =>
     (value || "")
@@ -340,7 +342,7 @@ function SizeCharts({
       return;
     }
 
-    const selectedSize = isWetsuitProduct(previewProduct) ? previewSize : "";
+    const selectedSize = isClothingProduct(previewProduct) ? previewSize : "";
     await handleAddToCart(previewProduct, selectedSize);
     closePreview();
   };
@@ -547,12 +549,12 @@ function SizeCharts({
                     </div>
 
                     <div className="ps-sizeChartProductBody">
-                      <p className="ps-sizeChartProductCategory">
-                        Rip Curl Wetsuit
-                      </p>
                       <h3 className="ps-sizeChartProductName">
                         {product.name || "Wetsuit"}
                       </h3>
+                      <p style={{ margin: "8px 0 0", color: "#5f5550" }}>
+                        ${Number(product.price || 0).toFixed(2)}
+                      </p>
                       <button
                         type="button"
                         className="ps-btn ps-btn-primary"
