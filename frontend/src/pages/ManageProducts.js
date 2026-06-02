@@ -14,6 +14,14 @@ function ManageProducts({
   initialProductToEdit,
 }) {
   const [products, setProducts] = useState([]);
+  const createDefaultSizeStock = () => ({
+    S: 0,
+    M: 0,
+    L: 0,
+    XL: 0,
+    XXL: 0,
+  });
+
   const [form, setForm] = useState({
     name: "",
     description: "",
@@ -24,7 +32,7 @@ function ManageProducts({
     image: "",
     image_urls: [],
     stock: "",
-    sizeStock: "",
+    sizeStock: createDefaultSizeStock(),
     boardHeight: "",
     boardVolume: "",
   });
@@ -79,6 +87,58 @@ function ManageProducts({
     }
 
     return "";
+  };
+
+  const parseSizeStockValue = (value) => {
+    const result = createDefaultSizeStock();
+
+    if (!value) {
+      return result;
+    }
+
+    let source = value;
+
+    if (typeof source === "string") {
+      const trimmed = source.trim();
+      if (!trimmed) {
+        return result;
+      }
+
+      try {
+        source = JSON.parse(trimmed);
+      } catch {
+        source = trimmed
+          .split(/[;,\n]/)
+          .map((item) => item.trim())
+          .filter(Boolean)
+          .reduce((acc, item) => {
+            const separatorIndex = item.indexOf(":");
+            if (separatorIndex === -1) {
+              return acc;
+            }
+            const key = item.slice(0, separatorIndex).trim().toUpperCase();
+            const stock = Number(item.slice(separatorIndex + 1).trim());
+            if (!key || Number.isNaN(stock) || stock < 0) {
+              return acc;
+            }
+            acc[key] = Math.floor(stock);
+            return acc;
+          }, {});
+      }
+    }
+
+    if (!source || typeof source !== "object" || Array.isArray(source)) {
+      return result;
+    }
+
+    return sizeOptions.reduce((next, size) => {
+      const rawValue = source[size] ?? source[size.toLowerCase()] ?? source[size.toUpperCase()];
+      const stockValue = Number(rawValue);
+      next[size] = Number.isFinite(stockValue) && stockValue >= 0
+        ? Math.floor(stockValue)
+        : 0;
+      return next;
+    }, {});
   };
 
   const isClothingCategory = (value) => {
@@ -226,7 +286,7 @@ function ManageProducts({
       image: "",
       image_urls: [],
       stock: "",
-      sizeStock: "",
+      sizeStock: createDefaultSizeStock(),
       boardHeight: "",
       boardVolume: "",
     });
@@ -266,11 +326,16 @@ function ManageProducts({
       }
     }
 
-    if (isClothingCategory(form.category) && !form.sizeStock.trim()) {
-      setError(
-        "Add size stock for clothing, for example S:2, M:2, L:2, XL:2, XXL:2.",
-      );
-      return;
+    if (isClothingCategory(form.category)) {
+      const hasValidSizeStock = Object.values(form.sizeStock || {})
+        .every((stock) => Number.isFinite(Number(stock)) && Number(stock) >= 0);
+
+      if (!hasValidSizeStock) {
+        setError(
+          "Enter valid stock values for clothing sizes using the fixed size grid.",
+        );
+        return;
+      }
     }
 
     const payload = new FormData();
@@ -286,7 +351,7 @@ function ManageProducts({
     }
 
     if (isClothingCategory(form.category)) {
-      payload.append("sizeStock", form.sizeStock.trim());
+      payload.append("sizeStock", JSON.stringify(form.sizeStock));
     }
 
     // Add surfboard-specific fields if category is Surfboard
@@ -368,7 +433,7 @@ function ManageProducts({
       image: product.image || "",
       image_urls: uniqueExistingImages,
       stock: product.stock ?? 0,
-      sizeStock: formatSizeStock(product.sizeStock || product.size_stock || ""),
+      sizeStock: parseSizeStockValue(product.sizeStock || product.size_stock || {}),
       boardHeight: product.boardHeight ?? product.height ?? "",
       boardVolume: product.boardVolume ?? product.volume ?? "",
     });
@@ -878,74 +943,65 @@ function ManageProducts({
                         fontWeight: 600,
                       }}
                     >
-                      Stock is derived from the size stock field below.
+                      Stock is derived from the size stock values below.
                     </div>
                   )}
 
                   {isClothingCategory(form.category) && (
-                    <textarea
-                      placeholder="Size stock (e.g. S:2, M:2, L:2, XL:2, XXL:2)"
-                      value={form.sizeStock}
-                      onChange={(e) =>
-                        setForm({ ...form, sizeStock: e.target.value })
-                      }
+                    <div
                       style={{
-                        padding: "10px 12px",
-                        border: "1px solid #d9c3ad",
-                        borderRadius: "8px",
-                        fontSize: "13px",
-                        fontFamily: "inherit",
-                        transition: "all 0.2s ease",
-                        background: "#fffdf8",
-                        width: "100%",
-                        minHeight: "72px",
                         gridColumn: "1 / -1",
-                      }}
-                      onFocus={(e) => {
-                        e.target.style.borderColor = "#245860";
-                        e.target.style.boxShadow =
-                          "0 0 0 3px rgba(36, 88, 96, 0.12)";
-                      }}
-                      onBlur={(e) => {
-                        e.target.style.borderColor = "#d9c3ad";
-                        e.target.style.boxShadow = "none";
-                      }}
-                    />
-                  )}
-
-                  {isClothingCategory(form.category) && (
-                    <select
-                      value={form.size}
-                      onChange={(e) =>
-                        setForm({ ...form, size: e.target.value })
-                      }
-                      style={{
-                        padding: "10px 12px",
-                        border: "1px solid #d9c3ad",
-                        borderRadius: "8px",
-                        fontSize: "14px",
-                        fontFamily: "inherit",
-                        background: "#fffdf8",
-                        cursor: "pointer",
-                        width: "100%",
-                      }}
-                      onFocus={(e) => {
-                        e.target.style.borderColor = "#245860";
-                        e.target.style.boxShadow =
-                          "0 0 0 3px rgba(36, 88, 96, 0.12)";
-                      }}
-                      onBlur={(e) => {
-                        e.target.style.borderColor = "#d9c3ad";
-                        e.target.style.boxShadow = "none";
+                        display: "grid",
+                        gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+                        gap: "12px",
+                        marginTop: "8px",
                       }}
                     >
-                      <option value="">Select Size</option>
                       {sizeOptions.map((size) => (
-                        <option key={size} value={size}>
-                          {size}
-                        </option>
+                        <label
+                          key={size}
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "6px",
+                            background: "#fffdf8",
+                            border: "1px solid #d9c3ad",
+                            borderRadius: "10px",
+                            padding: "12px",
+                            fontSize: "13px",
+                            color: "#1f1813",
+                          }}
+                        >
+                          <span style={{ fontWeight: 700 }}>{size}</span>
+                          <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={form.sizeStock[size] ?? 0}
+                            onChange={(e) => {
+                              const nextValue = Number(e.target.value);
+                              setForm({
+                                ...form,
+                                sizeStock: {
+                                  ...form.sizeStock,
+                                  [size]: Number.isFinite(nextValue) && nextValue >= 0
+                                    ? Math.floor(nextValue)
+                                    : 0,
+                                },
+                              });
+                            }}
+                            style={{
+                              padding: "10px 12px",
+                              border: "1px solid #d9c3ad",
+                              borderRadius: "8px",
+                              fontSize: "13px",
+                              fontFamily: "inherit",
+                              background: "#fffdf8",
+                            }}
+                          />
+                        </label>
                       ))}
-                    </select>
+                    </div>
                   )}
 
                   {(form.category || "")
