@@ -142,7 +142,7 @@ function App() {
         setPaymentSuccess({
           title: "Payment could not be completed",
           message:
-            "Your PayPal checkout was not completed. The order was marked as unsuccessful.",
+            "Your PayPal checkout was not completed. The order was marked as cancelled.",
           orderId: returnedOrderId || token || "-",
         });
       }

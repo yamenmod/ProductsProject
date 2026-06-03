@@ -4,6 +4,7 @@ const {
   serializeSizeStock,
   getSizeStockTotal,
 } = require("../utils/sizeStock");
+const { ORDER_STATUS, syncOrderStatusFields } = require("../utils/orderStatus");
 
 const createPending = async (req, res) => {
   try {
@@ -100,7 +101,14 @@ const getMyOrders = async (req, res) => {
     const userId = req.user.id;
 
     const [orders] = await db.query(
-      "SELECT id, user_id, total, payment_status, order_status, created_at, paid_at, cancelled_at FROM orders WHERE user_id = ? ORDER BY created_at DESC",
+      `SELECT id, user_id, total, status, payment_status, order_status, created_at, paid_at, cancelled_at
+       FROM orders
+       WHERE user_id = ?
+         AND (
+           order_status IN ('success', 'cancelled')
+           OR status IN ('success', 'cancelled')
+         )
+       ORDER BY created_at DESC`,
       [userId],
     );
 
@@ -132,13 +140,15 @@ const paySuccess = async (req, res) => {
     const order = orders[0];
 
     // Allow marking paid if currently pending
-    if (order.order_status !== "pending") {
+    const currentStatus = order.order_status || order.status;
+    if (currentStatus !== ORDER_STATUS.PENDING) {
       return res.status(400).json({ message: "Only pending orders can be marked as paid" });
     }
 
+    const synced = syncOrderStatusFields(ORDER_STATUS.SUCCESS);
     await db.query(
-      "UPDATE orders SET payment_status = ?, order_status = ?, paid_at = NOW() WHERE id = ?",
-      ["paid", "success", orderId],
+      "UPDATE orders SET status = ?, payment_status = ?, order_status = ?, paid_at = NOW() WHERE id = ?",
+      [synced.status, synced.payment_status, synced.order_status, orderId],
     );
 
     return res.status(200).json({ message: "Order marked as paid and successful" });
@@ -164,6 +174,15 @@ const cancel = async (req, res) => {
     }
 
     // Must be paid and within 48 hours
+    const orderBucket =
+      order.order_status === ORDER_STATUS.SUCCESS || order.status === ORDER_STATUS.SUCCESS
+        ? ORDER_STATUS.SUCCESS
+        : order.order_status || order.status;
+
+    if (orderBucket !== ORDER_STATUS.SUCCESS) {
+      return res.status(400).json({ message: "Only successful orders can be cancelled" });
+    }
+
     if (!order.paid_at) {
       return res.status(400).json({ message: "Only paid orders can be cancelled" });
     }
@@ -227,9 +246,10 @@ const cancel = async (req, res) => {
         }
       }
 
+      const synced = syncOrderStatusFields(ORDER_STATUS.CANCELLED);
       await connection.query(
-        "UPDATE orders SET order_status = ?, payment_status = ?, cancelled_at = NOW() WHERE id = ?",
-        ["cancelled", "refunded", orderId],
+        "UPDATE orders SET status = ?, order_status = ?, payment_status = ?, cancelled_at = NOW() WHERE id = ?",
+        [synced.status, synced.order_status, "refunded", orderId],
       );
 
       await connection.commit();

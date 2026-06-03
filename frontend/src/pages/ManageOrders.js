@@ -3,6 +3,11 @@ import axios from "axios";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { STATUS_COLORS, getStatusTone } from "../utils/statusColors";
+import {
+  getOrderBucket,
+  getOrderStatusLabel,
+  ORDER_STATUS_LABELS,
+} from "../utils/orderStatus";
 
 function ManageOrders({
   session,
@@ -52,27 +57,6 @@ function ManageOrders({
   useEffect(() => {
     setSelectedFilter(initialFilter || "all");
   }, [initialFilter]);
-
-  const normalizeStatus = (value) =>
-    (value || "").toString().trim().toLowerCase();
-
-  const getOrderBucket = useCallback((order) => {
-    const status = normalizeStatus(order?.status);
-
-    if (["paid", "success", "successful", "completed"].includes(status)) {
-      return "success";
-    }
-
-    if (
-      ["pending", "processing", "awaiting_payment", "open", "draft"].includes(
-        status,
-      )
-    ) {
-      return "pending";
-    }
-
-    return "unsuccessful";
-  }, []);
 
   useEffect(() => {
     const loadOrders = async () => {
@@ -174,7 +158,7 @@ function ManageOrders({
   }, [orders, searchTerm, selectedFilter, getOrderBucket, dateFrom, dateTo]);
 
   const summary = useMemo(() => {
-    const counts = { success: 0, unsuccessful: 0, pending: 0 };
+    const counts = { success: 0, cancelled: 0, pending: 0 };
 
     orders.forEach((order) => {
       counts[getOrderBucket(order)] += 1;
@@ -301,7 +285,7 @@ function ManageOrders({
             </h1>
             <p className="ps-lead" style={{ maxWidth: "760px" }}>
               Review every checkout and quickly spot whether the payment ended
-              up success, unsuccessful, or still pending.
+              up successful, cancelled, or still pending.
             </p>
           </div>
 
@@ -392,13 +376,21 @@ function ManageOrders({
             }}
           >
             {[
-              { label: "Success", value: summary.success, bucket: "success" },
               {
-                label: "Unsuccessful",
-                value: summary.unsuccessful,
-                bucket: "unsuccessful",
+                label: ORDER_STATUS_LABELS.success,
+                value: summary.success,
+                bucket: "success",
               },
-              { label: "Pending", value: summary.pending, bucket: "pending" },
+              {
+                label: ORDER_STATUS_LABELS.cancelled,
+                value: summary.cancelled,
+                bucket: "cancelled",
+              },
+              {
+                label: ORDER_STATUS_LABELS.pending,
+                value: summary.pending,
+                bucket: "pending",
+              },
             ].map((item) => (
               <button
                 key={item.label}
@@ -465,9 +457,9 @@ function ManageOrders({
 
             {[
               { key: "all", label: "All" },
-              { key: "success", label: "Success" },
-              { key: "unsuccessful", label: "Unsuccessful" },
-              { key: "pending", label: "Pending" },
+              { key: "success", label: ORDER_STATUS_LABELS.success },
+              { key: "cancelled", label: ORDER_STATUS_LABELS.cancelled },
+              { key: "pending", label: ORDER_STATUS_LABELS.pending },
             ].map((item) => (
               <button
                 key={item.key}
@@ -574,7 +566,7 @@ function ManageOrders({
                               color: tone.color,
                             }}
                           >
-                            {bucket}
+                            {getOrderStatusLabel(order)}
                           </span>
                         </td>
                         <td

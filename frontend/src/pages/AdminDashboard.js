@@ -3,6 +3,7 @@ import axios from "axios";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { STATUS_COLORS } from "../utils/statusColors";
+import { getOrderBucket, ORDER_STATUS_LABELS } from "../utils/orderStatus";
 import { resetVatRateCache } from "../utils/pricing";
 
 function AdminDashboard({
@@ -45,26 +46,11 @@ function AdminDashboard({
   const [vatInput, setVatInput] = useState("0");
   const [vatMessage, setVatMessage] = useState("");
   const [savingVat, setSavingVat] = useState(false);
+  const [maxProductsPerCart, setMaxProductsPerCart] = useState(10);
+  const [maxProductsInput, setMaxProductsInput] = useState("10");
+  const [maxProductsMessage, setMaxProductsMessage] = useState("");
+  const [savingMaxProducts, setSavingMaxProducts] = useState(false);
   const statusColors = STATUS_COLORS;
-
-  const normalizeStatus = (value) =>
-    (value || "").toString().trim().toLowerCase();
-
-  const getOrderBucket = (order) => {
-    const status = normalizeStatus(order?.status || order?.order_status);
-
-    // Only allow standardized statuses
-    if (status === "success") {
-      return "success";
-    }
-
-    if (status === "cancelled") {
-      return "cancelled";
-    }
-
-    // Default to pending
-    return "pending";
-  };
 
   const filteredOrders = useMemo(() => {
     const fromTime = dateFrom
@@ -111,19 +97,19 @@ function AdminDashboard({
     () => [
       {
         key: "success",
-        label: "Successful",
+        label: ORDER_STATUS_LABELS.success,
         value: filteredSummary.success,
         color: statusColors.success,
       },
       {
         key: "cancelled",
-        label: "Cancelled",
+        label: ORDER_STATUS_LABELS.cancelled,
         value: filteredSummary.cancelled,
         color: statusColors.cancelled,
       },
       {
         key: "pending",
-        label: "Pending",
+        label: ORDER_STATUS_LABELS.pending,
         value: filteredSummary.pending,
         color: statusColors.pending,
       },
@@ -223,6 +209,32 @@ function AdminDashboard({
     loadVat();
   }, [session?.token]);
 
+  useEffect(() => {
+    const loadMaxProducts = async () => {
+      if (!session?.token) {
+        return;
+      }
+
+      try {
+        const response = await axios.get(
+          "/api/admin/settings/max_products_per_cart",
+          {
+            headers: { Authorization: `Bearer ${session.token}` },
+          },
+        );
+
+        const value = Number(response.data?.value || 10);
+        const normalized = Number.isFinite(value) && value > 0 ? value : 10;
+        setMaxProductsPerCart(normalized);
+        setMaxProductsInput(String(normalized));
+      } catch (maxProductsError) {
+        console.error("Unable to load max products per cart:", maxProductsError.message);
+      }
+    };
+
+    loadMaxProducts();
+  }, [session?.token]);
+
   const saveVatRate = async () => {
     const parsedPercent = Number(vatInput);
 
@@ -261,6 +273,39 @@ function AdminDashboard({
     }
   };
 
+  const saveMaxProductsPerCart = async () => {
+    const parsed = Number(maxProductsInput);
+
+    if (!Number.isFinite(parsed) || parsed < 1 || parsed > 1000) {
+      setMaxProductsMessage("Max products per cart must be between 1 and 1000.");
+      return;
+    }
+
+    try {
+      setSavingMaxProducts(true);
+      setMaxProductsMessage("");
+
+      const response = await axios.put(
+        "/api/admin/settings/max_products_per_cart",
+        { value: parsed },
+        {
+          headers: { Authorization: `Bearer ${session.token}` },
+        },
+      );
+
+      const saved = Number(response.data?.value || parsed);
+      setMaxProductsPerCart(saved);
+      setMaxProductsInput(String(saved));
+      setMaxProductsMessage(`Cart limit updated to ${saved} products.`);
+    } catch (saveError) {
+      setMaxProductsMessage(
+        saveError.response?.data?.error || "Unable to update cart limit.",
+      );
+    } finally {
+      setSavingMaxProducts(false);
+    }
+  };
+
   const openOrders = (filter) => {
     if (typeof onOpenOrders === "function") {
       onOpenOrders(filter);
@@ -277,21 +322,21 @@ function AdminDashboard({
   const cards = [
     {
       key: "success",
-      label: "Successful",
+      label: ORDER_STATUS_LABELS.success,
       value: filteredSummary.success,
       color: statusColors.success,
       filter: "success",
     },
     {
       key: "cancelled",
-      label: "Cancelled",
+      label: ORDER_STATUS_LABELS.cancelled,
       value: filteredSummary.cancelled,
       color: statusColors.cancelled,
       filter: "cancelled",
     },
     {
       key: "pending",
-      label: "Pending",
+      label: ORDER_STATUS_LABELS.pending,
       value: filteredSummary.pending,
       color: statusColors.pending,
       filter: "pending",
@@ -484,6 +529,60 @@ function AdminDashboard({
                 }}
               >
                 {vatMessage || `Current VAT: ${vatRatePercent}%`}
+              </div>
+            </div>
+            <div style={{ minWidth: "220px", flex: "1 1 220px" }}>
+              <div
+                style={{
+                  color: "#65574d",
+                  fontSize: "12px",
+                  fontWeight: 800,
+                  letterSpacing: "1px",
+                  textTransform: "uppercase",
+                  marginBottom: "6px",
+                }}
+              >
+                Max products per cart
+              </div>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <input
+                  type="number"
+                  min="1"
+                  max="1000"
+                  value={maxProductsInput}
+                  onChange={(event) => setMaxProductsInput(event.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: "11px 12px",
+                    borderRadius: "12px",
+                    border: "1px solid rgba(31, 24, 19, 0.14)",
+                    background: "rgba(255, 250, 242, 0.95)",
+                    fontSize: "13px",
+                  }}
+                />
+                <button
+                  type="button"
+                  className="ps-btn ps-btn-primary"
+                  onClick={saveMaxProductsPerCart}
+                  disabled={savingMaxProducts}
+                  style={{ height: "44px", minWidth: "88px" }}
+                >
+                  {savingMaxProducts ? "Saving" : "Save"}
+                </button>
+              </div>
+              <div
+                style={{
+                  fontSize: "12px",
+                  color: maxProductsMessage
+                    ? maxProductsMessage.includes("updated")
+                      ? "#245860"
+                      : "#a83f34"
+                    : "#65574d",
+                  marginTop: "6px",
+                }}
+              >
+                {maxProductsMessage ||
+                  `Current limit: ${maxProductsPerCart} products per cart`}
               </div>
             </div>
           </div>

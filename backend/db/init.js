@@ -449,6 +449,63 @@ const initDatabase = async () => {
       }
     }
 
+    // Create categories table
+    await db.query(`
+    CREATE TABLE IF NOT EXISTS categories (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(100) NOT NULL UNIQUE,
+      description TEXT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )
+  `);
+    console.log("✅ Categories table verified/created");
+
+    // Create products table
+    await db.query(`
+    CREATE TABLE IF NOT EXISTS products (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(255) NOT NULL,
+      description TEXT NULL,
+      price DECIMAL(10, 2) NOT NULL DEFAULT 0,
+      stock INT NOT NULL DEFAULT 0,
+      max_quantity_per_user INT NOT NULL DEFAULT 10,
+      category_id INT NULL,
+      gender ENUM('male', 'female', 'unisex') NOT NULL DEFAULT 'unisex',
+      image_url MEDIUMTEXT NULL,
+      size VARCHAR(10) NULL DEFAULT NULL,
+      size_stock LONGTEXT NULL DEFAULT NULL,
+      board_length DECIMAL(5, 2) NULL DEFAULT NULL,
+      board_height DECIMAL(5, 2) NULL DEFAULT NULL,
+      height DECIMAL(5, 2) NULL DEFAULT NULL,
+      board_volume DECIMAL(5, 2) NULL DEFAULT NULL,
+      volume DECIMAL(5, 2) NULL DEFAULT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
+    )
+  `);
+    console.log("✅ Products table verified/created");
+
+    // Ensure max_quantity_per_user column exists (for existing tables)
+    const [maxQtyColumnRows] = await db.query(
+      `
+      SELECT COUNT(*) AS total
+      FROM information_schema.columns
+      WHERE table_schema = DATABASE()
+        AND table_name = 'products'
+        AND column_name = 'max_quantity_per_user'
+      `,
+    );
+
+    if (maxQtyColumnRows[0]?.total === 0) {
+      await db.query(`
+      ALTER TABLE products
+      ADD COLUMN max_quantity_per_user INT NOT NULL DEFAULT 10
+    `);
+      console.log("✅ max_quantity_per_user column added");
+    }
+
     // Create settings table for VAT and other configs
     await db.query(`
     CREATE TABLE IF NOT EXISTS settings (
@@ -500,7 +557,14 @@ const initDatabase = async () => {
     const expirePendingOrders = async () => {
       try {
         const [oldOrders] = await db.query(
-          `SELECT id FROM orders WHERE order_status = 'pending' AND created_at < (NOW() - INTERVAL 30 MINUTE)`,
+          `SELECT id FROM orders
+           WHERE (order_status = 'pending' OR status = 'pending')
+             AND created_at < (NOW() - INTERVAL 30 MINUTE)
+             AND (
+               payment_status = 'cart_hold'
+               OR payment_status = 'pending'
+               OR payment_status IS NULL
+             )`,
         );
 
         for (const o of oldOrders) {
@@ -549,8 +613,8 @@ const initDatabase = async () => {
             }
 
             await connection.query(
-              "UPDATE orders SET order_status = ?, payment_status = ?, cancelled_at = NOW() WHERE id = ?",
-              ["cancelled", "pending", o.id],
+              "UPDATE orders SET status = ?, order_status = ?, payment_status = ?, cancelled_at = NOW() WHERE id = ?",
+              ["cancelled", "cancelled", "cancelled", o.id],
             );
 
             await connection.commit();

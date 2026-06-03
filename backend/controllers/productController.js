@@ -368,7 +368,8 @@ const getProducts = async (req, res) => {
     );
     return res.status(200).json(response);
   } catch (error) {
-    return res.status(500).json({ message: "Server error" });
+    console.error("getProducts error:", error);
+    return res.status(500).json({ message: error.message || "Server error" });
   }
 };
 

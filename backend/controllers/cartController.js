@@ -13,6 +13,12 @@ const {
   getVatRateFromDb,
 } = require("../utils/pricing");
 const { getMaxProductsPerCart, getMaxQuantityPerProduct } = require("../utils/settings");
+const {
+  rebuildCartHoldOrder,
+  findCartHoldOrderId,
+  CART_HOLD_PAYMENT_STATUS,
+} = require("../utils/cartPendingOrder");
+const { syncOrderStatusFields } = require("../utils/orderStatus");
 
 // Cart, checkout, payment, and admin order reporting endpoints.
 
@@ -494,67 +500,6 @@ const addToCart = async (req, res) => {
         return res.status(404).json({ message: "User not found" });
       }
 
-      // Compute total stock
-      const currentSizeStock = normalizeSizeStockMap(product.size_stock);
-      let totalStock = 0;
-      if (currentSizeStock) {
-        totalStock = normalizedSize
-          ? Number(currentSizeStock[normalizedSize] || 0)
-          : getSizeStockTotal(currentSizeStock);
-      } else {
-        totalStock = Number(product.stock) || 0;
-      }
-
-      // Reserved in carts
-      let reservedCart = 0;
-      if (currentSizeStock && normalizedSize) {
-        const [rc] = await connection.query(
-          "SELECT COALESCE(SUM(quantity),0) AS reserved FROM cart_items WHERE product_id = ? AND size = ?",
-          [productId, normalizedSize],
-        );
-        reservedCart = Number(rc[0].reserved || 0);
-      } else {
-        const [rc] = await connection.query(
-          "SELECT COALESCE(SUM(quantity),0) AS reserved FROM cart_items WHERE product_id = ?",
-          [productId],
-        );
-        reservedCart = Number(rc[0].reserved || 0);
-      }
-
-      // Reserved in pending orders
-      let reservedOrders = 0;
-      if (currentSizeStock && normalizedSize) {
-        const [rowsOrders] = await connection.query(
-          `SELECT oi.quantity, oi.name FROM order_items oi
-           JOIN orders o ON o.id = oi.order_id
-           WHERE oi.product_id = ? AND o.status = 'pending'`,
-          [productId],
-        );
-        for (const r of rowsOrders) {
-          const name = r.name || "";
-          const m = name.match(/\(\s*Size\s*([^\)]+)\s*\)/i);
-          if (m && m[1] && m[1].toUpperCase() === normalizedSize) {
-            reservedOrders += Number(r.quantity || 0);
-          }
-        }
-      } else {
-        const [ro] = await connection.query(
-          `SELECT COALESCE(SUM(oi.quantity),0) AS reserved FROM order_items oi
-           JOIN orders o ON o.id = oi.order_id
-           WHERE oi.product_id = ? AND o.status = 'pending'`,
-          [productId],
-        );
-        reservedOrders = Number(ro[0].reserved || 0);
-      }
-
-      const available = Math.max(0, totalStock - (reservedCart + reservedOrders));
-
-      if (qty > available) {
-        await connection.rollback();
-        connection.release();
-        return res.status(400).json({ message: `Only ${available} items left in stock` });
-      }
-
       const [existingItems] = await connection.query(
         "SELECT id FROM cart_items WHERE user_id = ? AND product_id = ? AND size = ? LIMIT 1",
         [req.user.id, productId, isClothing ? normalizedSize : ""],
@@ -617,6 +562,16 @@ const addToCart = async (req, res) => {
         );
       }
 
+      try {
+        await rebuildCartHoldOrder(connection, req.user.id, db);
+      } catch (rebuildError) {
+        await connection.rollback();
+        connection.release();
+        return res.status(400).json({
+          message: rebuildError.message || "Unable to reserve stock for cart",
+        });
+      }
+
       await connection.commit();
       connection.release();
 
@@ -665,14 +620,28 @@ const removeFromCart = async (req, res) => {
       .trim()
       .toUpperCase();
 
-    await db.query(
-      normalizedSize
-        ? "DELETE FROM cart_items WHERE user_id = ? AND product_id = ? AND size = ?"
-        : "DELETE FROM cart_items WHERE user_id = ? AND product_id = ?",
-      normalizedSize
-        ? [req.user.id, productId, normalizedSize]
-        : [req.user.id, productId],
-    );
+    const connection = await db.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      await connection.query(
+        normalizedSize
+          ? "DELETE FROM cart_items WHERE user_id = ? AND product_id = ? AND size = ?"
+          : "DELETE FROM cart_items WHERE user_id = ? AND product_id = ?",
+        normalizedSize
+          ? [req.user.id, productId, normalizedSize]
+          : [req.user.id, productId],
+      );
+
+      await rebuildCartHoldOrder(connection, req.user.id, db);
+
+      await connection.commit();
+      connection.release();
+    } catch (transactionError) {
+      await connection.rollback();
+      connection.release();
+      return res.status(500).json({ message: "Server error" });
+    }
 
     const [rows] = await db.query(
       `
@@ -770,66 +739,6 @@ const updateCartQuantity = async (req, res) => {
           return res.status(404).json({ message: "Cart item not found" });
         }
 
-        const existingQty = Number(existingItems[0].quantity || 0);
-
-        // Compute total stock
-        const currentSizeStock = normalizeSizeStockMap(product.size_stock);
-        let totalStock = 0;
-        if (currentSizeStock) {
-          totalStock = normalizedSize
-            ? Number(currentSizeStock[normalizedSize] || 0)
-            : getSizeStockTotal(currentSizeStock);
-        } else {
-          totalStock = Number(product.stock) || 0;
-        }
-
-        // Sum all cart reservations for this product/size
-        const [rcAll] = await connection.query(
-          currentSizeStock && normalizedSize
-            ? "SELECT COALESCE(SUM(quantity),0) AS reserved FROM cart_items WHERE product_id = ? AND size = ?"
-            : "SELECT COALESCE(SUM(quantity),0) AS reserved FROM cart_items WHERE product_id = ?",
-          currentSizeStock && normalizedSize ? [productId, normalizedSize] : [productId],
-        );
-        const reservedCartAll = Number(rcAll[0].reserved || 0);
-
-        // Reserved in pending orders
-        let reservedOrders = 0;
-        if (currentSizeStock && normalizedSize) {
-          const [rowsOrders] = await connection.query(
-            `SELECT oi.quantity, oi.name FROM order_items oi
-             JOIN orders o ON o.id = oi.order_id
-             WHERE oi.product_id = ? AND o.status = 'pending'`,
-            [productId],
-          );
-          for (const r of rowsOrders) {
-            const name = r.name || "";
-            const m = name.match(/\(\s*Size\s*([^\)]+)\s*\)/i);
-            if (m && m[1] && m[1].toUpperCase() === normalizedSize) {
-              reservedOrders += Number(r.quantity || 0);
-            }
-          }
-        } else {
-          const [ro] = await connection.query(
-            `SELECT COALESCE(SUM(oi.quantity),0) AS reserved FROM order_items oi
-             JOIN orders o ON o.id = oi.order_id
-             WHERE oi.product_id = ? AND o.status = 'pending'`,
-            [productId],
-          );
-          reservedOrders = Number(ro[0].reserved || 0);
-        }
-
-        // Reservations excluding this user's current cart quantity
-        const reservedOthers = Math.max(0, reservedCartAll - existingQty);
-        const allowedMax = Math.max(0, totalStock - (reservedOthers + reservedOrders));
-
-        if (nextQuantity > allowedMax) {
-          await connection.rollback();
-          connection.release();
-          return res.status(400).json({
-            message: `Only ${allowedMax} item${allowedMax === 1 ? "" : "s"} available in stock`,
-          });
-        }
-
         // Check max quantity per product
         const maxQtyPerProduct = Number(product.max_quantity_per_user || 10);
         if (nextQuantity > maxQtyPerProduct) {
@@ -846,6 +755,16 @@ const updateCartQuantity = async (req, res) => {
           nextQuantity,
           existingItems[0].id,
         ]);
+      }
+
+      try {
+        await rebuildCartHoldOrder(connection, req.user.id, db);
+      } catch (rebuildError) {
+        await connection.rollback();
+        connection.release();
+        return res.status(400).json({
+          message: rebuildError.message || "Unable to update cart reservation",
+        });
       }
 
       await connection.commit();
@@ -920,80 +839,62 @@ const checkout = async (req, res) => {
       return res.status(400).json({ message: "Cart is empty" });
     }
 
-    let total = 0;
-    const items = [];
-
     const connection = await db.getConnection();
 
     try {
       await connection.beginTransaction();
 
-      for (const item of cartRows) {
-        if (getAvailableStock(item, item.size) < Number(item.quantity)) {
-          await connection.rollback();
-          connection.release();
-          return res.status(400).json({
-            message: `Not enough stock for ${item.name}`,
-          });
-        }
-
-        const currentSizeStock = normalizeSizeStockMap(item.size_stock);
-
-        if (currentSizeStock && item.size) {
-          const nextSizeStock = { ...currentSizeStock };
-          nextSizeStock[item.size] =
-            Number(nextSizeStock[item.size] || 0) - Number(item.quantity);
-
-          await connection.query(
-            "UPDATE products SET stock = ?, size_stock = ?, updated_at = NOW() WHERE id = ?",
-            [
-              getSizeStockTotal(nextSizeStock),
-              serializeSizeStock(nextSizeStock),
-              item.id,
-            ],
-          );
-        } else {
-          await connection.query(
-            "UPDATE products SET stock = stock - ?, updated_at = NOW() WHERE id = ?",
-            [Number(item.quantity), item.id],
-          );
-        }
-
-        const pricing = calculateVatPricing(item.price);
-        const subtotal = roundMoney(pricing.finalPrice * Number(item.quantity));
-        total = roundMoney(total + subtotal);
-
-        items.push({
-          product: item.id,
-          name: item.name,
-          displayName: item.size
-            ? `${item.name} (Size ${item.size})`
-            : item.name,
-          basePrice: pricing.basePrice,
-          vatAmount: pricing.vatAmount,
-          finalPrice: pricing.finalPrice,
-          quantity: Number(item.quantity),
-          subtotal,
+      try {
+        await rebuildCartHoldOrder(connection, req.user.id, db);
+      } catch (rebuildError) {
+        await connection.rollback();
+        connection.release();
+        return res.status(400).json({
+          message: rebuildError.message || "Unable to complete checkout",
         });
       }
 
-      const [orderResult] = await connection.query(
-        "INSERT INTO orders (user_id, total, customer_email, status, payment_status, order_status, paid_at, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())",
-        [req.user.id, total, users[0]?.email || null, ORDER_STATUS.SUCCESS, "paid", "success"],
+      const cartHoldId = await findCartHoldOrderId(connection, req.user.id);
+      if (!cartHoldId) {
+        await connection.rollback();
+        connection.release();
+        return res.status(400).json({ message: "Cart is empty" });
+      }
+
+      const [orderRows] = await connection.query(
+        "SELECT total FROM orders WHERE id = ? LIMIT 1",
+        [cartHoldId],
+      );
+      const total = roundMoney(Number(orderRows[0]?.total || 0));
+
+      const [orderItemRows] = await connection.query(
+        "SELECT product_id, name, price, quantity FROM order_items WHERE order_id = ?",
+        [cartHoldId],
       );
 
-      for (const item of items) {
-        await connection.query(
-          "INSERT INTO order_items (order_id, product_id, name, price, quantity) VALUES (?, ?, ?, ?, ?)",
-          [
-            orderResult.insertId,
-            item.product,
-            item.displayName || item.name,
-            item.finalPrice,
-            item.quantity,
-          ],
-        );
-      }
+      const items = orderItemRows.map((row) => ({
+        product: row.product_id,
+        name: row.name,
+        displayName: row.name,
+        finalPrice: Number(row.price),
+        quantity: Number(row.quantity),
+        subtotal: roundMoney(Number(row.price) * Number(row.quantity)),
+      }));
+
+      const synced = syncOrderStatusFields(ORDER_STATUS.SUCCESS);
+      await connection.query(
+        `UPDATE orders
+         SET status = ?, payment_status = ?, order_status = ?, paid_at = NOW(),
+             customer_email = COALESCE(?, customer_email)
+         WHERE id = ?`,
+        [
+          synced.status,
+          synced.payment_status,
+          synced.order_status,
+          users[0]?.email || null,
+          cartHoldId,
+        ],
+      );
 
       await connection.query("DELETE FROM cart_items WHERE user_id = ?", [
         req.user.id,
@@ -1004,9 +905,9 @@ const checkout = async (req, res) => {
       return res.status(200).json({
         message: "Purchase completed successfully",
         order: {
-          id: orderResult.insertId,
+          id: cartHoldId,
           items,
-          total: roundMoney(total),
+          total,
           status: ORDER_STATUS.SUCCESS,
         },
       });
@@ -1102,29 +1003,67 @@ const createPaypalOrder = async (req, res) => {
     try {
       await connection.beginTransaction();
 
-      const [orderResult] = await connection.query(
-        "INSERT INTO orders (user_id, total, customer_email, status, created_at) VALUES (?, ?, ?, ?, NOW())",
-        [req.user.id, total, userRecord?.email || null, ORDER_STATUS.PENDING],
-      );
+      try {
+        await rebuildCartHoldOrder(connection, req.user.id, db);
+      } catch (rebuildError) {
+        await connection.rollback();
+        connection.release();
+        return res.status(400).json({
+          message: rebuildError.message || "Unable to reserve stock for checkout",
+        });
+      }
 
-      for (const item of items) {
+      let orderId = await findCartHoldOrderId(connection, req.user.id);
+      const pendingSync = syncOrderStatusFields(ORDER_STATUS.PENDING);
+
+      if (orderId) {
         await connection.query(
-          "INSERT INTO order_items (order_id, product_id, name, price, quantity) VALUES (?, ?, ?, ?, ?)",
+          `UPDATE orders
+           SET total = ?, customer_email = ?, status = ?, order_status = ?, payment_status = ?
+           WHERE id = ?`,
           [
-            orderResult.insertId,
-            item.id,
-            item.displayName || item.name,
-            item.pricing.finalPrice,
-            Number(item.quantity),
+            total,
+            userRecord?.email || null,
+            pendingSync.status,
+            pendingSync.order_status,
+            pendingSync.payment_status,
+            orderId,
           ],
         );
+      } else {
+        const [orderResult] = await connection.query(
+          `INSERT INTO orders (user_id, total, customer_email, status, payment_status, order_status, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+          [
+            req.user.id,
+            total,
+            userRecord?.email || null,
+            pendingSync.status,
+            pendingSync.payment_status,
+            pendingSync.order_status,
+          ],
+        );
+        orderId = orderResult.insertId;
+
+        for (const item of items) {
+          await connection.query(
+            "INSERT INTO order_items (order_id, product_id, name, price, quantity) VALUES (?, ?, ?, ?, ?)",
+            [
+              orderId,
+              item.id,
+              item.displayName || item.name,
+              item.pricing.finalPrice,
+              Number(item.quantity),
+            ],
+          );
+        }
       }
 
       await connection.query(
         "INSERT INTO payments (user_id, order_id, paypal_order_id, status, amount, currency, raw_response) VALUES (?, ?, ?, ?, ?, ?, ?)",
         [
           req.user.id,
-          orderResult.insertId,
+          orderId,
           paypalOrderId,
           ORDER_STATUS.PENDING,
           Number(total),
@@ -1138,27 +1077,27 @@ const createPaypalOrder = async (req, res) => {
 
       logPayPalFlow("order-created", {
         userId: req.user?.id || null,
-        orderId: orderResult.insertId,
+        orderId,
         paypalOrderId,
         status: ORDER_STATUS.PENDING,
       });
 
       logPayPalFlow("user-redirected-to-paypal", {
         userId: req.user?.id || null,
-        orderId: orderResult.insertId,
+        orderId,
         paypalOrderId,
       });
 
       logPayPalFlow("final-status-assigned", {
         userId: req.user?.id || null,
-        orderId: orderResult.insertId,
+        orderId,
         paypalOrderId,
         finalStatus: ORDER_STATUS.PENDING,
       });
 
       return res.status(200).json({
         orderID: paypalOrderId,
-        orderId: orderResult.insertId,
+        orderId,
         total: total.toFixed(2),
         currency: PAYPAL_CURRENCY,
         status: ORDER_STATUS.PENDING,
@@ -1347,12 +1286,26 @@ const capturePaypalOrder = async (req, res) => {
         );
       }
 
+      const [orderMetaRows] = await connection.query(
+        "SELECT payment_status FROM orders WHERE id = ? LIMIT 1",
+        [orderId],
+      );
+      const stockAlreadyReserved =
+        orderMetaRows[0]?.payment_status === CART_HOLD_PAYMENT_STATUS;
+
+      const finalSynced = syncOrderStatusFields(finalOrderStatus);
       await connection.query(
-        "UPDATE orders SET status = ?, payment_status = ?, order_status = ?, paid_at = NOW(), total = ?, customer_email = COALESCE(?, customer_email), created_at = created_at WHERE id = ?",
+        `UPDATE orders
+         SET status = ?, payment_status = ?, order_status = ?,
+             paid_at = CASE WHEN ? = ? THEN NOW() ELSE paid_at END,
+             total = ?, customer_email = COALESCE(?, customer_email)
+         WHERE id = ?`,
         [
+          finalSynced.status,
+          finalSynced.payment_status,
+          finalSynced.order_status,
           finalOrderStatus,
-          finalOrderStatus === ORDER_STATUS.SUCCESS ? "paid" : "pending",
-          finalOrderStatus === ORDER_STATUS.SUCCESS ? "success" : "pending",
+          ORDER_STATUS.SUCCESS,
           Number(amountValue),
           userRecord.email || captureData?.payer?.email_address || null,
           orderId,
@@ -1362,7 +1315,7 @@ const capturePaypalOrder = async (req, res) => {
       await connection.query(
         "UPDATE payments SET status = ?, amount = ?, currency = ?, raw_response = ? WHERE paypal_order_id = ? AND user_id = ?",
         [
-          finalOrderStatus,
+          finalSynced.status,
           Number(amountValue),
           currencyCode,
           JSON.stringify(captureData),
@@ -1372,37 +1325,39 @@ const capturePaypalOrder = async (req, res) => {
       );
 
       if (finalOrderStatus === ORDER_STATUS.SUCCESS) {
-        const [cartRows] = await connection.query(
-          `
-            SELECT p.id, p.stock, p.size_stock, ci.size, ci.quantity
-            FROM cart_items ci
-            JOIN products p ON p.id = ci.product_id
-            WHERE ci.user_id = ?
-          `,
-          [req.user.id],
-        );
+        if (!stockAlreadyReserved) {
+          const [cartRows] = await connection.query(
+            `
+              SELECT p.id, p.stock, p.size_stock, ci.size, ci.quantity
+              FROM cart_items ci
+              JOIN products p ON p.id = ci.product_id
+              WHERE ci.user_id = ?
+            `,
+            [req.user.id],
+          );
 
-        for (const item of cartRows) {
-          const currentSizeStock = normalizeSizeStockMap(item.size_stock);
+          for (const item of cartRows) {
+            const currentSizeStock = normalizeSizeStockMap(item.size_stock);
 
-          if (currentSizeStock && item.size) {
-            const nextSizeStock = { ...currentSizeStock };
-            nextSizeStock[item.size] =
-              Number(nextSizeStock[item.size] || 0) - Number(item.quantity);
+            if (currentSizeStock && item.size) {
+              const nextSizeStock = { ...currentSizeStock };
+              nextSizeStock[item.size] =
+                Number(nextSizeStock[item.size] || 0) - Number(item.quantity);
 
-            await connection.query(
-              "UPDATE products SET stock = ?, size_stock = ?, updated_at = NOW() WHERE id = ?",
-              [
-                getSizeStockTotal(nextSizeStock),
-                serializeSizeStock(nextSizeStock),
-                item.id,
-              ],
-            );
-          } else {
-            await connection.query(
-              "UPDATE products SET stock = stock - ?, updated_at = NOW() WHERE id = ?",
-              [Number(item.quantity), item.id],
-            );
+              await connection.query(
+                "UPDATE products SET stock = ?, size_stock = ?, updated_at = NOW() WHERE id = ?",
+                [
+                  getSizeStockTotal(nextSizeStock),
+                  serializeSizeStock(nextSizeStock),
+                  item.id,
+                ],
+              );
+            } else {
+              await connection.query(
+                "UPDATE products SET stock = stock - ?, updated_at = NOW() WHERE id = ?",
+                [Number(item.quantity), item.id],
+              );
+            }
           }
         }
 
@@ -1565,12 +1520,17 @@ const markPaypalOrderAsUnsuccessful = async ({
       JOIN payments p ON p.order_id = o.id
       SET
         o.status = CASE WHEN o.status = ? THEN o.status ELSE ? END,
+        o.order_status = CASE WHEN o.order_status = ? THEN o.order_status ELSE ? END,
+        o.payment_status = CASE WHEN o.payment_status = 'paid' THEN o.payment_status ELSE ? END,
         p.status = CASE WHEN p.status = ? THEN p.status ELSE ? END,
         p.raw_response = ?
       WHERE ${whereClause}
     `,
     [
       ORDER_STATUS.SUCCESS,
+      finalStatus,
+      ORDER_STATUS.SUCCESS,
+      finalStatus,
       finalStatus,
       ORDER_STATUS.SUCCESS,
       finalStatus,
@@ -1709,7 +1669,7 @@ const handlePaypalCancelReturn = async (req, res) => {
       logPayPalFlow("final-status-assigned", {
         paypalOrderId: orderID,
         orderId: update.orderId,
-        finalStatus: ORDER_STATUS.CANCELED,
+        finalStatus: ORDER_STATUS.CANCELLED,
       });
     }
 
@@ -1753,17 +1713,17 @@ const cancelPaypalOrder = async (req, res) => {
       paypalOrderId: orderID,
       userId: req.user?.id || null,
       orderId: update.orderId,
-      finalStatus: ORDER_STATUS.CANCELED,
+      finalStatus: ORDER_STATUS.CANCELLED,
     });
 
     return res.status(200).json({
-      message: "PayPal order marked as canceled",
-      status: ORDER_STATUS.CANCELED,
+      message: "PayPal order marked as cancelled",
+      status: ORDER_STATUS.CANCELLED,
     });
   } catch (error) {
     console.error("[paypal:cancel]", error.message || error);
     return res.status(500).json({
-      message: "Unable to mark PayPal order as unsuccessful",
+      message: "Unable to mark PayPal order as cancelled",
     });
   }
 };
@@ -1780,12 +1740,13 @@ const getAdminOrders = async (req, res) => {
           u.email,
           o.total,
           o.status,
+          o.order_status,
           o.created_at,
           COUNT(oi.id) AS item_count
         FROM orders o
         JOIN users u ON u.id = o.user_id
         LEFT JOIN order_items oi ON oi.order_id = o.id
-        GROUP BY o.id, o.user_id, u.username, u.email, o.total, o.status, o.created_at
+        GROUP BY o.id, o.user_id, u.username, u.email, o.total, o.status, o.order_status, o.created_at
         ORDER BY o.created_at DESC, o.id DESC
       `,
     );
@@ -1797,7 +1758,8 @@ const getAdminOrders = async (req, res) => {
         username: row.username,
         email: row.email,
         total: Number(row.total),
-        status: row.status,
+        status: row.status || row.order_status,
+        order_status: row.order_status || row.status,
         itemCount: Number(row.item_count),
         createdAt: row.created_at,
       })),
