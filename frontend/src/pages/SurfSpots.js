@@ -204,6 +204,8 @@ function Products({
   const [previewImageIndex, setPreviewImageIndex] = useState(0);
   const [previewSize, setPreviewSize] = useState("");
   const [cardImageIndices, setCardImageIndices] = useState({});
+  const [cartErrorMessage, setCartErrorMessage] = useState("");
+  const [maxProducts, setMaxProducts] = useState(10);
   const swipeStartXRef = useRef(null);
 
   const sizeOptions = ["S", "M", "L", "XL", "XXL"];
@@ -256,11 +258,14 @@ function Products({
       if (typeof onAddToCart === "function") {
         const added = await onAddToCart(res.data);
         if (added) {
+          setCartErrorMessage("");
           onNavigate("cart");
         }
       }
     } catch (requestError) {
-      console.error("Add to cart failed:", requestError.message);
+      const errorMsg = requestError.response?.data?.message || requestError.message;
+      console.error("Add to cart failed:", errorMsg);
+      setCartErrorMessage(errorMsg);
     }
   };
 
@@ -589,6 +594,40 @@ function Products({
                   fontFamily: "inherit",
                 }}
               />
+            </div>
+          )}
+
+          {cartErrorMessage && (
+            <div
+              style={{
+                marginBottom: "20px",
+                padding: "12px 16px",
+                background: "#fff3cd",
+                border: "1px solid #ffc107",
+                borderRadius: "8px",
+                color: "#856404",
+                fontSize: "14px",
+                fontWeight: "500",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <span>{cartErrorMessage}</span>
+              <button
+                onClick={() => setCartErrorMessage("")}
+                style={{
+                  background: "none",
+                  border: "none",
+                  fontSize: "18px",
+                  cursor: "pointer",
+                  color: "#856404",
+                  padding: 0,
+                  marginLeft: "8px",
+                }}
+              >
+                ×
+              </button>
             </div>
           )}
 

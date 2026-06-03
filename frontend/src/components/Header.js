@@ -327,6 +327,17 @@ function Header({
             </button>
           )}
 
+          {user && user.role === "user" && (
+            <button
+              type="button"
+              className="ps-nav-link"
+              onClick={() => onNavigate("my-orders")}
+              style={{ marginLeft: 8 }}
+            >
+              My Orders
+            </button>
+          )}
+
           <button
             type="button"
             className="ps-btn ps-btn-secondary"

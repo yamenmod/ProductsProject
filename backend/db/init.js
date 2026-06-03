@@ -168,6 +168,10 @@ const initDatabase = async () => {
       total DECIMAL(10, 2) NOT NULL DEFAULT 0,
       customer_email VARCHAR(255) NULL DEFAULT NULL,
       status VARCHAR(50) NOT NULL DEFAULT 'pending',
+      payment_status VARCHAR(50) NOT NULL DEFAULT 'pending',
+      order_status VARCHAR(50) NOT NULL DEFAULT 'pending',
+      paid_at DATETIME NULL DEFAULT NULL,
+      cancelled_at DATETIME NULL DEFAULT NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     )
@@ -194,6 +198,39 @@ const initDatabase = async () => {
       ALTER TABLE orders
       MODIFY COLUMN status VARCHAR(50) NOT NULL DEFAULT 'pending'
     `);
+
+    // Ensure payment_status and order_status exist and are normalized
+    const [paymentStatusColumn] = await db.query(
+      `SELECT COUNT(*) AS total FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'orders' AND column_name = 'payment_status'`,
+    );
+
+    if (paymentStatusColumn[0]?.total === 0) {
+      await db.query(`ALTER TABLE orders ADD COLUMN payment_status VARCHAR(50) NOT NULL DEFAULT 'pending'`);
+    }
+
+    const [orderStatusColumn] = await db.query(
+      `SELECT COUNT(*) AS total FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'orders' AND column_name = 'order_status'`,
+    );
+
+    if (orderStatusColumn[0]?.total === 0) {
+      await db.query(`ALTER TABLE orders ADD COLUMN order_status VARCHAR(50) NOT NULL DEFAULT 'pending'`);
+    }
+
+    const [paidAtColumn] = await db.query(
+      `SELECT COUNT(*) AS total FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'orders' AND column_name = 'paid_at'`,
+    );
+
+    if (paidAtColumn[0]?.total === 0) {
+      await db.query(`ALTER TABLE orders ADD COLUMN paid_at DATETIME NULL DEFAULT NULL`);
+    }
+
+    const [cancelledAtColumn] = await db.query(
+      `SELECT COUNT(*) AS total FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'orders' AND column_name = 'cancelled_at'`,
+    );
+
+    if (cancelledAtColumn[0]?.total === 0) {
+      await db.query(`ALTER TABLE orders ADD COLUMN cancelled_at DATETIME NULL DEFAULT NULL`);
+    }
 
     await db.query(`
       UPDATE orders
@@ -437,7 +474,103 @@ const initDatabase = async () => {
       );
     }
 
+    // Initialize max_products_per_cart if not already set
+    const [existingMaxProducts] = await db.query(
+      "SELECT * FROM settings WHERE key_name = 'max_products_per_cart'",
+    );
+
+    if (!existingMaxProducts || existingMaxProducts.length === 0) {
+      await db.query(
+        "INSERT INTO settings (key_name, value) VALUES ('max_products_per_cart', '10')",
+      );
+    }
+
+    // Initialize max_quantity_per_product if not already set
+    const [existingMaxQty] = await db.query(
+      "SELECT * FROM settings WHERE key_name = 'max_quantity_per_product'",
+    );
+
+    if (!existingMaxQty || existingMaxQty.length === 0) {
+      await db.query(
+        "INSERT INTO settings (key_name, value) VALUES ('max_quantity_per_product', '10')",
+      );
+    }
+
     console.log("✅ Database initialization complete!");
+
+    // Periodic cleanup: expire pending orders older than 30 minutes and restore stock
+    const expirePendingOrders = async () => {
+      try {
+        const [oldOrders] = await db.query(
+          `SELECT id FROM orders WHERE order_status = 'pending' AND created_at < (NOW() - INTERVAL 30 MINUTE)`,
+        );
+
+        for (const o of oldOrders) {
+          const connection = await db.getConnection();
+          try {
+            await connection.beginTransaction();
+
+            const [items] = await connection.query(
+              "SELECT product_id, quantity, name FROM order_items WHERE order_id = ?",
+              [o.id],
+            );
+
+            for (const it of items) {
+              const [products] = await connection.query(
+                "SELECT * FROM products WHERE id = ? LIMIT 1 FOR UPDATE",
+                [it.product_id],
+              );
+              if (!products.length) continue;
+              const product = products[0];
+              const sizeStock = (() => {
+                try {
+                  return JSON.parse(product.size_stock || null);
+                } catch (e) {
+                  return null;
+                }
+              })();
+
+              if (sizeStock) {
+                // Try to parse size from name
+                const m = (it.name || "").match(/\(\s*Size\s*([^\)]+)\s*\)/i);
+                if (m && m[1]) {
+                  const size = m[1].toUpperCase();
+                  const next = { ...sizeStock };
+                  next[size] = (Number(next[size] || 0) + Number(it.quantity || 0));
+                  await connection.query(
+                    "UPDATE products SET stock = ?, size_stock = ?, updated_at = NOW() WHERE id = ?",
+                    [Object.values(next).reduce((s, v) => s + Number(v || 0), 0), JSON.stringify(next), it.product_id],
+                  );
+                }
+              } else {
+                await connection.query(
+                  "UPDATE products SET stock = stock + ?, updated_at = NOW() WHERE id = ?",
+                  [it.quantity, it.product_id],
+                );
+              }
+            }
+
+            await connection.query(
+              "UPDATE orders SET order_status = ?, payment_status = ?, cancelled_at = NOW() WHERE id = ?",
+              ["expired", "failed", o.id],
+            );
+
+            await connection.commit();
+            connection.release();
+          } catch (txErr) {
+            await connection.rollback();
+            connection.release();
+            console.error("[expirePendingOrders] tx error", txErr.message || txErr);
+          }
+        }
+      } catch (err) {
+        console.error("[expirePendingOrders] error", err.message || err);
+      }
+    };
+
+    setInterval(() => {
+      void expirePendingOrders();
+    }, 60 * 1000); // run every 1 minute
   } catch (error) {
     console.error("❌ Database initialization failed:", error);
     throw error;

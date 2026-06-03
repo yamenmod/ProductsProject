@@ -12,6 +12,7 @@ import ManageProducts from "./pages/ManageProducts";
 import ManageCustomers from "./pages/ManageCustomers";
 import AdminDashboard from "./pages/AdminDashboard";
 import Profile from "./pages/Profile";
+import MyOrders from "./pages/MyOrders";
 
 const normalizeCartItems = (items = []) =>
   (Array.isArray(items) ? items : []).map((item) => {
@@ -647,6 +648,16 @@ function App() {
         onRemoveFromCart={handleRemoveFromCart}
         onUpdateCartQuantity={handleUpdateCartQuantity}
         cartCount={cartCount}
+      />,
+    );
+  }
+
+  if (currentPage === "my-orders") {
+    return withPaymentSuccessModal(
+      <MyOrders
+        session={session}
+        user={session.user}
+        onNavigate={handleNavigate}
       />,
     );
   }

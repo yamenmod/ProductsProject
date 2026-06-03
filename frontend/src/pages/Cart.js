@@ -30,6 +30,7 @@ function Cart({
   const [paypalMessage, setPaypalMessage] = useState("");
   const [isPayPalLoading, setIsPayPalLoading] = useState(false);
   const [vatRate, setVatRate] = useState(null);
+  const [errorMessage, setErrorMessage] = useState("");
 
   const normalizeCartItems = (items = []) =>
     (Array.isArray(items) ? items : []).map((item) => {
@@ -102,10 +103,17 @@ function Cart({
 
     if (nextQuantity <= 0) {
       await onRemoveFromCart?.(item.id, item.size || "");
+      setErrorMessage("");
       return;
     }
 
-    await onUpdateCartQuantity(item.id, nextQuantity, item.size || "");
+    try {
+      await onUpdateCartQuantity(item.id, nextQuantity, item.size || "");
+      setErrorMessage("");
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message || "Failed to update quantity";
+      setErrorMessage(msg);
+    }
   };
 
   const openPayPalModal = () => {
@@ -501,6 +509,38 @@ function Cart({
             </div>
           ) : (
             <div style={{ display: "grid", gap: "24px" }}>
+              {errorMessage && (
+                <div
+                  style={{
+                    padding: "12px 16px",
+                    background: "#fff3cd",
+                    border: "1px solid #ffc107",
+                    borderRadius: "8px",
+                    color: "#856404",
+                    fontSize: "14px",
+                    fontWeight: "500",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <span>{errorMessage}</span>
+                  <button
+                    onClick={() => setErrorMessage("")}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      fontSize: "18px",
+                      cursor: "pointer",
+                      color: "#856404",
+                      padding: 0,
+                      marginLeft: "8px",
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
               {displayItems.map((item) => {
                 console.log("[vat:product-card-label]", {
                   itemId: item.id,

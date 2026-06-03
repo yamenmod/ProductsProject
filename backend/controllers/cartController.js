@@ -12,6 +12,7 @@ const {
   roundMoney,
   getVatRateFromDb,
 } = require("../utils/pricing");
+const { getMaxProductsPerCart, getMaxQuantityPerProduct } = require("../utils/settings");
 
 // Cart, checkout, payment, and admin order reporting endpoints.
 
@@ -40,8 +41,10 @@ const isClothingProduct = (category) => {
   return normalized.includes("clothing") || normalized.includes("wetsuit");
 };
 
-const normalizeOrderStatusFromCapture = (captureStatus) => {
-  return String(captureStatus || "").toUpperCase() === "COMPLETED"
+const normalizeOrderStatusFromCapture = (captureStatus, captureUnitStatus) => {
+  const normalizedStatus = String(captureStatus || "").toUpperCase();
+  const normalizedUnitStatus = String(captureUnitStatus || "").toUpperCase();
+  return (normalizedStatus === "COMPLETED" || normalizedUnitStatus === "COMPLETED")
     ? ORDER_STATUS.SUCCESSFUL
     : ORDER_STATUS.FAILED;
 };
@@ -223,44 +226,88 @@ const quickCheckout = async (req, res) => {
     const qty = Number(quantity) > 0 ? Number(quantity) : 1;
     const normalizedSize = (size || "").toString().trim().toUpperCase();
 
-    const [products] = await db.query(
-      `SELECT p.id, p.name, p.price, p.stock, p.size_stock, c.name AS category
-       FROM products p
-       LEFT JOIN categories c ON c.id = p.category_id
-       WHERE p.id = ? LIMIT 1`,
-      [productId],
-    );
-
-    if (!products.length) {
-      return res.status(404).json({ message: "Product not found" });
-    }
-
-    const product = products[0];
-    const isClothing = isClothingProduct(product.category);
-
-    if (isClothing && !normalizedSize) {
-      return res
-        .status(400)
-        .json({ message: "Size is required for clothing products" });
-    }
-
-    if (getAvailableStock(product, normalizedSize) < qty) {
-      return res
-        .status(400)
-        .json({ message: `Not enough stock for ${product.name}` });
-    }
-
     const connection = await db.getConnection();
-
     try {
       await connection.beginTransaction();
 
+      const [products] = await connection.query(
+        `SELECT p.id, p.name, p.price, p.stock, p.size_stock, c.name AS category
+         FROM products p
+         LEFT JOIN categories c ON c.id = p.category_id
+         WHERE p.id = ? LIMIT 1 FOR UPDATE`,
+        [productId],
+      );
+
+      if (!products.length) {
+        await connection.rollback();
+        connection.release();
+        return res.status(404).json({ message: "Product not found" });
+      }
+
+      const product = products[0];
+      const isClothing = isClothingProduct(product.category);
+
+      if (isClothing && !normalizedSize) {
+        await connection.rollback();
+        connection.release();
+        return res
+          .status(400)
+          .json({ message: "Size is required for clothing products" });
+      }
+
       const currentSizeStock = normalizeSizeStockMap(product.size_stock);
+      let totalStock = 0;
+      if (currentSizeStock) {
+        totalStock = normalizedSize
+          ? Number(currentSizeStock[normalizedSize] || 0)
+          : getSizeStockTotal(currentSizeStock);
+      } else {
+        totalStock = Number(product.stock) || 0;
+      }
+
+      // Compute reservations
+      const [rc] = await connection.query(
+        currentSizeStock && normalizedSize
+          ? "SELECT COALESCE(SUM(quantity),0) AS reserved FROM cart_items WHERE product_id = ? AND size = ?"
+          : "SELECT COALESCE(SUM(quantity),0) AS reserved FROM cart_items WHERE product_id = ?",
+        currentSizeStock && normalizedSize ? [productId, normalizedSize] : [productId],
+      );
+      const reservedCart = Number(rc[0].reserved || 0);
+
+      let reservedOrders = 0;
+      if (currentSizeStock && normalizedSize) {
+        const [rowsOrders] = await connection.query(
+          `SELECT oi.quantity, oi.name FROM order_items oi
+           JOIN orders o ON o.id = oi.order_id
+           WHERE oi.product_id = ? AND o.status = 'pending'`,
+          [productId],
+        );
+        for (const r of rowsOrders) {
+          const name = r.name || "";
+          const m = name.match(/\(\s*Size\s*([^\)]+)\s*\)/i);
+          if (m && m[1] && m[1].toUpperCase() === normalizedSize) {
+            reservedOrders += Number(r.quantity || 0);
+          }
+        }
+      } else {
+        const [ro] = await connection.query(
+          `SELECT COALESCE(SUM(oi.quantity),0) AS reserved FROM order_items oi
+           JOIN orders o ON o.id = oi.order_id
+           WHERE oi.product_id = ? AND o.status = 'pending'`,
+          [productId],
+        );
+        reservedOrders = Number(ro[0].reserved || 0);
+      }
+
+      const available = Math.max(0, totalStock - (reservedCart + reservedOrders));
+      if (qty > available) {
+        await connection.rollback();
+        connection.release();
+        return res.status(400).json({ message: `Not enough stock for ${product.name}` });
+      }
 
       if (isClothing && currentSizeStock) {
-        const nextSizeStock = {
-          ...currentSizeStock,
-        };
+        const nextSizeStock = { ...currentSizeStock };
         nextSizeStock[normalizedSize] =
           Number(nextSizeStock[normalizedSize] || 0) - qty;
 
@@ -302,30 +349,13 @@ const quickCheckout = async (req, res) => {
       await connection.commit();
       connection.release();
 
-      // Send order confirmation email. If email sending fails, do not roll back the order.
       try {
         await emailService.sendOrderConfirmation({
           orderId: orderResult.insertId,
           userId: req.user.id,
         });
       } catch (emailErr) {
-        console.error(
-          "[checkout] order confirmation email failed",
-          emailErr.message || emailErr,
-        );
-      }
-
-      // Send order confirmation email asynchronously. Don't block or rollback on failures.
-      try {
-        await emailService.sendOrderConfirmation({
-          orderId: orderResult.insertId,
-          userId: req.user.id,
-        });
-      } catch (emailErr) {
-        console.error(
-          "[quickCheckout] order confirmation email failed",
-          emailErr.message || emailErr,
-        );
+        console.error("[quickCheckout] order confirmation email failed", emailErr.message || emailErr);
       }
 
       return res.status(200).json({
@@ -418,72 +448,181 @@ const addToCart = async (req, res) => {
     const { productId, quantity, size } = req.body;
     const sourcePage = req.headers["x-source-page"] || "unknown";
 
-    console.log(
-      `[cart:add] source=${sourcePage} user=${req.user?.id} product=${productId} qty=${quantity}`,
-    );
-
     if (!productId) {
       return res.status(400).json({ message: "Product ID is required" });
     }
 
     const qty = Number(quantity) > 0 ? Number(quantity) : 1;
-
-    const [products] = await db.query(
-      `
-        SELECT p.id, c.name AS category
-        FROM products p
-        LEFT JOIN categories c ON c.id = p.category_id
-        WHERE p.id = ?
-        LIMIT 1
-      `,
-      [productId],
-    );
-    if (!products.length) {
-      return res.status(404).json({ message: "Product not found" });
-    }
-
     const normalizedSize = (size || "").toString().trim().toUpperCase();
-    const isClothing = isClothingProduct(products[0].category);
 
-    if (isClothing && !normalizedSize) {
-      return res
-        .status(400)
-        .json({ message: "Size is required for clothing products" });
-    }
+    const connection = await db.getConnection();
+    try {
+      await connection.beginTransaction();
 
-    const [users] = await db.query(
-      "SELECT id, email FROM users WHERE id = ? LIMIT 1",
-      [req.user.id],
-    );
-    if (!users.length) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    const [existingItems] = await db.query(
-      "SELECT id FROM cart_items WHERE user_id = ? AND product_id = ? AND size = ? LIMIT 1",
-      [req.user.id, productId, isClothing ? normalizedSize : ""],
-    );
-
-    if (existingItems.length) {
-      await db.query(
-        "UPDATE cart_items SET quantity = quantity + ? WHERE id = ?",
-        [qty, existingItems[0].id],
+      const [products] = await connection.query(
+        `SELECT p.id, p.stock, p.size_stock, c.name AS category
+         FROM products p
+         LEFT JOIN categories c ON c.id = p.category_id
+         WHERE p.id = ?
+         LIMIT 1 FOR UPDATE`,
+        [productId],
       );
-      console.log(
-        `[cart:add] updated existing item id=${existingItems[0].id} user=${req.user.id}`,
-      );
-    } else {
-      await db.query(
-        "INSERT INTO cart_items (user_id, product_id, size, quantity) VALUES (?, ?, ?, ?)",
-        [req.user.id, productId, isClothing ? normalizedSize : "", qty],
-      );
-      console.log(
-        `[cart:add] inserted new item user=${req.user.id} product=${productId}`,
-      );
-    }
 
-    const [rows] = await db.query(
-      `
+      if (!products.length) {
+        await connection.rollback();
+        connection.release();
+        return res.status(404).json({ message: "Product not found" });
+      }
+
+      const product = products[0];
+      const isClothing = isClothingProduct(product.category);
+
+      if (isClothing && !normalizedSize) {
+        await connection.rollback();
+        connection.release();
+        return res
+          .status(400)
+          .json({ message: "Size is required for clothing products" });
+      }
+
+      const [users] = await connection.query(
+        "SELECT id, email FROM users WHERE id = ? LIMIT 1",
+        [req.user.id],
+      );
+      if (!users.length) {
+        await connection.rollback();
+        connection.release();
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Compute total stock
+      const currentSizeStock = normalizeSizeStockMap(product.size_stock);
+      let totalStock = 0;
+      if (currentSizeStock) {
+        totalStock = normalizedSize
+          ? Number(currentSizeStock[normalizedSize] || 0)
+          : getSizeStockTotal(currentSizeStock);
+      } else {
+        totalStock = Number(product.stock) || 0;
+      }
+
+      // Reserved in carts
+      let reservedCart = 0;
+      if (currentSizeStock && normalizedSize) {
+        const [rc] = await connection.query(
+          "SELECT COALESCE(SUM(quantity),0) AS reserved FROM cart_items WHERE product_id = ? AND size = ?",
+          [productId, normalizedSize],
+        );
+        reservedCart = Number(rc[0].reserved || 0);
+      } else {
+        const [rc] = await connection.query(
+          "SELECT COALESCE(SUM(quantity),0) AS reserved FROM cart_items WHERE product_id = ?",
+          [productId],
+        );
+        reservedCart = Number(rc[0].reserved || 0);
+      }
+
+      // Reserved in pending orders
+      let reservedOrders = 0;
+      if (currentSizeStock && normalizedSize) {
+        const [rowsOrders] = await connection.query(
+          `SELECT oi.quantity, oi.name FROM order_items oi
+           JOIN orders o ON o.id = oi.order_id
+           WHERE oi.product_id = ? AND o.status = 'pending'`,
+          [productId],
+        );
+        for (const r of rowsOrders) {
+          const name = r.name || "";
+          const m = name.match(/\(\s*Size\s*([^\)]+)\s*\)/i);
+          if (m && m[1] && m[1].toUpperCase() === normalizedSize) {
+            reservedOrders += Number(r.quantity || 0);
+          }
+        }
+      } else {
+        const [ro] = await connection.query(
+          `SELECT COALESCE(SUM(oi.quantity),0) AS reserved FROM order_items oi
+           JOIN orders o ON o.id = oi.order_id
+           WHERE oi.product_id = ? AND o.status = 'pending'`,
+          [productId],
+        );
+        reservedOrders = Number(ro[0].reserved || 0);
+      }
+
+      const available = Math.max(0, totalStock - (reservedCart + reservedOrders));
+
+      if (qty > available) {
+        await connection.rollback();
+        connection.release();
+        return res.status(400).json({ message: `Only ${available} items left in stock` });
+      }
+
+      const [existingItems] = await connection.query(
+        "SELECT id FROM cart_items WHERE user_id = ? AND product_id = ? AND size = ? LIMIT 1",
+        [req.user.id, productId, isClothing ? normalizedSize : ""],
+      );
+
+      if (existingItems.length) {
+        // Check max quantity per product
+        const maxQtyPerProduct = await getMaxQuantityPerProduct();
+        const existingQty = Number(existingItems[0].quantity || 0);
+        const newTotalQty = existingQty + qty;
+
+        if (newTotalQty > maxQtyPerProduct) {
+          await connection.rollback();
+          connection.release();
+          return res.status(400).json({
+            message: `Maximum quantity allowed for this product is ${maxQtyPerProduct}. If you need a larger order, please contact us.`,
+            maxQuantity: maxQtyPerProduct,
+            currentQuantity: existingQty,
+          });
+        }
+
+        await connection.query(
+          "UPDATE cart_items SET quantity = quantity + ? WHERE id = ?",
+          [qty, existingItems[0].id],
+        );
+      } else {
+        // Check max quantity per product on new item
+        const maxQtyPerProduct = await getMaxQuantityPerProduct();
+        if (qty > maxQtyPerProduct) {
+          await connection.rollback();
+          connection.release();
+          return res.status(400).json({
+            message: `Maximum quantity allowed for this product is ${maxQtyPerProduct}. If you need a larger order, please contact us.`,
+            maxQuantity: maxQtyPerProduct,
+            currentQuantity: 0,
+          });
+        }
+
+        // Check max products per cart limit for new products
+        const maxProducts = await getMaxProductsPerCart();
+        const [distinctProducts] = await connection.query(
+          "SELECT COUNT(DISTINCT product_id) as count FROM cart_items WHERE user_id = ?",
+          [req.user.id],
+        );
+        const currentDistinctCount = Number(distinctProducts[0]?.count || 0);
+
+        if (currentDistinctCount >= maxProducts) {
+          await connection.rollback();
+          connection.release();
+          return res.status(400).json({
+            message: `You can add up to ${maxProducts} different products to your cart. If you need more products, please contact us.`,
+            maxProducts,
+            currentCount: currentDistinctCount,
+          });
+        }
+
+        await connection.query(
+          "INSERT INTO cart_items (user_id, product_id, size, quantity) VALUES (?, ?, ?, ?)",
+          [req.user.id, productId, isClothing ? normalizedSize : "", qty],
+        );
+      }
+
+      await connection.commit();
+      connection.release();
+
+      const [rows] = await db.query(
+        `
         SELECT
           p.id,
           p.name,
@@ -499,10 +638,16 @@ const addToCart = async (req, res) => {
         WHERE ci.user_id = ?
         ORDER BY ci.id DESC
       `,
-      [req.user.id],
-    );
+        [req.user.id],
+      );
 
-    return res.status(200).json(mapCartRows(rows, vatRate));
+      return res.status(200).json(mapCartRows(rows, vatRate));
+    } catch (transactionError) {
+      await connection.rollback();
+      connection.release();
+      console.error(`[cart:add] transaction error: ${transactionError.message}`);
+      return res.status(500).json({ message: "Server error" });
+    }
   } catch (error) {
     console.error(`[cart:add] error: ${error.message}`);
     return res.status(500).json({ message: "Server error" });
@@ -576,61 +721,139 @@ const updateCartQuantity = async (req, res) => {
       return res.status(400).json({ message: "Quantity must be a number" });
     }
 
-    if (nextQuantity <= 0) {
-      await db.query(
-        normalizedSize
-          ? "DELETE FROM cart_items WHERE user_id = ? AND product_id = ? AND size = ?"
-          : "DELETE FROM cart_items WHERE user_id = ? AND product_id = ?",
-        normalizedSize
-          ? [req.user.id, productId, normalizedSize]
-          : [req.user.id, productId],
-      );
-    } else {
-      const [products] = await db.query(
-        `SELECT p.stock, p.size_stock, c.name AS category
-         FROM products p
-         LEFT JOIN categories c ON c.id = p.category_id
-         WHERE p.id = ? LIMIT 1`,
-        [productId],
-      );
+    const connection = await db.getConnection();
+    try {
+      await connection.beginTransaction();
 
-      if (!products.length) {
-        return res.status(404).json({ message: "Product not found" });
+      if (nextQuantity <= 0) {
+        await connection.query(
+          normalizedSize
+            ? "DELETE FROM cart_items WHERE user_id = ? AND product_id = ? AND size = ?"
+            : "DELETE FROM cart_items WHERE user_id = ? AND product_id = ?",
+          normalizedSize
+            ? [req.user.id, productId, normalizedSize]
+            : [req.user.id, productId],
+        );
+      } else {
+        const [products] = await connection.query(
+          `SELECT p.id, p.stock, p.size_stock, c.name AS category
+           FROM products p
+           LEFT JOIN categories c ON c.id = p.category_id
+           WHERE p.id = ? LIMIT 1 FOR UPDATE`,
+          [productId],
+        );
+
+        if (!products.length) {
+          await connection.rollback();
+          connection.release();
+          return res.status(404).json({ message: "Product not found" });
+        }
+
+        const product = products[0];
+        const isClothing = isClothingProduct(product.category);
+
+        if (isClothing && !normalizedSize) {
+          await connection.rollback();
+          connection.release();
+          return res
+            .status(400)
+            .json({ message: "Size is required for clothing products" });
+        }
+
+        const [existingItems] = await connection.query(
+          "SELECT id, quantity FROM cart_items WHERE user_id = ? AND product_id = ? AND size = ? LIMIT 1 FOR UPDATE",
+          [req.user.id, productId, normalizedSize],
+        );
+
+        if (!existingItems.length) {
+          await connection.rollback();
+          connection.release();
+          return res.status(404).json({ message: "Cart item not found" });
+        }
+
+        const existingQty = Number(existingItems[0].quantity || 0);
+
+        // Compute total stock
+        const currentSizeStock = normalizeSizeStockMap(product.size_stock);
+        let totalStock = 0;
+        if (currentSizeStock) {
+          totalStock = normalizedSize
+            ? Number(currentSizeStock[normalizedSize] || 0)
+            : getSizeStockTotal(currentSizeStock);
+        } else {
+          totalStock = Number(product.stock) || 0;
+        }
+
+        // Sum all cart reservations for this product/size
+        const [rcAll] = await connection.query(
+          currentSizeStock && normalizedSize
+            ? "SELECT COALESCE(SUM(quantity),0) AS reserved FROM cart_items WHERE product_id = ? AND size = ?"
+            : "SELECT COALESCE(SUM(quantity),0) AS reserved FROM cart_items WHERE product_id = ?",
+          currentSizeStock && normalizedSize ? [productId, normalizedSize] : [productId],
+        );
+        const reservedCartAll = Number(rcAll[0].reserved || 0);
+
+        // Reserved in pending orders
+        let reservedOrders = 0;
+        if (currentSizeStock && normalizedSize) {
+          const [rowsOrders] = await connection.query(
+            `SELECT oi.quantity, oi.name FROM order_items oi
+             JOIN orders o ON o.id = oi.order_id
+             WHERE oi.product_id = ? AND o.status = 'pending'`,
+            [productId],
+          );
+          for (const r of rowsOrders) {
+            const name = r.name || "";
+            const m = name.match(/\(\s*Size\s*([^\)]+)\s*\)/i);
+            if (m && m[1] && m[1].toUpperCase() === normalizedSize) {
+              reservedOrders += Number(r.quantity || 0);
+            }
+          }
+        } else {
+          const [ro] = await connection.query(
+            `SELECT COALESCE(SUM(oi.quantity),0) AS reserved FROM order_items oi
+             JOIN orders o ON o.id = oi.order_id
+             WHERE oi.product_id = ? AND o.status = 'pending'`,
+            [productId],
+          );
+          reservedOrders = Number(ro[0].reserved || 0);
+        }
+
+        // Reservations excluding this user's current cart quantity
+        const reservedOthers = Math.max(0, reservedCartAll - existingQty);
+        const allowedMax = Math.max(0, totalStock - (reservedOthers + reservedOrders));
+
+        if (nextQuantity > allowedMax) {
+          await connection.rollback();
+          connection.release();
+          return res.status(400).json({
+            message: `Only ${allowedMax} item${allowedMax === 1 ? "" : "s"} available in stock`,
+          });
+        }
+
+        // Check max quantity per product
+        const maxQtyPerProduct = await getMaxQuantityPerProduct();
+        if (nextQuantity > maxQtyPerProduct) {
+          await connection.rollback();
+          connection.release();
+          return res.status(400).json({
+            message: `Maximum quantity allowed for this product is ${maxQtyPerProduct}. If you need a larger order, please contact us.`,
+            maxQuantity: maxQtyPerProduct,
+            currentQuantity: nextQuantity,
+          });
+        }
+
+        await connection.query("UPDATE cart_items SET quantity = ? WHERE id = ?", [
+          nextQuantity,
+          existingItems[0].id,
+        ]);
       }
 
-      const product = products[0];
-      const isClothing = isClothingProduct(product.category);
+      await connection.commit();
+      connection.release();
 
-      if (isClothing && !normalizedSize) {
-        return res
-          .status(400)
-          .json({ message: "Size is required for clothing products" });
-      }
-
-      const stock = getAvailableStock(product, normalizedSize);
-      if (nextQuantity > stock) {
-        return res.status(400).json({
-          message: `Only ${stock} item${stock === 1 ? "" : "s"} available in stock`,
-        });
-      }
-
-      const [existingItems] = await db.query(
-        "SELECT id FROM cart_items WHERE user_id = ? AND product_id = ? AND size = ? LIMIT 1",
-        [req.user.id, productId, normalizedSize],
-      );
-
-      if (!existingItems.length) {
-        return res.status(404).json({ message: "Cart item not found" });
-      }
-
-      await db.query("UPDATE cart_items SET quantity = ? WHERE id = ?", [
-        nextQuantity,
-        existingItems[0].id,
-      ]);
-    }
-
-    const [rows] = await db.query(
-      `
+      const [rows] = await db.query(
+        `
         SELECT
           p.id,
           p.name,
@@ -646,10 +869,16 @@ const updateCartQuantity = async (req, res) => {
         WHERE ci.user_id = ?
         ORDER BY ci.id DESC
       `,
-      [req.user.id],
-    );
+        [req.user.id],
+      );
 
-    return res.status(200).json(mapCartRows(rows, vatRate));
+      return res.status(200).json(mapCartRows(rows, vatRate));
+    } catch (transactionError) {
+      await connection.rollback();
+      connection.release();
+      console.error(`[cart:updateQty] transaction error: ${transactionError.message}`);
+      return res.status(500).json({ message: "Server error" });
+    }
   } catch (error) {
     return res.status(500).json({ message: "Server error" });
   }
@@ -750,8 +979,8 @@ const checkout = async (req, res) => {
       }
 
       const [orderResult] = await connection.query(
-        "INSERT INTO orders (user_id, total, customer_email, status, created_at) VALUES (?, ?, ?, ?, NOW())",
-        [req.user.id, total, users[0]?.email || null, ORDER_STATUS.SUCCESSFUL],
+        "INSERT INTO orders (user_id, total, customer_email, status, payment_status, order_status, paid_at, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())",
+        [req.user.id, total, users[0]?.email || null, ORDER_STATUS.SUCCESSFUL, "paid", "successful"],
       );
 
       for (const item of items) {
@@ -980,6 +1209,37 @@ const capturePaypalOrder = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
+    const connection = await db.getConnection();
+    const [existingPayments] = await connection.query(
+      `
+        SELECT id, order_id, status
+        FROM payments
+        WHERE paypal_order_id = ? AND user_id = ?
+        ORDER BY id DESC
+        LIMIT 1
+      `,
+      [orderID, req.user.id],
+    );
+
+    if (
+      existingPayments.length &&
+      existingPayments[0].status === ORDER_STATUS.SUCCESSFUL
+    ) {
+      const orderId = existingPayments[0].order_id;
+      connection.release();
+      return res.status(200).json({
+        message: "PayPal order has already been captured",
+        order: {
+          id: orderId,
+          status: ORDER_STATUS.SUCCESSFUL,
+        },
+        payment: {
+          paypalOrderId: orderID,
+          status: ORDER_STATUS.SUCCESSFUL,
+        },
+      });
+    }
+
     const accessToken = await getPayPalAccessToken();
 
     logPayPalFlow("capture-called", {
@@ -1000,17 +1260,20 @@ const capturePaypalOrder = async (req, res) => {
 
     const captureData = response.data;
     const captureStatus = captureData.status;
+    const captureUnit =
+      captureData.purchase_units?.[0]?.payments?.captures?.[0] || null;
+    const finalOrderStatus = normalizeOrderStatusFromCapture(
+      captureStatus,
+      captureUnit?.status,
+    );
     console.log("[paypal:capture] payment captured", {
       orderId: orderID,
       status: captureStatus,
+      captureUnitStatus: captureUnit?.status,
       userId: req.user?.id,
     });
-    const finalOrderStatus = normalizeOrderStatusFromCapture(captureStatus);
-    const captureUnit =
-      captureData.purchase_units?.[0]?.payments?.captures?.[0] || null;
     const amountValue = captureUnit?.amount?.value || "0.00";
     const currencyCode = captureUnit?.amount?.currency_code || PAYPAL_CURRENCY;
-    const connection = await db.getConnection();
 
     try {
       await connection.beginTransaction();
@@ -1045,12 +1308,14 @@ const capturePaypalOrder = async (req, res) => {
         const { total, items } = await calculateCartTotal(req.user.id);
 
         const [orderResult] = await connection.query(
-          "INSERT INTO orders (user_id, total, customer_email, status, created_at) VALUES (?, ?, ?, ?, NOW())",
+          "INSERT INTO orders (user_id, total, customer_email, status, payment_status, order_status, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())",
           [
             req.user.id,
             total,
             userRecord.email || captureData?.payer?.email_address || null,
             ORDER_STATUS.PENDING,
+            "pending",
+            "pending",
           ],
         );
 
@@ -1084,9 +1349,11 @@ const capturePaypalOrder = async (req, res) => {
       }
 
       await connection.query(
-        "UPDATE orders SET status = ?, total = ?, customer_email = COALESCE(?, customer_email), created_at = created_at WHERE id = ?",
+        "UPDATE orders SET status = ?, payment_status = ?, order_status = ?, paid_at = NOW(), total = ?, customer_email = COALESCE(?, customer_email), created_at = created_at WHERE id = ?",
         [
           finalOrderStatus,
+          finalOrderStatus === ORDER_STATUS.SUCCESSFUL ? "paid" : "failed",
+          finalOrderStatus === ORDER_STATUS.SUCCESSFUL ? "successful" : "pending",
           Number(amountValue),
           userRecord.email || captureData?.payer?.email_address || null,
           orderId,
@@ -1108,7 +1375,7 @@ const capturePaypalOrder = async (req, res) => {
       if (finalOrderStatus === ORDER_STATUS.SUCCESSFUL) {
         const [cartRows] = await connection.query(
           `
-            SELECT p.id, p.stock, ci.quantity
+            SELECT p.id, p.stock, p.size_stock, ci.size, ci.quantity
             FROM cart_items ci
             JOIN products p ON p.id = ci.product_id
             WHERE ci.user_id = ?
@@ -1117,10 +1384,27 @@ const capturePaypalOrder = async (req, res) => {
         );
 
         for (const item of cartRows) {
-          await connection.query(
-            "UPDATE products SET stock = stock - ?, updated_at = NOW() WHERE id = ?",
-            [Number(item.quantity), item.id],
-          );
+          const currentSizeStock = normalizeSizeStockMap(item.size_stock);
+
+          if (currentSizeStock && item.size) {
+            const nextSizeStock = { ...currentSizeStock };
+            nextSizeStock[item.size] =
+              Number(nextSizeStock[item.size] || 0) - Number(item.quantity);
+
+            await connection.query(
+              "UPDATE products SET stock = ?, size_stock = ?, updated_at = NOW() WHERE id = ?",
+              [
+                getSizeStockTotal(nextSizeStock),
+                serializeSizeStock(nextSizeStock),
+                item.id,
+              ],
+            );
+          } else {
+            await connection.query(
+              "UPDATE products SET stock = stock - ?, updated_at = NOW() WHERE id = ?",
+              [Number(item.quantity), item.id],
+            );
+          }
         }
 
         await connection.query("DELETE FROM cart_items WHERE user_id = ?", [
@@ -1203,52 +1487,37 @@ const capturePaypalOrder = async (req, res) => {
     console.error("[paypal:capture]", error.message || error);
 
     const finalUnsuccessfulStatus = ORDER_STATUS.FAILED;
+    const failureReason =
+      error?.response?.data?.details?.[0]?.description ||
+      error?.response?.data?.message ||
+      error.message ||
+      "capture-error";
 
     logPayPalFlow("capture-unsuccessful", {
       paypalOrderId: req.body?.orderID || null,
       userId: req.user?.id || null,
-      reason:
-        error?.response?.data?.details?.[0]?.description ||
-        error?.response?.data?.message ||
-        error.message ||
-        "capture-error",
+      reason: failureReason,
       finalStatus: finalUnsuccessfulStatus,
     });
 
     if (req.body?.orderID && req.user?.id) {
       try {
-        await db.query(
-          "UPDATE payments SET status = ?, raw_response = ? WHERE paypal_order_id = ? AND user_id = ?",
-          [
-            finalUnsuccessfulStatus,
-            JSON.stringify({
-              error:
-                error?.response?.data ||
-                error.message ||
-                "Capture unsuccessful",
-              markedAt: new Date().toISOString(),
-            }),
-            req.body.orderID,
-            req.user.id,
-          ],
-        );
-        await db.query(
-          `
-            UPDATE orders o
-            JOIN payments p ON p.order_id = o.id
-            SET o.status = ?
-            WHERE p.paypal_order_id = ? AND p.user_id = ?
-          `,
-          [finalUnsuccessfulStatus, req.body.orderID, req.user.id],
-        );
-
-        logPayPalFlow("final-status-assigned", {
-          orderId: null,
-          paypalOrderId: req.body.orderID,
+        const markResult = await markPaypalOrderAsUnsuccessful({
+          orderID: req.body.orderID,
           userId: req.user.id,
-          finalStatus: finalUnsuccessfulStatus,
-          reason: "capture-error",
+          reason: failureReason,
+          status: finalUnsuccessfulStatus,
         });
+
+        if (markResult.updated) {
+          logPayPalFlow("final-status-assigned", {
+            orderId: markResult.orderId,
+            paypalOrderId: req.body.orderID,
+            userId: req.user.id,
+            finalStatus: finalUnsuccessfulStatus,
+            reason: "capture-error",
+          });
+        }
       } catch (statusUpdateError) {
         console.error("[paypal:capture] unable to mark unsuccessful", {
           orderId: req.body.orderID,
@@ -1259,10 +1528,7 @@ const capturePaypalOrder = async (req, res) => {
     }
 
     return res.status(500).json({
-      message:
-        error?.response?.data?.details?.[0]?.description ||
-        error?.response?.data?.message ||
-        "Unable to capture PayPal order",
+      message: failureReason,
     });
   }
 };
@@ -1346,10 +1612,11 @@ const handlePaypalSuccessReturn = async (req, res) => {
   try {
     const [paymentRows] = await db.query(
       `
-        SELECT user_id
-        FROM payments
-        WHERE paypal_order_id = ?
-        ORDER BY id DESC
+        SELECT p.user_id, o.status AS order_status, p.status AS payment_status, p.order_id
+        FROM payments p
+        LEFT JOIN orders o ON o.id = p.order_id
+        WHERE p.paypal_order_id = ?
+        ORDER BY p.id DESC
         LIMIT 1
       `,
       [orderID],
@@ -1365,7 +1632,19 @@ const handlePaypalSuccessReturn = async (req, res) => {
       );
     }
 
-    const userId = Number(paymentRows[0].user_id);
+    const paymentRow = paymentRows[0];
+    const userId = Number(paymentRow.user_id);
+
+    if (
+      paymentRow.order_status === ORDER_STATUS.SUCCESSFUL ||
+      paymentRow.payment_status === ORDER_STATUS.SUCCESSFUL
+    ) {
+      return res.redirect(
+        `${FRONTEND_BASE_URL}/?paypalSuccess=1&orderId=${encodeURIComponent(
+          paymentRow.order_id || orderID,
+        )}`,
+      );
+    }
 
     const fakeReq = {
       body: { orderID },
