@@ -53,21 +53,12 @@ function AdminDashboard({
   const getOrderBucket = (order) => {
     const status = normalizeStatus(order?.status || order?.order_status);
 
-    // Check for success status
-    if (
-      ["success", "successful", "paid", "completed", "delivered"].includes(
-        status,
-      )
-    ) {
+    // Only allow standardized statuses
+    if (status === "success") {
       return "success";
     }
 
-    // Check for cancelled status
-    if (
-      ["cancelled", "canceled", "cancelled", "expired", "failed", "unsuccessful"].includes(
-        status,
-      )
-    ) {
+    if (status === "cancelled") {
       return "cancelled";
     }
 
@@ -292,11 +283,11 @@ function AdminDashboard({
       filter: "success",
     },
     {
-      key: "unsuccessful",
-      label: "Unsuccessful",
-      value: filteredSummary.unsuccessful,
-      color: statusColors.unsuccessful,
-      filter: "unsuccessful",
+      key: "cancelled",
+      label: "Cancelled",
+      value: filteredSummary.cancelled,
+      color: statusColors.cancelled,
+      filter: "cancelled",
     },
     {
       key: "pending",

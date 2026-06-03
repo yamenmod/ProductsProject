@@ -615,6 +615,16 @@ function Cart({
                           Size: {item.size}
                         </p>
                       ) : null}
+                      <p
+                        style={{
+                          margin: "0 0 8px",
+                          color: "#245860",
+                          fontSize: "13px",
+                          fontWeight: 600,
+                        }}
+                      >
+                        Stock: {item.stock || 0} available
+                      </p>
                       <div
                         style={{ margin: 0, color: "#1f1813", fontWeight: 700 }}
                       >

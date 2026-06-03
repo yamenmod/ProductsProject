@@ -138,7 +138,7 @@ const paySuccess = async (req, res) => {
 
     await db.query(
       "UPDATE orders SET payment_status = ?, order_status = ?, paid_at = NOW() WHERE id = ?",
-      ["paid", "successful", orderId],
+      ["paid", "success", orderId],
     );
 
     return res.status(200).json({ message: "Order marked as paid and successful" });

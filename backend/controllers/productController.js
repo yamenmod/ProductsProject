@@ -288,6 +288,7 @@ const normalizeProduct = (row, vatRate = 0) => {
     price: roundMoney(row.price),
     ...calculateVatPricing(row.price, vatRate),
     stock: normalizedStock,
+    max_quantity_per_user: Number(row.max_quantity_per_user || 10),
     category_id: row.category_id,
     category: row.category || "",
     gender: normalizeGenderInput(row.gender),
@@ -342,6 +343,7 @@ const getProducts = async (req, res) => {
           p.description,
           p.price,
           p.stock,
+          p.max_quantity_per_user,
           p.size_stock,
           p.category_id,
           p.gender,
@@ -383,6 +385,7 @@ const getProductById = async (req, res) => {
           p.description,
           p.price,
           p.stock,
+          p.max_quantity_per_user,
           p.size_stock,
           p.category_id,
           p.gender,
@@ -426,6 +429,7 @@ const createProduct = async (req, res) => {
       image,
       images,
       stock,
+      maxQuantityPerUser,
       sizeStock,
       boardLength,
       height,
@@ -487,6 +491,7 @@ const createProduct = async (req, res) => {
           description,
           price,
           stock,
+          max_quantity_per_user,
           category_id,
           gender,
           image_url,
@@ -499,13 +504,14 @@ const createProduct = async (req, res) => {
           volume,
           created_at,
           updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
       `,
       [
         name.trim(),
         description || "",
         calculateVatPricing(price).basePrice,
         nextStock,
+        maxQuantityPerUser !== undefined ? Number(maxQuantityPerUser) : 10,
         categoryId,
         nextGender,
         storedImageValue,
@@ -535,6 +541,7 @@ const createProduct = async (req, res) => {
           p.description,
           p.price,
           p.stock,
+          p.max_quantity_per_user,
           p.size_stock,
           p.category_id,
           p.gender,
@@ -570,7 +577,7 @@ const updateProduct = async (req, res) => {
   // Update an existing product and refresh its stored images.
   try {
     const [existingRows] = await db.query(
-      "SELECT p.id, p.name, p.price, p.stock, p.category_id, p.description, p.gender, p.image_url, p.size, p.board_length, p.board_height, p.height, p.board_volume, p.volume, c.name AS category FROM products p LEFT JOIN categories c ON c.id = p.category_id WHERE p.id = ? LIMIT 1",
+      "SELECT p.id, p.name, p.price, p.stock, p.max_quantity_per_user, p.category_id, p.description, p.gender, p.image_url, p.size, p.board_length, p.board_height, p.height, p.board_volume, p.volume, c.name AS category FROM products p LEFT JOIN categories c ON c.id = p.category_id WHERE p.id = ? LIMIT 1",
       [req.params.id],
     );
 
@@ -588,6 +595,7 @@ const updateProduct = async (req, res) => {
       image,
       images,
       stock,
+      maxQuantityPerUser,
       boardLength,
       height,
       boardHeight,
@@ -687,6 +695,7 @@ const updateProduct = async (req, res) => {
           description = ?,
           price = ?,
           stock = ?,
+          max_quantity_per_user = ?,
           category_id = ?,
           gender = ?,
           image_url = ?,
@@ -705,6 +714,7 @@ const updateProduct = async (req, res) => {
         description !== undefined ? description : existingProduct.description,
         nextPrice,
         nextStock,
+        maxQuantityPerUser !== undefined ? Number(maxQuantityPerUser) : (existingProduct.max_quantity_per_user || 10),
         nextCategoryId,
         nextGender,
         storedImageValue,
@@ -737,6 +747,7 @@ const updateProduct = async (req, res) => {
           p.description,
           p.price,
           p.stock,
+          p.max_quantity_per_user,
           p.category_id,
           p.gender,
           p.image_url,

@@ -32,6 +32,7 @@ function ManageProducts({
     image: "",
     image_urls: [],
     stock: "",
+    maxQuantityPerUser: "",
     sizeStock: createDefaultSizeStock(),
     boardHeight: "",
     boardVolume: "",
@@ -286,6 +287,7 @@ function ManageProducts({
       image: "",
       image_urls: [],
       stock: "",
+      maxQuantityPerUser: "",
       sizeStock: createDefaultSizeStock(),
       boardHeight: "",
       boardVolume: "",
@@ -345,6 +347,7 @@ function ManageProducts({
     payload.append("category", form.category.trim());
     payload.append("gender", normalizeGenderValue(form.gender));
     payload.append("stock", form.stock === "" ? 0 : Number(form.stock));
+    payload.append("maxQuantityPerUser", form.maxQuantityPerUser === "" ? 10 : Number(form.maxQuantityPerUser));
 
     if (isClothingCategory(form.category) && form.size) {
       payload.append("size", form.size);
@@ -433,6 +436,7 @@ function ManageProducts({
       image: product.image || "",
       image_urls: uniqueExistingImages,
       stock: product.stock ?? 0,
+      maxQuantityPerUser: product.max_quantity_per_user ?? 10,
       sizeStock: parseSizeStockValue(product.sizeStock || product.size_stock || {}),
       boardHeight: product.boardHeight ?? product.height ?? "",
       boardVolume: product.boardVolume ?? product.volume ?? "",
@@ -921,6 +925,34 @@ function ManageProducts({
                       transition: "all 0.2s ease",
                       background: "#fffdf8",
                       opacity: isClothingCategory(form.category) ? 0.7 : 1,
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = "#245860";
+                      e.target.style.boxShadow =
+                        "0 0 0 3px rgba(36, 88, 96, 0.12)";
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = "#d9c3ad";
+                      e.target.style.boxShadow = "none";
+                    }}
+                  />
+
+                  <input
+                    type="number"
+                    min="1"
+                    placeholder="Max Quantity Per User"
+                    value={form.maxQuantityPerUser}
+                    onChange={(e) =>
+                      setForm({ ...form, maxQuantityPerUser: e.target.value })
+                    }
+                    style={{
+                      padding: "10px 12px",
+                      border: "1px solid #d9c3ad",
+                      borderRadius: "8px",
+                      fontSize: "13px",
+                      fontFamily: "inherit",
+                      transition: "all 0.2s ease",
+                      background: "#fffdf8",
                     }}
                     onFocus={(e) => {
                       e.target.style.borderColor = "#245860";

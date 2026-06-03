@@ -32,6 +32,11 @@ const productSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
+    max_quantity_per_user: {
+      type: Number,
+      default: 10,
+      min: 1,
+    },
     boardLength: {
       type: Number,
       default: null,

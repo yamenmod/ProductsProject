@@ -459,7 +459,7 @@ const addToCart = async (req, res) => {
       await connection.beginTransaction();
 
       const [products] = await connection.query(
-        `SELECT p.id, p.stock, p.size_stock, c.name AS category
+        `SELECT p.id, p.stock, p.size_stock, p.max_quantity_per_user, c.name AS category
          FROM products p
          LEFT JOIN categories c ON c.id = p.category_id
          WHERE p.id = ?
@@ -562,7 +562,7 @@ const addToCart = async (req, res) => {
 
       if (existingItems.length) {
         // Check max quantity per product
-        const maxQtyPerProduct = await getMaxQuantityPerProduct();
+        const maxQtyPerProduct = Number(product.max_quantity_per_user || 10);
         const existingQty = Number(existingItems[0].quantity || 0);
         const newTotalQty = existingQty + qty;
 
@@ -582,7 +582,7 @@ const addToCart = async (req, res) => {
         );
       } else {
         // Check max quantity per product on new item
-        const maxQtyPerProduct = await getMaxQuantityPerProduct();
+        const maxQtyPerProduct = Number(product.max_quantity_per_user || 10);
         if (qty > maxQtyPerProduct) {
           await connection.rollback();
           connection.release();
@@ -735,7 +735,7 @@ const updateCartQuantity = async (req, res) => {
         );
       } else {
         const [products] = await connection.query(
-          `SELECT p.id, p.stock, p.size_stock, c.name AS category
+          `SELECT p.id, p.stock, p.size_stock, p.max_quantity_per_user, c.name AS category
            FROM products p
            LEFT JOIN categories c ON c.id = p.category_id
            WHERE p.id = ? LIMIT 1 FOR UPDATE`,
@@ -831,7 +831,7 @@ const updateCartQuantity = async (req, res) => {
         }
 
         // Check max quantity per product
-        const maxQtyPerProduct = await getMaxQuantityPerProduct();
+        const maxQtyPerProduct = Number(product.max_quantity_per_user || 10);
         if (nextQuantity > maxQtyPerProduct) {
           await connection.rollback();
           connection.release();
