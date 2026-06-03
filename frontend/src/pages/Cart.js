@@ -512,7 +512,7 @@ function Cart({
               {errorMessage && (
                 <div
                   style={{
-                    padding: "12px 16px",
+                    padding: "16px",
                     background: "#fff3cd",
                     border: "1px solid #ffc107",
                     borderRadius: "8px",
@@ -520,25 +520,47 @@ function Cart({
                     fontSize: "14px",
                     fontWeight: "500",
                     display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
+                    flexDirection: "column",
+                    gap: "12px",
                   }}
                 >
-                  <span>{errorMessage}</span>
-                  <button
-                    onClick={() => setErrorMessage("")}
+                  <div
                     style={{
-                      background: "none",
-                      border: "none",
-                      fontSize: "18px",
-                      cursor: "pointer",
-                      color: "#856404",
-                      padding: 0,
-                      marginLeft: "8px",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "flex-start",
                     }}
                   >
-                    ×
-                  </button>
+                    <span style={{ flex: 1 }}>{errorMessage}</span>
+                    <button
+                      onClick={() => setErrorMessage("")}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        fontSize: "18px",
+                        cursor: "pointer",
+                        color: "#856404",
+                        padding: 0,
+                        marginLeft: "8px",
+                      }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                  {errorMessage.includes("bulk orders") && (
+                    <button
+                      type="button"
+                      className="ps-btn ps-btn-primary"
+                      onClick={() => onNavigate("contact")}
+                      style={{
+                        padding: "10px 16px",
+                        fontSize: "13px",
+                        alignSelf: "flex-start",
+                      }}
+                    >
+                      Contact us for bulk orders
+                    </button>
+                  )}
                 </div>
               )}
               {displayItems.map((item) => {
@@ -615,16 +637,6 @@ function Cart({
                           Size: {item.size}
                         </p>
                       ) : null}
-                      <p
-                        style={{
-                          margin: "0 0 8px",
-                          color: "#245860",
-                          fontSize: "13px",
-                          fontWeight: 600,
-                        }}
-                      >
-                        Stock: {item.stock || 0} available
-                      </p>
                       <div
                         style={{ margin: 0, color: "#1f1813", fontWeight: 700 }}
                       >
@@ -674,67 +686,92 @@ function Cart({
                       <div
                         style={{
                           display: "flex",
-                          alignItems: "center",
+                          flexDirection: "column",
+                          alignItems: "flex-end",
                           gap: "6px",
-                          background: "#f3f1ed",
-                          border: "1px solid #d8d1c8",
-                          borderRadius: "999px",
-                          padding: "4px 8px",
                         }}
                       >
-                        <button
-                          type="button"
-                          className="ps-btn"
+                        {(item.quantity || 1) >= 10 && (
+                          <div
+                            style={{
+                              padding: "6px 10px",
+                              background: "#fff3cd",
+                              border: "1px solid #ffc107",
+                              borderRadius: "6px",
+                              color: "#856404",
+                              fontSize: "11px",
+                              fontWeight: "500",
+                              textAlign: "right",
+                            }}
+                          >
+                            For bulk orders, please contact us.
+                          </div>
+                        )}
+                        <div
                           style={{
-                            width: "28px",
-                            height: "28px",
-                            padding: 0,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "6px",
+                            background: "#f3f1ed",
+                            border: "1px solid #d8d1c8",
                             borderRadius: "999px",
-                            border: "1px solid #c6beb4",
-                            background: "#ffffff",
-                            color: "#6c6258",
-                            fontSize: "18px",
-                            fontWeight: 800,
-                            lineHeight: 1,
-                            boxShadow: "none",
-                          }}
-                          onClick={() => handleChangeQuantity(item, -1)}
-                          aria-label={`Decrease quantity of ${item.name || "item"}`}
-                        >
-                          -
-                        </button>
-                        <span
-                          style={{
-                            minWidth: "20px",
-                            textAlign: "center",
-                            fontWeight: 800,
-                            color: "#5f5550",
-                            fontSize: "13px",
+                            padding: "4px 8px",
                           }}
                         >
-                          {item.quantity || 1}
-                        </span>
-                        <button
-                          type="button"
-                          className="ps-btn"
-                          style={{
-                            width: "28px",
-                            height: "28px",
-                            padding: 0,
-                            borderRadius: "999px",
-                            border: "1px solid #c6beb4",
-                            background: "#ffffff",
-                            color: "#6c6258",
-                            fontSize: "18px",
-                            fontWeight: 800,
-                            lineHeight: 1,
-                            boxShadow: "none",
-                          }}
-                          onClick={() => handleChangeQuantity(item, 1)}
-                          aria-label={`Increase quantity of ${item.name || "item"}`}
-                        >
-                          +
-                        </button>
+                          <button
+                            type="button"
+                            className="ps-btn"
+                            style={{
+                              width: "28px",
+                              height: "28px",
+                              padding: 0,
+                              borderRadius: "999px",
+                              border: "1px solid #c6beb4",
+                              background: "#ffffff",
+                              color: "#6c6258",
+                              fontSize: "18px",
+                              fontWeight: 800,
+                              lineHeight: 1,
+                              boxShadow: "none",
+                            }}
+                            onClick={() => handleChangeQuantity(item, -1)}
+                            aria-label={`Decrease quantity of ${item.name || "item"}`}
+                          >
+                            -
+                          </button>
+                          <span
+                            style={{
+                              minWidth: "20px",
+                              textAlign: "center",
+                              fontWeight: 800,
+                              color: "#5f5550",
+                              fontSize: "13px",
+                            }}
+                          >
+                            {item.quantity || 1}
+                          </span>
+                          <button
+                            type="button"
+                            className="ps-btn"
+                            style={{
+                              width: "28px",
+                              height: "28px",
+                              padding: 0,
+                              borderRadius: "999px",
+                              border: "1px solid #c6beb4",
+                              background: "#ffffff",
+                              color: "#6c6258",
+                              fontSize: "18px",
+                              fontWeight: 800,
+                              lineHeight: 1,
+                              boxShadow: "none",
+                            }}
+                            onClick={() => handleChangeQuantity(item, 1)}
+                            aria-label={`Increase quantity of ${item.name || "item"}`}
+                          >
+                            +
+                          </button>
+                        </div>
                       </div>
                       <button
                         type="button"

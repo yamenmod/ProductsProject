@@ -206,6 +206,7 @@ function Products({
   const [cardImageIndices, setCardImageIndices] = useState({});
   const [cartErrorMessage, setCartErrorMessage] = useState("");
   const [maxProducts, setMaxProducts] = useState(10);
+  const [showBulkOrderCTA, setShowBulkOrderCTA] = useState(false);
   const swipeStartXRef = useRef(null);
 
   const sizeOptions = ["S", "M", "L", "XL", "XXL"];
@@ -259,6 +260,7 @@ function Products({
         const added = await onAddToCart(res.data);
         if (added) {
           setCartErrorMessage("");
+          setShowBulkOrderCTA(false);
           onNavigate("cart");
         }
       }
@@ -266,6 +268,7 @@ function Products({
       const errorMsg = requestError.response?.data?.message || requestError.message;
       console.error("Add to cart failed:", errorMsg);
       setCartErrorMessage(errorMsg);
+      setShowBulkOrderCTA(errorMsg.includes("bulk orders"));
     }
   };
 
@@ -601,7 +604,7 @@ function Products({
             <div
               style={{
                 marginBottom: "20px",
-                padding: "12px 16px",
+                padding: "16px",
                 background: "#fff3cd",
                 border: "1px solid #ffc107",
                 borderRadius: "8px",
@@ -609,25 +612,50 @@ function Products({
                 fontSize: "14px",
                 fontWeight: "500",
                 display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
+                flexDirection: "column",
+                gap: "12px",
               }}
             >
-              <span>{cartErrorMessage}</span>
-              <button
-                onClick={() => setCartErrorMessage("")}
+              <div
                 style={{
-                  background: "none",
-                  border: "none",
-                  fontSize: "18px",
-                  cursor: "pointer",
-                  color: "#856404",
-                  padding: 0,
-                  marginLeft: "8px",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "flex-start",
                 }}
               >
-                ×
-              </button>
+                <span style={{ flex: 1 }}>{cartErrorMessage}</span>
+                <button
+                  onClick={() => {
+                    setCartErrorMessage("");
+                    setShowBulkOrderCTA(false);
+                  }}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    fontSize: "18px",
+                    cursor: "pointer",
+                    color: "#856404",
+                    padding: 0,
+                    marginLeft: "8px",
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+              {showBulkOrderCTA && (
+                <button
+                  type="button"
+                  className="ps-btn ps-btn-primary"
+                  onClick={() => onNavigate("contact")}
+                  style={{
+                    padding: "10px 16px",
+                    fontSize: "13px",
+                    alignSelf: "flex-start",
+                  }}
+                >
+                  Contact us for bulk orders
+                </button>
+              )}
             </div>
           )}
 

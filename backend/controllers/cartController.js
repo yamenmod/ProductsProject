@@ -515,7 +515,7 @@ const addToCart = async (req, res) => {
           await connection.rollback();
           connection.release();
           return res.status(400).json({
-            message: `Maximum quantity allowed for this product is ${maxQtyPerProduct}. If you need a larger order, please contact us.`,
+            message: "You've reached the maximum quantity limit. For bulk orders, please contact us.",
             maxQuantity: maxQtyPerProduct,
             currentQuantity: existingQty,
           });
@@ -532,7 +532,7 @@ const addToCart = async (req, res) => {
           await connection.rollback();
           connection.release();
           return res.status(400).json({
-            message: `Maximum quantity allowed for this product is ${maxQtyPerProduct}. If you need a larger order, please contact us.`,
+            message: "You've reached the maximum quantity limit. For bulk orders, please contact us.",
             maxQuantity: maxQtyPerProduct,
             currentQuantity: 0,
           });
@@ -745,7 +745,7 @@ const updateCartQuantity = async (req, res) => {
           await connection.rollback();
           connection.release();
           return res.status(400).json({
-            message: `Maximum quantity allowed for this product is ${maxQtyPerProduct}. If you need a larger order, please contact us.`,
+            message: "You've reached the maximum quantity limit. For bulk orders, please contact us.",
             maxQuantity: maxQtyPerProduct,
             currentQuantity: nextQuantity,
           });

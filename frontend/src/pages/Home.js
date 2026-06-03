@@ -20,6 +20,8 @@ function Home({
   const [previewImageIndex, setPreviewImageIndex] = useState(0);
   const [previewSize, setPreviewSize] = useState("");
   const [cardImageIndices, setCardImageIndices] = useState({});
+  const [cartErrorMessage, setCartErrorMessage] = useState("");
+  const [showBulkOrderCTA, setShowBulkOrderCTA] = useState(false);
   const surfboardRailRef = useRef(null);
   const wetsuitRailRef = useRef(null);
   const swipeStartXRef = useRef(null);
@@ -326,9 +328,14 @@ function Home({
         await onAddToCart(response.data);
       }
 
+      setCartErrorMessage("");
+      setShowBulkOrderCTA(false);
       return true;
     } catch (error) {
-      console.error("Home add to cart failed:", error.message);
+      const errorMsg = error.response?.data?.message || error.message;
+      console.error("Home add to cart failed:", errorMsg);
+      setCartErrorMessage(errorMsg);
+      setShowBulkOrderCTA(errorMsg.includes("bulk orders"));
       return false;
     }
   };
@@ -570,6 +577,66 @@ function Home({
         onLogout={onLogout}
         cartCount={cartCount}
       />
+
+      {cartErrorMessage && (
+        <div
+          style={{
+            maxWidth: "1200px",
+            margin: "20px auto",
+            padding: "16px",
+            background: "#fff3cd",
+            border: "1px solid #ffc107",
+            borderRadius: "8px",
+            color: "#856404",
+            fontSize: "14px",
+            fontWeight: "500",
+            display: "flex",
+            flexDirection: "column",
+            gap: "12px",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "flex-start",
+            }}
+          >
+            <span style={{ flex: 1 }}>{cartErrorMessage}</span>
+            <button
+              onClick={() => {
+                setCartErrorMessage("");
+                setShowBulkOrderCTA(false);
+              }}
+              style={{
+                background: "none",
+                border: "none",
+                fontSize: "18px",
+                cursor: "pointer",
+                color: "#856404",
+                padding: 0,
+                marginLeft: "8px",
+              }}
+            >
+              ×
+            </button>
+          </div>
+          {showBulkOrderCTA && (
+            <button
+              type="button"
+              className="ps-btn ps-btn-primary"
+              onClick={() => onNavigate("contact")}
+              style={{
+                padding: "10px 16px",
+                fontSize: "13px",
+                alignSelf: "flex-start",
+              }}
+            >
+              Contact us for bulk orders
+            </button>
+          )}
+        </div>
+      )}
 
       <main className="ps-main">
         <section className="ps-home-hero">
