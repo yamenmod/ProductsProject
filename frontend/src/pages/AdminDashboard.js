@@ -51,22 +51,28 @@ function AdminDashboard({
     (value || "").toString().trim().toLowerCase();
 
   const getOrderBucket = (order) => {
-    const status = normalizeStatus(order?.status);
+    const status = normalizeStatus(order?.status || order?.order_status);
 
+    // Check for success status
     if (
-      ["pending", "processing", "awaiting_payment", "open", "draft"].includes(
+      ["success", "successful", "paid", "completed", "delivered"].includes(
         status,
       )
     ) {
-      return "pending";
+      return "success";
     }
 
-    // "failed" and "canceled" both go to unsuccessful bucket
-    if (["failed", "canceled", "unsuccessful"].includes(status)) {
-      return "unsuccessful";
+    // Check for cancelled status
+    if (
+      ["cancelled", "canceled", "cancelled", "expired", "failed", "unsuccessful"].includes(
+        status,
+      )
+    ) {
+      return "cancelled";
     }
 
-    return "unsuccessful";
+    // Default to pending
+    return "pending";
   };
 
   const filteredOrders = useMemo(() => {
@@ -97,7 +103,7 @@ function AdminDashboard({
   }, [orders, dateFrom, dateTo]);
 
   const filteredSummary = useMemo(() => {
-    const summary = { success: 0, unsuccessful: 0, pending: 0 };
+    const summary = { success: 0, cancelled: 0, pending: 0 };
 
     filteredOrders.forEach((order) => {
       summary[getOrderBucket(order)] += 1;
@@ -105,7 +111,7 @@ function AdminDashboard({
 
     return {
       success: summary.success,
-      unsuccessful: summary.unsuccessful,
+      cancelled: summary.cancelled,
       pending: summary.pending,
     };
   }, [filteredOrders]);
@@ -119,10 +125,10 @@ function AdminDashboard({
         color: statusColors.success,
       },
       {
-        key: "unsuccessful",
-        label: "Unsuccessful",
-        value: filteredSummary.unsuccessful,
-        color: statusColors.unsuccessful,
+        key: "cancelled",
+        label: "Cancelled",
+        value: filteredSummary.cancelled,
+        color: statusColors.cancelled,
       },
       {
         key: "pending",

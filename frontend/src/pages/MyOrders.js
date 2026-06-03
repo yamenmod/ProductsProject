@@ -38,7 +38,7 @@ function MyOrders({ session, user, onNavigate }) {
 
   const canCancel = (order) => {
     if (!order.paid_at) return false;
-    if (order.order_status !== "successful") return false;
+    if (order.order_status !== "success") return false;
     const paidAt = new Date(order.paid_at);
     const now = new Date();
     const ms48 = 48 * 60 * 60 * 1000;
@@ -49,12 +49,10 @@ function MyOrders({ session, user, onNavigate }) {
     switch (status) {
       case "pending":
         return "#ff9800";
-      case "successful":
+      case "success":
         return "#4caf50";
       case "cancelled":
         return "#f44336";
-      case "expired":
-        return "#9c27b0";
       default:
         return "#757575";
     }
@@ -130,6 +128,11 @@ function MyOrders({ session, user, onNavigate }) {
 
                 <div style={{ marginBottom: "16px", borderTop: "1px solid #eee", paddingTop: "12px" }}>
                   <h4 style={{ margin: "0 0 8px 0", fontSize: "13px", color: "#1f1813" }}>Items:</h4>
+                  {canCancel(o) && o.order_status === "success" && (
+                    <div style={{ marginBottom: "12px", fontSize: "12px", color: "#d9534f", fontStyle: "italic", padding: "8px", background: "#fff5f5", borderLeft: "3px solid #d9534f", borderRadius: "4px" }}>
+                      ✓ You can cancel this order within 48 hours of purchase (expires at {new Date(new Date(o.paid_at).getTime() + 48 * 60 * 60 * 1000).toLocaleString()})
+                    </div>
+                  )}
                   {o.items && o.items.length > 0 ? (
                     <ul style={{ margin: "0", paddingLeft: "20px", color: "#555", fontSize: "13px" }}>
                       {o.items.map((it, idx) => (
@@ -151,7 +154,7 @@ function MyOrders({ session, user, onNavigate }) {
                       Cancel Order
                     </button>
                   )}
-                  {o.order_status === "successful" && !canCancel(o) && (
+                  {o.order_status === "success" && !canCancel(o) && (
                     <div style={{ fontSize: "12px", color: "#999", alignSelf: "center" }}>
                       Cancellation window expired
                     </div>

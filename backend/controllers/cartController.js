@@ -31,9 +31,8 @@ const FRONTEND_BASE_URL = (
 
 const ORDER_STATUS = {
   PENDING: "pending",
-  SUCCESSFUL: "successful",
-  FAILED: "failed",
-  CANCELED: "canceled",
+  SUCCESS: "success",
+  CANCELLED: "cancelled",
 };
 
 const isClothingProduct = (category) => {
@@ -45,8 +44,8 @@ const normalizeOrderStatusFromCapture = (captureStatus, captureUnitStatus) => {
   const normalizedStatus = String(captureStatus || "").toUpperCase();
   const normalizedUnitStatus = String(captureUnitStatus || "").toUpperCase();
   return (normalizedStatus === "COMPLETED" || normalizedUnitStatus === "COMPLETED")
-    ? ORDER_STATUS.SUCCESSFUL
-    : ORDER_STATUS.FAILED;
+    ? ORDER_STATUS.SUCCESS
+    : ORDER_STATUS.CANCELLED;
 };
 
 const isPayerNotApprovedError = (error) => {
@@ -332,7 +331,7 @@ const quickCheckout = async (req, res) => {
 
       const [orderResult] = await connection.query(
         "INSERT INTO orders (user_id, total, status, created_at) VALUES (?, ?, ?, NOW())",
-        [req.user.id, total, ORDER_STATUS.SUCCESSFUL],
+        [req.user.id, total, ORDER_STATUS.SUCCESS],
       );
 
       await connection.query(
@@ -374,7 +373,7 @@ const quickCheckout = async (req, res) => {
             },
           ],
           total,
-          status: ORDER_STATUS.SUCCESSFUL,
+          status: ORDER_STATUS.SUCCESS,
         },
       });
     } catch (transactionError) {
@@ -980,7 +979,7 @@ const checkout = async (req, res) => {
 
       const [orderResult] = await connection.query(
         "INSERT INTO orders (user_id, total, customer_email, status, payment_status, order_status, paid_at, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())",
-        [req.user.id, total, users[0]?.email || null, ORDER_STATUS.SUCCESSFUL, "paid", "successful"],
+        [req.user.id, total, users[0]?.email || null, ORDER_STATUS.SUCCESS, "paid", "success"],
       );
 
       for (const item of items) {
@@ -1008,7 +1007,7 @@ const checkout = async (req, res) => {
           id: orderResult.insertId,
           items,
           total: roundMoney(total),
-          status: ORDER_STATUS.SUCCESSFUL,
+          status: ORDER_STATUS.SUCCESS,
         },
       });
     } catch (transactionError) {
@@ -1223,7 +1222,7 @@ const capturePaypalOrder = async (req, res) => {
 
     if (
       existingPayments.length &&
-      existingPayments[0].status === ORDER_STATUS.SUCCESSFUL
+      existingPayments[0].status === ORDER_STATUS.SUCCESS
     ) {
       const orderId = existingPayments[0].order_id;
       connection.release();
@@ -1231,11 +1230,11 @@ const capturePaypalOrder = async (req, res) => {
         message: "PayPal order has already been captured",
         order: {
           id: orderId,
-          status: ORDER_STATUS.SUCCESSFUL,
+          status: ORDER_STATUS.SUCCESS,
         },
         payment: {
           paypalOrderId: orderID,
-          status: ORDER_STATUS.SUCCESSFUL,
+          status: ORDER_STATUS.SUCCESS,
         },
       });
     }
@@ -1352,8 +1351,8 @@ const capturePaypalOrder = async (req, res) => {
         "UPDATE orders SET status = ?, payment_status = ?, order_status = ?, paid_at = NOW(), total = ?, customer_email = COALESCE(?, customer_email), created_at = created_at WHERE id = ?",
         [
           finalOrderStatus,
-          finalOrderStatus === ORDER_STATUS.SUCCESSFUL ? "paid" : "failed",
-          finalOrderStatus === ORDER_STATUS.SUCCESSFUL ? "successful" : "pending",
+          finalOrderStatus === ORDER_STATUS.SUCCESS ? "paid" : "pending",
+          finalOrderStatus === ORDER_STATUS.SUCCESS ? "success" : "pending",
           Number(amountValue),
           userRecord.email || captureData?.payer?.email_address || null,
           orderId,
@@ -1372,7 +1371,7 @@ const capturePaypalOrder = async (req, res) => {
         ],
       );
 
-      if (finalOrderStatus === ORDER_STATUS.SUCCESSFUL) {
+      if (finalOrderStatus === ORDER_STATUS.SUCCESS) {
         const [cartRows] = await connection.query(
           `
             SELECT p.id, p.stock, p.size_stock, ci.size, ci.quantity
@@ -1429,7 +1428,7 @@ const capturePaypalOrder = async (req, res) => {
         finalStatus: finalOrderStatus,
       });
 
-      if (finalOrderStatus === ORDER_STATUS.SUCCESSFUL) {
+      if (finalOrderStatus === ORDER_STATUS.SUCCESS) {
         try {
           console.log("[paypal:invoice] sending order confirmation email", {
             orderId,
@@ -1486,7 +1485,7 @@ const capturePaypalOrder = async (req, res) => {
   } catch (error) {
     console.error("[paypal:capture]", error.message || error);
 
-    const finalUnsuccessfulStatus = ORDER_STATUS.FAILED;
+    const finalUnsuccessfulStatus = ORDER_STATUS.CANCELLED;
     const failureReason =
       error?.response?.data?.details?.[0]?.description ||
       error?.response?.data?.message ||
@@ -1543,10 +1542,10 @@ const markPaypalOrderAsUnsuccessful = async ({
     return { updated: false, orderId: null };
   }
 
-  // Determine status based on reason: use CANCELED for cancellations, FAILED for other issues
+  // Determine status based on reason: always use CANCELLED for both cancellations and failures
   const finalStatus =
     status ||
-    (reason.includes("cancel") ? ORDER_STATUS.CANCELED : ORDER_STATUS.FAILED);
+    ORDER_STATUS.CANCELLED;
 
   let whereClause = "p.paypal_order_id = ?";
   const whereParams = [orderID];
@@ -1571,9 +1570,9 @@ const markPaypalOrderAsUnsuccessful = async ({
       WHERE ${whereClause}
     `,
     [
-      ORDER_STATUS.SUCCESSFUL,
+      ORDER_STATUS.SUCCESS,
       finalStatus,
-      ORDER_STATUS.SUCCESSFUL,
+      ORDER_STATUS.SUCCESS,
       finalStatus,
       rawResponse,
       ...whereParams,
@@ -1636,8 +1635,8 @@ const handlePaypalSuccessReturn = async (req, res) => {
     const userId = Number(paymentRow.user_id);
 
     if (
-      paymentRow.order_status === ORDER_STATUS.SUCCESSFUL ||
-      paymentRow.payment_status === ORDER_STATUS.SUCCESSFUL
+      paymentRow.order_status === ORDER_STATUS.SUCCESS ||
+      paymentRow.payment_status === ORDER_STATUS.SUCCESS
     ) {
       return res.redirect(
         `${FRONTEND_BASE_URL}/?paypalSuccess=1&orderId=${encodeURIComponent(

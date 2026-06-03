@@ -1,6 +1,6 @@
 export const STATUS_COLORS = {
   success: "#79b64a",
-  unsuccessful: "#f07c2e",
+  cancelled: "#f07c2e",
   pending: "#ffbf24",
 };
 

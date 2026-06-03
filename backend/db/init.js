@@ -235,11 +235,10 @@ const initDatabase = async () => {
     await db.query(`
       UPDATE orders
       SET status = CASE
-        WHEN LOWER(TRIM(status)) IN ('paid', 'completed', 'success', 'successful') THEN 'successful'
+        WHEN LOWER(TRIM(status)) IN ('paid', 'completed', 'success', 'successful') THEN 'success'
         WHEN LOWER(TRIM(status)) IN ('pending', 'processing', 'awaiting_payment', 'open', 'draft') THEN 'pending'
-        WHEN LOWER(TRIM(status)) IN ('failed', 'failure', 'error') THEN 'failed'
-        WHEN LOWER(TRIM(status)) IN ('canceled', 'cancelled', 'cancel') THEN 'canceled'
-        ELSE 'failed'
+        WHEN LOWER(TRIM(status)) IN ('failed', 'failure', 'error', 'canceled', 'cancelled', 'cancel') THEN 'cancelled'
+        ELSE 'cancelled'
       END
     `);
 
@@ -259,11 +258,10 @@ const initDatabase = async () => {
     await db.query(`
       UPDATE payments
       SET status = CASE
-        WHEN LOWER(TRIM(status)) IN ('paid', 'completed', 'success', 'successful') THEN 'successful'
+        WHEN LOWER(TRIM(status)) IN ('paid', 'completed', 'success', 'successful') THEN 'success'
         WHEN LOWER(TRIM(status)) IN ('pending', 'processing', 'awaiting_payment', 'open', 'draft') THEN 'pending'
-        WHEN LOWER(TRIM(status)) IN ('failed', 'failure', 'error') THEN 'failed'
-        WHEN LOWER(TRIM(status)) IN ('canceled', 'cancelled', 'cancel') THEN 'canceled'
-        ELSE 'failed'
+        WHEN LOWER(TRIM(status)) IN ('failed', 'failure', 'error', 'canceled', 'cancelled', 'cancel') THEN 'cancelled'
+        ELSE 'cancelled'
       END
     `);
 
@@ -552,7 +550,7 @@ const initDatabase = async () => {
 
             await connection.query(
               "UPDATE orders SET order_status = ?, payment_status = ?, cancelled_at = NOW() WHERE id = ?",
-              ["expired", "failed", o.id],
+              ["cancelled", "pending", o.id],
             );
 
             await connection.commit();
