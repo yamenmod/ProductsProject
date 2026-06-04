@@ -17,6 +17,7 @@ const {
   rebuildCartHoldOrder,
   findCartHoldOrderId,
   CART_HOLD_PAYMENT_STATUS,
+  cleanupExpiredCartHoldOrders,
 } = require("../utils/cartPendingOrder");
 const { syncOrderStatusFields } = require("../utils/orderStatus");
 
@@ -418,6 +419,19 @@ const getCart = async (req, res) => {
   try {
     const vatRate = await getVatRateFromDb(db);
 
+    // Cleanup expired cart hold orders
+    const connection = await db.getConnection();
+    try {
+      await connection.beginTransaction();
+      await cleanupExpiredCartHoldOrders(connection);
+      await connection.commit();
+    } catch (cleanupError) {
+      await connection.rollback();
+      console.error("[cart:getCart] cleanup error:", cleanupError.message);
+    } finally {
+      connection.release();
+    }
+
     const [rows] = await db.query(
       `
         SELECT
@@ -438,7 +452,42 @@ const getCart = async (req, res) => {
       [req.user.id],
     );
 
-    return res.status(200).json(mapCartRows(rows, vatRate));
+    const cartItems = mapCartRows(rows, vatRate);
+
+    // Get cart hold order info for timer
+    const [holdOrders] = await db.query(
+      `
+        SELECT id, created_at, cart_hold_expires_at
+        FROM orders
+        WHERE user_id = ?
+          AND order_status = ?
+          AND payment_status = ?
+        ORDER BY id DESC
+        LIMIT 1
+      `,
+      [req.user.id, ORDER_STATUS.PENDING, CART_HOLD_PAYMENT_STATUS],
+    );
+
+    let holdOrderInfo = null;
+    if (holdOrders.length) {
+      const holdOrder = holdOrders[0];
+      const expiresAt = new Date(holdOrder.cart_hold_expires_at);
+      const now = new Date();
+      const remainingSeconds = Math.max(0, Math.floor((expiresAt - now) / 1000));
+      
+      holdOrderInfo = {
+        orderId: holdOrder.id,
+        createdAt: holdOrder.created_at,
+        expiresAt: holdOrder.cart_hold_expires_at,
+        remainingSeconds,
+        isExpired: remainingSeconds <= 0,
+      };
+    }
+
+    return res.status(200).json({
+      items: cartItems,
+      holdOrder: holdOrderInfo,
+    });
   } catch (error) {
     return res.status(500).json({ message: "Server error" });
   }
@@ -506,8 +555,9 @@ const addToCart = async (req, res) => {
       );
 
       if (existingItems.length) {
-        // Check max quantity per product
-        const maxQtyPerProduct = Number(product.max_quantity_per_user || 10);
+        // Check max quantity per product (use product-level setting or fall back to global setting)
+        const globalMaxQty = await getMaxQuantityPerProduct();
+        const maxQtyPerProduct = Number(product.max_quantity_per_user || globalMaxQty);
         const existingQty = Number(existingItems[0].quantity || 0);
         const newTotalQty = existingQty + qty;
 
@@ -526,8 +576,9 @@ const addToCart = async (req, res) => {
           [qty, existingItems[0].id],
         );
       } else {
-        // Check max quantity per product on new item
-        const maxQtyPerProduct = Number(product.max_quantity_per_user || 10);
+        // Check max quantity per product on new item (use product-level setting or fall back to global setting)
+        const globalMaxQty = await getMaxQuantityPerProduct();
+        const maxQtyPerProduct = Number(product.max_quantity_per_user || globalMaxQty);
         if (qty > maxQtyPerProduct) {
           await connection.rollback();
           connection.release();
@@ -595,7 +646,42 @@ const addToCart = async (req, res) => {
         [req.user.id],
       );
 
-      return res.status(200).json(mapCartRows(rows, vatRate));
+      const cartItems = mapCartRows(rows, vatRate);
+
+      // Get cart hold order info for timer
+      const [holdOrders] = await db.query(
+        `
+          SELECT id, created_at, cart_hold_expires_at
+          FROM orders
+          WHERE user_id = ?
+            AND order_status = ?
+            AND payment_status = ?
+          ORDER BY id DESC
+          LIMIT 1
+        `,
+        [req.user.id, ORDER_STATUS.PENDING, CART_HOLD_PAYMENT_STATUS],
+      );
+
+      let holdOrderInfo = null;
+      if (holdOrders.length) {
+        const holdOrder = holdOrders[0];
+        const expiresAt = new Date(holdOrder.cart_hold_expires_at);
+        const now = new Date();
+        const remainingSeconds = Math.max(0, Math.floor((expiresAt - now) / 1000));
+        
+        holdOrderInfo = {
+          orderId: holdOrder.id,
+          createdAt: holdOrder.created_at,
+          expiresAt: holdOrder.cart_hold_expires_at,
+          remainingSeconds,
+          isExpired: remainingSeconds <= 0,
+        };
+      }
+
+      return res.status(200).json({
+        items: cartItems,
+        holdOrder: holdOrderInfo,
+      });
     } catch (transactionError) {
       await connection.rollback();
       connection.release();

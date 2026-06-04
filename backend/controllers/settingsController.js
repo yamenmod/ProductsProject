@@ -141,6 +141,32 @@ const updateSetting = async (req, res) => {
       return res.json({ key, value: storedValue });
     }
 
+    // Validate max_quantity_per_user if updating it
+    if (key === "max_quantity_per_user") {
+      const numValue = parseInt(value, 10);
+      if (isNaN(numValue) || numValue < 1) {
+        return res
+          .status(400)
+          .json({ error: "Max quantity per user must be a positive integer" });
+      }
+
+      if (numValue > 1000) {
+        return res
+          .status(400)
+          .json({ error: "Max quantity per user cannot exceed 1000" });
+      }
+
+      const storedValue = String(numValue);
+      await db.query(
+        "INSERT INTO settings (key_name, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value = ?",
+        [key, storedValue, storedValue],
+      );
+
+      console.log("[settings:update]", { key, value: storedValue });
+
+      return res.json({ key, value: storedValue });
+    }
+
     await db.query(
       "INSERT INTO settings (key_name, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value = ?",
       [key, value, value],

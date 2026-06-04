@@ -31,6 +31,8 @@ function Cart({
   const [isPayPalLoading, setIsPayPalLoading] = useState(false);
   const [vatRate, setVatRate] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
+  const [holdOrder, setHoldOrder] = useState(null);
+  const [remainingTime, setRemainingTime] = useState(0);
 
   const normalizeCartItems = (items = []) =>
     (Array.isArray(items) ? items : []).map((item) => {
@@ -234,6 +236,25 @@ function Cart({
     loadPayPalConfig();
   }, [loadPayPalConfig]);
 
+  // Countdown timer for cart hold order
+  useEffect(() => {
+    if (!holdOrder || remainingTime <= 0) {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setRemainingTime((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [holdOrder]);
+
   const parseImageValue = (value) => {
     if (!value) {
       return [];
@@ -410,7 +431,11 @@ function Cart({
           },
         });
 
-        setDisplayItems(normalizeCartItems(response.data));
+        setDisplayItems(normalizeCartItems(response.data.items || response.data));
+        setHoldOrder(response.data.holdOrder || null);
+        if (response.data.holdOrder?.remainingSeconds) {
+          setRemainingTime(response.data.holdOrder.remainingSeconds);
+        }
       } catch (error) {
         console.error("Failed to load cart page items:", error.message);
       }
@@ -497,6 +522,88 @@ function Cart({
               Continue shopping
             </button>
           </div>
+
+          {holdOrder && remainingTime > 0 && (
+            <div
+              style={{
+                padding: "16px 20px",
+                background: "linear-gradient(135deg, #fff3cd 0%, #ffe69c 100%)",
+                border: "2px solid #ffc107",
+                borderRadius: "12px",
+                marginBottom: "24px",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: "16px",
+              }}
+            >
+              <div>
+                <p
+                  style={{
+                    margin: "0 0 4px 0",
+                    fontSize: "13px",
+                    fontWeight: 700,
+                    color: "#856404",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.8px",
+                  }}
+                >
+                  ⏰ Stock Reserved
+                </p>
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: "14px",
+                    color: "#856404",
+                  }}
+                >
+                  Complete your purchase within 30 minutes to keep your reserved items.
+                </p>
+              </div>
+              <div
+                style={{
+                  padding: "12px 20px",
+                  background: "#fff",
+                  border: "2px solid #ffc107",
+                  borderRadius: "999px",
+                  fontSize: "24px",
+                  fontWeight: 800,
+                  color: "#856404",
+                  fontFamily: "'Bebas Neue', Impact, sans-serif",
+                  minWidth: "120px",
+                  textAlign: "center",
+                }}
+              >
+                {Math.floor(remainingTime / 60)
+                  .toString()
+                  .padStart(2, "0")}
+                :{(remainingTime % 60).toString().padStart(2, "0")}
+              </div>
+            </div>
+          )}
+
+          {holdOrder && remainingTime <= 0 && (
+            <div
+              style={{
+                padding: "16px 20px",
+                background: "#f8d7da",
+                border: "2px solid #dc3545",
+                borderRadius: "12px",
+                marginBottom: "24px",
+              }}
+            >
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: "14px",
+                  fontWeight: 600,
+                  color: "#721c24",
+                }}
+              >
+                ⚠️ Your reservation has expired. Please remove items from your cart and add them again to reserve stock.
+              </p>
+            </div>
+          )}
 
           {displayItems.length === 0 ? (
             <div

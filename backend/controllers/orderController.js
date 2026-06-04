@@ -104,10 +104,6 @@ const getMyOrders = async (req, res) => {
       `SELECT id, user_id, total, status, payment_status, order_status, created_at, paid_at, cancelled_at
        FROM orders
        WHERE user_id = ?
-         AND (
-           order_status IN ('success', 'cancelled')
-           OR status IN ('success', 'cancelled')
-         )
        ORDER BY created_at DESC`,
       [userId],
     );
@@ -189,7 +185,8 @@ const cancel = async (req, res) => {
 
     const paidAt = new Date(order.paid_at);
     const now = new Date();
-    const ms48 = 48 * 60 * 60 * 1000;
+    //const ms48 = 48 * 60 * 60 * 1000;
+    const ms48 = 60;
     if (now - paidAt > ms48) {
       return res.status(400).json({ message: "Cancellation window expired" });
     }

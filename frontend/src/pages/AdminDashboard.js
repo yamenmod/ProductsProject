@@ -50,6 +50,10 @@ function AdminDashboard({
   const [maxProductsInput, setMaxProductsInput] = useState("10");
   const [maxProductsMessage, setMaxProductsMessage] = useState("");
   const [savingMaxProducts, setSavingMaxProducts] = useState(false);
+  const [maxQtyPerUser, setMaxQtyPerUser] = useState(10);
+  const [maxQtyInput, setMaxQtyInput] = useState("10");
+  const [maxQtyMessage, setMaxQtyMessage] = useState("");
+  const [savingMaxQty, setSavingMaxQty] = useState(false);
   const statusColors = STATUS_COLORS;
 
   const filteredOrders = useMemo(() => {
@@ -235,6 +239,32 @@ function AdminDashboard({
     loadMaxProducts();
   }, [session?.token]);
 
+  useEffect(() => {
+    const loadMaxQtyPerUser = async () => {
+      if (!session?.token) {
+        return;
+      }
+
+      try {
+        const response = await axios.get(
+          "/api/admin/settings/max_quantity_per_user",
+          {
+            headers: { Authorization: `Bearer ${session.token}` },
+          },
+        );
+
+        const value = Number(response.data?.value || 10);
+        const normalized = Number.isFinite(value) && value > 0 ? value : 10;
+        setMaxQtyPerUser(normalized);
+        setMaxQtyInput(String(normalized));
+      } catch (maxQtyError) {
+        console.error("Unable to load max quantity per user:", maxQtyError.message);
+      }
+    };
+
+    loadMaxQtyPerUser();
+  }, [session?.token]);
+
   const saveVatRate = async () => {
     const parsedPercent = Number(vatInput);
 
@@ -303,6 +333,37 @@ function AdminDashboard({
       );
     } finally {
       setSavingMaxProducts(false);
+    }
+  };
+
+  const saveMaxQtyPerUser = async () => {
+    const parsed = Number(maxQtyInput);
+
+    if (!Number.isFinite(parsed) || parsed < 1 || parsed > 1000) {
+      setMaxQtyMessage("Max quantity per user must be between 1 and 1000.");
+      return;
+    }
+
+    try {
+      setSavingMaxQty(true);
+      setMaxQtyMessage("");
+
+      const response = await axios.put(
+        "/api/admin/settings/max_quantity_per_user",
+        { value: parsed },
+        {
+          headers: { Authorization: `Bearer ${session.token}` },
+        },
+      );
+
+      const saved = Number(response.data?.value || parsed);
+      setMaxQtyPerUser(saved);
+      setMaxQtyInput(String(saved));
+      setMaxQtyMessage(`Max quantity per user updated to ${saved}.`);
+    } catch (saveError) {
+      setMaxQtyMessage(saveError.response?.data?.error || "Unable to update max quantity per user.");
+    } finally {
+      setSavingMaxQty(false);
     }
   };
 
@@ -583,6 +644,59 @@ function AdminDashboard({
               >
                 {maxProductsMessage ||
                   `Current limit: ${maxProductsPerCart} products per cart`}
+              </div>
+            </div>
+            <div style={{ minWidth: "220px", flex: "1 1 220px" }}>
+              <div
+                style={{
+                  color: "#65574d",
+                  fontSize: "12px",
+                  fontWeight: 800,
+                  letterSpacing: "1px",
+                  textTransform: "uppercase",
+                  marginBottom: "6px",
+                }}
+              >
+                Max quantity per user
+              </div>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <input
+                  type="number"
+                  min="1"
+                  max="1000"
+                  value={maxQtyInput}
+                  onChange={(event) => setMaxQtyInput(event.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: "11px 12px",
+                    borderRadius: "12px",
+                    border: "1px solid rgba(31, 24, 19, 0.14)",
+                    background: "rgba(255, 250, 242, 0.95)",
+                    fontSize: "13px",
+                  }}
+                />
+                <button
+                  type="button"
+                  className="ps-btn ps-btn-primary"
+                  onClick={saveMaxQtyPerUser}
+                  disabled={savingMaxQty}
+                  style={{ height: "44px", minWidth: "88px" }}
+                >
+                  {savingMaxQty ? "Saving" : "Save"}
+                </button>
+              </div>
+              <div
+                style={{
+                  fontSize: "12px",
+                  color: maxQtyMessage
+                    ? maxQtyMessage.includes("updated")
+                      ? "#245860"
+                      : "#a83f34"
+                    : "#65574d",
+                  marginTop: "6px",
+                }}
+              >
+                {maxQtyMessage || `Current limit: ${maxQtyPerUser}`}
               </div>
             </div>
           </div>

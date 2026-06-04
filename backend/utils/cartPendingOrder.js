@@ -134,6 +134,41 @@ const clearCartHoldOrder = async (connection, userId) => {
   return orderId;
 };
 
+const cleanupExpiredCartHoldOrders = async (connection) => {
+  const [expiredOrders] = await connection.query(
+    `SELECT id, user_id
+     FROM orders
+     WHERE order_status = ?
+       AND payment_status = ?
+       AND cart_hold_expires_at < NOW()
+       AND NOT EXISTS (
+         SELECT 1 FROM payments p WHERE p.order_id = orders.id
+       )`,
+    [ORDER_STATUS.PENDING, CART_HOLD_PAYMENT_STATUS],
+  );
+
+  for (const order of expiredOrders) {
+    const [items] = await connection.query(
+      "SELECT product_id, quantity, name FROM order_items WHERE order_id = ?",
+      [order.id],
+    );
+
+    for (const item of items) {
+      await restoreOrderItemStock(connection, item);
+    }
+
+    await connection.query("DELETE FROM order_items WHERE order_id = ?", [order.id]);
+    await connection.query(
+      `UPDATE orders
+       SET status = ?, order_status = ?, payment_status = ?, cancelled_at = NOW()
+       WHERE id = ?`,
+      [ORDER_STATUS.CANCELLED, ORDER_STATUS.CANCELLED, "cancelled", order.id],
+    );
+  }
+
+  return expiredOrders.length;
+};
+
 const rebuildCartHoldOrder = async (connection, userId, db) => {
   const [cartRows] = await connection.query(
     `
@@ -175,8 +210,8 @@ const rebuildCartHoldOrder = async (connection, userId, db) => {
     await connection.query("DELETE FROM order_items WHERE order_id = ?", [orderId]);
   } else {
     const [orderResult] = await connection.query(
-      `INSERT INTO orders (user_id, total, status, payment_status, order_status, created_at)
-       VALUES (?, 0, ?, ?, ?, NOW())`,
+      `INSERT INTO orders (user_id, total, status, payment_status, order_status, created_at, cart_hold_expires_at)
+       VALUES (?, 0, ?, ?, ?, NOW(), DATE_ADD(NOW(), INTERVAL 30 MINUTE))`,
       [
         userId,
         ORDER_STATUS.PENDING,
@@ -224,7 +259,7 @@ const rebuildCartHoldOrder = async (connection, userId, db) => {
 
   await connection.query(
     `UPDATE orders
-     SET total = ?, status = ?, order_status = ?, payment_status = ?, cancelled_at = NULL
+     SET total = ?, status = ?, order_status = ?, payment_status = ?, cancelled_at = NULL, cart_hold_expires_at = DATE_ADD(NOW(), INTERVAL 30 MINUTE)
      WHERE id = ?`,
     [
       total,
@@ -244,4 +279,5 @@ module.exports = {
   clearCartHoldOrder,
   rebuildCartHoldOrder,
   restoreOrderItemStock,
+  cleanupExpiredCartHoldOrders,
 };
