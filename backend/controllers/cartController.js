@@ -13,12 +13,6 @@ const {
   getVatRateFromDb,
 } = require("../utils/pricing");
 const { getMaxProductsPerCart, getMaxQuantityPerProduct } = require("../utils/settings");
-const {
-  rebuildCartHoldOrder,
-  findCartHoldOrderId,
-  CART_HOLD_PAYMENT_STATUS,
-  cleanupExpiredCartHoldOrders,
-} = require("../utils/cartPendingOrder");
 const { syncOrderStatusFields } = require("../utils/orderStatus");
 
 // Cart, checkout, payment, and admin order reporting endpoints.
@@ -37,7 +31,6 @@ const FRONTEND_BASE_URL = (
 ).trim();
 
 const ORDER_STATUS = {
-  PENDING: "pending",
   SUCCESS: "success",
   CANCELLED: "cancelled",
 };
@@ -281,29 +274,6 @@ const quickCheckout = async (req, res) => {
       const reservedCart = Number(rc[0].reserved || 0);
 
       let reservedOrders = 0;
-      if (currentSizeStock && normalizedSize) {
-        const [rowsOrders] = await connection.query(
-          `SELECT oi.quantity, oi.name FROM order_items oi
-           JOIN orders o ON o.id = oi.order_id
-           WHERE oi.product_id = ? AND o.status = 'pending'`,
-          [productId],
-        );
-        for (const r of rowsOrders) {
-          const name = r.name || "";
-          const m = name.match(/\(\s*Size\s*([^\)]+)\s*\)/i);
-          if (m && m[1] && m[1].toUpperCase() === normalizedSize) {
-            reservedOrders += Number(r.quantity || 0);
-          }
-        }
-      } else {
-        const [ro] = await connection.query(
-          `SELECT COALESCE(SUM(oi.quantity),0) AS reserved FROM order_items oi
-           JOIN orders o ON o.id = oi.order_id
-           WHERE oi.product_id = ? AND o.status = 'pending'`,
-          [productId],
-        );
-        reservedOrders = Number(ro[0].reserved || 0);
-      }
 
       const available = Math.max(0, totalStock - (reservedCart + reservedOrders));
       if (qty > available) {
@@ -454,39 +424,9 @@ const getCart = async (req, res) => {
 
     const cartItems = mapCartRows(rows, vatRate);
 
-    // Get cart hold order info for timer
-    const [holdOrders] = await db.query(
-      `
-        SELECT id, created_at, cart_hold_expires_at
-        FROM orders
-        WHERE user_id = ?
-          AND order_status = ?
-          AND payment_status = ?
-        ORDER BY id DESC
-        LIMIT 1
-      `,
-      [req.user.id, ORDER_STATUS.PENDING, CART_HOLD_PAYMENT_STATUS],
-    );
-
-    let holdOrderInfo = null;
-    if (holdOrders.length) {
-      const holdOrder = holdOrders[0];
-      const expiresAt = new Date(holdOrder.cart_hold_expires_at);
-      const now = new Date();
-      const remainingSeconds = Math.max(0, Math.floor((expiresAt - now) / 1000));
-      
-      holdOrderInfo = {
-        orderId: holdOrder.id,
-        createdAt: holdOrder.created_at,
-        expiresAt: holdOrder.cart_hold_expires_at,
-        remainingSeconds,
-        isExpired: remainingSeconds <= 0,
-      };
-    }
-
     return res.status(200).json({
       items: cartItems,
-      holdOrder: holdOrderInfo,
+      holdOrder: null,
     });
   } catch (error) {
     return res.status(500).json({ message: "Server error" });
@@ -613,15 +553,7 @@ const addToCart = async (req, res) => {
         );
       }
 
-      try {
-        await rebuildCartHoldOrder(connection, req.user.id, db);
-      } catch (rebuildError) {
-        await connection.rollback();
-        connection.release();
-        return res.status(400).json({
-          message: rebuildError.message || "Unable to reserve stock for cart",
-        });
-      }
+      // Stock validation will happen at checkout time
 
       await connection.commit();
       connection.release();
@@ -648,39 +580,9 @@ const addToCart = async (req, res) => {
 
       const cartItems = mapCartRows(rows, vatRate);
 
-      // Get cart hold order info for timer
-      const [holdOrders] = await db.query(
-        `
-          SELECT id, created_at, cart_hold_expires_at
-          FROM orders
-          WHERE user_id = ?
-            AND order_status = ?
-            AND payment_status = ?
-          ORDER BY id DESC
-          LIMIT 1
-        `,
-        [req.user.id, ORDER_STATUS.PENDING, CART_HOLD_PAYMENT_STATUS],
-      );
-
-      let holdOrderInfo = null;
-      if (holdOrders.length) {
-        const holdOrder = holdOrders[0];
-        const expiresAt = new Date(holdOrder.cart_hold_expires_at);
-        const now = new Date();
-        const remainingSeconds = Math.max(0, Math.floor((expiresAt - now) / 1000));
-        
-        holdOrderInfo = {
-          orderId: holdOrder.id,
-          createdAt: holdOrder.created_at,
-          expiresAt: holdOrder.cart_hold_expires_at,
-          remainingSeconds,
-          isExpired: remainingSeconds <= 0,
-        };
-      }
-
       return res.status(200).json({
         items: cartItems,
-        holdOrder: holdOrderInfo,
+        holdOrder: null,
       });
     } catch (transactionError) {
       await connection.rollback();
@@ -843,15 +745,7 @@ const updateCartQuantity = async (req, res) => {
         ]);
       }
 
-      try {
-        await rebuildCartHoldOrder(connection, req.user.id, db);
-      } catch (rebuildError) {
-        await connection.rollback();
-        connection.release();
-        return res.status(400).json({
-          message: rebuildError.message || "Unable to update cart reservation",
-        });
-      }
+      // Stock validation will happen at checkout time
 
       await connection.commit();
       connection.release();
@@ -1089,104 +983,60 @@ const createPaypalOrder = async (req, res) => {
     try {
       await connection.beginTransaction();
 
-      try {
-        await rebuildCartHoldOrder(connection, req.user.id, db);
-      } catch (rebuildError) {
-        await connection.rollback();
-        connection.release();
-        return res.status(400).json({
-          message: rebuildError.message || "Unable to reserve stock for checkout",
-        });
-      }
+      // Validate stock availability before creating PayPal order
+      const [cartRows] = await connection.query(
+        `
+          SELECT
+            p.id,
+            p.name,
+            p.price,
+            p.stock,
+            p.size_stock,
+            c.name AS category,
+            ci.size,
+            ci.quantity
+          FROM cart_items ci
+          JOIN products p ON p.id = ci.product_id
+          LEFT JOIN categories c ON c.id = p.category_id
+          WHERE ci.user_id = ?
+        `,
+        [req.user.id],
+      );
 
-      let orderId = await findCartHoldOrderId(connection, req.user.id);
-      const pendingSync = syncOrderStatusFields(ORDER_STATUS.PENDING);
+      for (const item of cartRows) {
+        const product = item;
+        const normalizedSize = (item.size || "").toString().trim().toUpperCase();
+        const qty = Number(item.quantity || 0);
+        const sizeStock = normalizeSizeStockMap(product.size_stock);
 
-      if (orderId) {
-        await connection.query(
-          `UPDATE orders
-           SET total = ?, customer_email = ?, status = ?, order_status = ?, payment_status = ?
-           WHERE id = ?`,
-          [
-            total,
-            userRecord?.email || null,
-            pendingSync.status,
-            pendingSync.order_status,
-            pendingSync.payment_status,
-            orderId,
-          ],
-        );
-      } else {
-        const [orderResult] = await connection.query(
-          `INSERT INTO orders (user_id, total, customer_email, status, payment_status, order_status, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, NOW())`,
-          [
-            req.user.id,
-            total,
-            userRecord?.email || null,
-            pendingSync.status,
-            pendingSync.payment_status,
-            pendingSync.order_status,
-          ],
-        );
-        orderId = orderResult.insertId;
+        let available = 0;
+        if (sizeStock) {
+          available = normalizedSize ? Number(sizeStock[normalizedSize] || 0) : getSizeStockTotal(sizeStock);
+        } else {
+          available = Number(product.stock || 0);
+        }
 
-        for (const item of items) {
-          await connection.query(
-            "INSERT INTO order_items (order_id, product_id, name, price, quantity) VALUES (?, ?, ?, ?, ?)",
-            [
-              orderId,
-              item.id,
-              item.displayName || item.name,
-              item.pricing.finalPrice,
-              Number(item.quantity),
-            ],
-          );
+        if (qty > available) {
+          await connection.rollback();
+          connection.release();
+          return res.status(400).json({
+            message: `Only ${available} items left for ${product.name}`,
+          });
         }
       }
-
-      await connection.query(
-        "INSERT INTO payments (user_id, order_id, paypal_order_id, status, amount, currency, raw_response) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        [
-          req.user.id,
-          orderId,
-          paypalOrderId,
-          ORDER_STATUS.PENDING,
-          Number(total),
-          PAYPAL_CURRENCY,
-          JSON.stringify(response.data),
-        ],
-      );
 
       await connection.commit();
       connection.release();
 
       logPayPalFlow("order-created", {
         userId: req.user?.id || null,
-        orderId,
         paypalOrderId,
-        status: ORDER_STATUS.PENDING,
-      });
-
-      logPayPalFlow("user-redirected-to-paypal", {
-        userId: req.user?.id || null,
-        orderId,
-        paypalOrderId,
-      });
-
-      logPayPalFlow("final-status-assigned", {
-        userId: req.user?.id || null,
-        orderId,
-        paypalOrderId,
-        finalStatus: ORDER_STATUS.PENDING,
       });
 
       return res.status(200).json({
         orderID: paypalOrderId,
-        orderId,
         total: total.toFixed(2),
         currency: PAYPAL_CURRENCY,
-        status: ORDER_STATUS.PENDING,
       });
     } catch (transactionError) {
       await connection.rollback();
@@ -1196,7 +1046,7 @@ const createPaypalOrder = async (req, res) => {
         error: transactionError.message,
       });
       return res.status(500).json({
-        message: "Unable to persist pending PayPal order",
+        message: "Unable to create PayPal order",
       });
     }
   } catch (error) {
@@ -1331,15 +1181,68 @@ const capturePaypalOrder = async (req, res) => {
       if (!orderId) {
         const { total, items } = await calculateCartTotal(req.user.id);
 
+        // Validate and reserve stock
+        for (const item of items) {
+          const [products] = await connection.query(
+            `SELECT p.id, p.name, p.stock, p.size_stock, c.name AS category
+             FROM products p
+             LEFT JOIN categories c ON c.id = p.category_id
+             WHERE p.id = ? LIMIT 1 FOR UPDATE`,
+            [item.id],
+          );
+
+          if (!products.length) {
+            await connection.rollback();
+            connection.release();
+            return res.status(404).json({ message: `Product ${item.id} not found` });
+          }
+
+          const product = products[0];
+          const sizeStock = normalizeSizeStockMap(product.size_stock);
+          const normalizedSize = (item.size || "").toString().trim().toUpperCase();
+          const qty = Number(item.quantity || 0);
+
+          let available = 0;
+          if (sizeStock) {
+            available = normalizedSize ? Number(sizeStock[normalizedSize] || 0) : getSizeStockTotal(sizeStock);
+          } else {
+            available = Number(product.stock || 0);
+          }
+
+          if (qty > available) {
+            await connection.rollback();
+            connection.release();
+            return res.status(400).json({
+              message: `Only ${available} items left for ${product.name}`,
+            });
+          }
+
+          // Deduct stock
+          if (sizeStock && normalizedSize) {
+            const nextSizeStock = { ...sizeStock };
+            nextSizeStock[normalizedSize] = Number(nextSizeStock[normalizedSize] || 0) - qty;
+            await connection.query(
+              "UPDATE products SET stock = ?, size_stock = ?, updated_at = NOW() WHERE id = ?",
+              [getSizeStockTotal(nextSizeStock), serializeSizeStock(nextSizeStock), product.id],
+            );
+          } else {
+            await connection.query(
+              "UPDATE products SET stock = stock - ?, updated_at = NOW() WHERE id = ?",
+              [qty, product.id],
+            );
+          }
+        }
+
+        const synced = syncOrderStatusFields(finalOrderStatus);
         const [orderResult] = await connection.query(
-          "INSERT INTO orders (user_id, total, customer_email, status, payment_status, order_status, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())",
+          "INSERT INTO orders (user_id, total, customer_email, status, payment_status, order_status, created_at, paid_at) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())",
           [
             req.user.id,
             total,
             userRecord.email || captureData?.payer?.email_address || null,
-            ORDER_STATUS.PENDING,
-            "pending",
-            "pending",
+            synced.status,
+            synced.payment_status,
+            synced.order_status,
           ],
         );
 
@@ -1364,7 +1267,7 @@ const capturePaypalOrder = async (req, res) => {
             req.user.id,
             orderId,
             orderID,
-            ORDER_STATUS.PENDING,
+            synced.status,
             Number(amountValue),
             currencyCode,
             JSON.stringify(captureData),
@@ -1372,26 +1275,16 @@ const capturePaypalOrder = async (req, res) => {
         );
       }
 
-      const [orderMetaRows] = await connection.query(
-        "SELECT payment_status FROM orders WHERE id = ? LIMIT 1",
-        [orderId],
-      );
-      const stockAlreadyReserved =
-        orderMetaRows[0]?.payment_status === CART_HOLD_PAYMENT_STATUS;
-
       const finalSynced = syncOrderStatusFields(finalOrderStatus);
       await connection.query(
         `UPDATE orders
          SET status = ?, payment_status = ?, order_status = ?,
-             paid_at = CASE WHEN ? = ? THEN NOW() ELSE paid_at END,
              total = ?, customer_email = COALESCE(?, customer_email)
          WHERE id = ?`,
         [
           finalSynced.status,
           finalSynced.payment_status,
           finalSynced.order_status,
-          finalOrderStatus,
-          ORDER_STATUS.SUCCESS,
           Number(amountValue),
           userRecord.email || captureData?.payer?.email_address || null,
           orderId,
@@ -1411,42 +1304,6 @@ const capturePaypalOrder = async (req, res) => {
       );
 
       if (finalOrderStatus === ORDER_STATUS.SUCCESS) {
-        if (!stockAlreadyReserved) {
-          const [cartRows] = await connection.query(
-            `
-              SELECT p.id, p.stock, p.size_stock, ci.size, ci.quantity
-              FROM cart_items ci
-              JOIN products p ON p.id = ci.product_id
-              WHERE ci.user_id = ?
-            `,
-            [req.user.id],
-          );
-
-          for (const item of cartRows) {
-            const currentSizeStock = normalizeSizeStockMap(item.size_stock);
-
-            if (currentSizeStock && item.size) {
-              const nextSizeStock = { ...currentSizeStock };
-              nextSizeStock[item.size] =
-                Number(nextSizeStock[item.size] || 0) - Number(item.quantity);
-
-              await connection.query(
-                "UPDATE products SET stock = ?, size_stock = ?, updated_at = NOW() WHERE id = ?",
-                [
-                  getSizeStockTotal(nextSizeStock),
-                  serializeSizeStock(nextSizeStock),
-                  item.id,
-                ],
-              );
-            } else {
-              await connection.query(
-                "UPDATE products SET stock = stock - ?, updated_at = NOW() WHERE id = ?",
-                [Number(item.quantity), item.id],
-              );
-            }
-          }
-        }
-
         await connection.query("DELETE FROM cart_items WHERE user_id = ?", [
           req.user.id,
         ]);
@@ -1791,7 +1648,7 @@ const cancelPaypalOrder = async (req, res) => {
 
     if (!update.updated) {
       return res.status(404).json({
-        message: "Pending PayPal order not found for cancellation",
+        message: "PayPal order not found for cancellation",
       });
     }
 

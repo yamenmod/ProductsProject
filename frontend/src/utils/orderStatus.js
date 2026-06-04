@@ -1,7 +1,6 @@
 export const ORDER_STATUS_LABELS = {
   success: "Successful",
-  cancelled: "Cancelled",
-  pending: "Pending",
+  cancelled: "Unsuccessful",
 };
 
 const normalizeStatus = (value) =>
@@ -18,23 +17,16 @@ export const getOrderBucket = (order) => {
     return "cancelled";
   }
 
-  if (
-    ["pending", "processing", "awaiting_payment", "open", "draft"].includes(
-      status,
-    )
-  ) {
-    return "pending";
-  }
-
-  return "pending";
+  // Default to cancelled for unrecognized statuses
+  return "cancelled";
 };
 
 export const getOrderStatusLabel = (order) => {
   const bucket = getOrderBucket(order);
-  return ORDER_STATUS_LABELS[bucket] || ORDER_STATUS_LABELS.pending;
+  return ORDER_STATUS_LABELS[bucket] || ORDER_STATUS_LABELS.cancelled;
 };
 
 export const getUserFacingOrderBucket = (order) => {
   const bucket = getOrderBucket(order);
-  return bucket === "pending" ? null : bucket;
+  return bucket;
 };

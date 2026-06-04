@@ -6,95 +6,6 @@ const {
 } = require("../utils/sizeStock");
 const { ORDER_STATUS, syncOrderStatusFields } = require("../utils/orderStatus");
 
-const createPending = async (req, res) => {
-  try {
-    const userId = req.user.id;
-    const { items = [], total = 0 } = req.body;
-
-    if (!Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ message: "No items provided" });
-    }
-
-    const connection = await db.getConnection();
-    try {
-      await connection.beginTransaction();
-
-      const [orderResult] = await connection.query(
-        "INSERT INTO orders (user_id, total, payment_status, order_status, created_at) VALUES (?, ?, ?, ?, NOW())",
-        [userId, Number(total) || 0, "pending", "pending"],
-      );
-
-      const orderId = orderResult.insertId;
-
-      for (const it of items) {
-        const productId = Number(it.product_id);
-        const qty = Number(it.quantity) || 0;
-        const size = (it.size || "").toString().trim().toUpperCase();
-
-        const [products] = await connection.query(
-          "SELECT * FROM products WHERE id = ? LIMIT 1 FOR UPDATE",
-          [productId],
-        );
-
-        if (!products.length) {
-          await connection.rollback();
-          connection.release();
-          return res.status(404).json({ message: `Product ${productId} not found` });
-        }
-
-        const product = products[0];
-        const sizeStock = normalizeSizeStockMap(product.size_stock);
-
-        let available = 0;
-        if (sizeStock) {
-          available = Number(sizeStock[size] || 0);
-        } else {
-          available = Number(product.stock || 0);
-        }
-
-        if (qty > available) {
-          await connection.rollback();
-          connection.release();
-          return res.status(400).json({ message: `Only ${available} items left for product ${productId}` });
-        }
-
-        // Decrement stock immediately to reserve
-        if (sizeStock) {
-          const next = { ...sizeStock };
-          next[size] = Math.max(0, Number(next[size] || 0) - qty);
-
-          await connection.query(
-            "UPDATE products SET stock = ?, size_stock = ?, updated_at = NOW() WHERE id = ?",
-            [getSizeStockTotal(next), serializeSizeStock(next), productId],
-          );
-        } else {
-          await connection.query(
-            "UPDATE products SET stock = GREATEST(0, stock - ?) , updated_at = NOW() WHERE id = ?",
-            [qty, productId],
-          );
-        }
-
-        await connection.query(
-          "INSERT INTO order_items (order_id, product_id, name, price, quantity) VALUES (?, ?, ?, ?, ?)",
-          [orderId, productId, product.name || "", Number(it.price) || Number(product.price) || 0, qty],
-        );
-      }
-
-      await connection.commit();
-      connection.release();
-
-      return res.status(201).json({ message: "Pending order created", orderId });
-    } catch (txErr) {
-      await connection.rollback();
-      connection.release();
-      console.error("[orders:createPending]", txErr.message || txErr);
-      return res.status(500).json({ message: "Server error" });
-    }
-  } catch (error) {
-    console.error("[orders:createPending]", error.message || error);
-    return res.status(500).json({ message: "Server error" });
-  }
-};
 
 const getMyOrders = async (req, res) => {
   try {
@@ -135,12 +46,7 @@ const paySuccess = async (req, res) => {
 
     const order = orders[0];
 
-    // Allow marking paid if currently pending
-    const currentStatus = order.order_status || order.status;
-    if (currentStatus !== ORDER_STATUS.PENDING) {
-      return res.status(400).json({ message: "Only pending orders can be marked as paid" });
-    }
-
+    // Mark order as successful
     const synced = syncOrderStatusFields(ORDER_STATUS.SUCCESS);
     await db.query(
       "UPDATE orders SET status = ?, payment_status = ?, order_status = ?, paid_at = NOW() WHERE id = ?",
@@ -289,7 +195,6 @@ const getAllOrders = async (req, res) => {
 };
 
 module.exports = {
-  createPending,
   getMyOrders,
   paySuccess,
   cancel,

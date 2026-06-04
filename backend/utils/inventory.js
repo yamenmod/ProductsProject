@@ -1,7 +1,7 @@
 const db = require("../db/connection");
 const { normalizeSizeStockMap, getSizeStockTotal } = require("./sizeStock");
 
-// Compute available stock considering all carts and pending orders.
+// Compute available stock considering all carts.
 // Returns a number >= 0.
 const getRealAvailableStock = async (productId, size = "") => {
   const normalizedSize = (size || "").toString().trim().toUpperCase();
@@ -43,34 +43,7 @@ const getRealAvailableStock = async (productId, size = "") => {
     reservedCart = Number(rc[0].reserved || 0);
   }
 
-  // Reserved in pending orders
-  let reservedOrders = 0;
-  if (sizeStock && normalizedSize) {
-    const [rowsOrders] = await db.query(
-      `SELECT oi.quantity, oi.name FROM order_items oi
-       JOIN orders o ON o.id = oi.order_id
-       WHERE oi.product_id = ? AND o.status = 'pending'`,
-      [productId],
-    );
-
-    for (const r of rowsOrders) {
-      const name = r.name || "";
-      const match = name.match(/\(\s*Size\s*([^\)]+)\s*\)/i);
-      if (match && match[1] && match[1].toUpperCase() === normalizedSize) {
-        reservedOrders += Number(r.quantity || 0);
-      }
-    }
-  } else {
-    const [ro] = await db.query(
-      `SELECT COALESCE(SUM(oi.quantity),0) AS reserved FROM order_items oi
-       JOIN orders o ON o.id = oi.order_id
-       WHERE oi.product_id = ? AND o.status = 'pending'`,
-      [productId],
-    );
-    reservedOrders = Number(ro[0].reserved || 0);
-  }
-
-  const available = Math.max(0, totalStock - (reservedCart + reservedOrders));
+  const available = Math.max(0, totalStock - reservedCart);
   return available;
 };
 

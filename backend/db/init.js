@@ -167,9 +167,9 @@ const initDatabase = async () => {
       user_id INT NOT NULL,
       total DECIMAL(10, 2) NOT NULL DEFAULT 0,
       customer_email VARCHAR(255) NULL DEFAULT NULL,
-      status VARCHAR(50) NOT NULL DEFAULT 'pending',
-      payment_status VARCHAR(50) NOT NULL DEFAULT 'pending',
-      order_status VARCHAR(50) NOT NULL DEFAULT 'pending',
+      status VARCHAR(50) NOT NULL DEFAULT 'cancelled',
+      payment_status VARCHAR(50) NOT NULL DEFAULT 'cancelled',
+      order_status VARCHAR(50) NOT NULL DEFAULT 'cancelled',
       paid_at DATETIME NULL DEFAULT NULL,
       cancelled_at DATETIME NULL DEFAULT NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -196,7 +196,7 @@ const initDatabase = async () => {
 
     await db.query(`
       ALTER TABLE orders
-      MODIFY COLUMN status VARCHAR(50) NOT NULL DEFAULT 'pending'
+      MODIFY COLUMN status VARCHAR(50) NOT NULL DEFAULT 'cancelled'
     `);
 
     // Ensure payment_status and order_status exist and are normalized
@@ -205,7 +205,7 @@ const initDatabase = async () => {
     );
 
     if (paymentStatusColumn[0]?.total === 0) {
-      await db.query(`ALTER TABLE orders ADD COLUMN payment_status VARCHAR(50) NOT NULL DEFAULT 'pending'`);
+      await db.query(`ALTER TABLE orders ADD COLUMN payment_status VARCHAR(50) NOT NULL DEFAULT 'cancelled'`);
     }
 
     const [orderStatusColumn] = await db.query(
@@ -213,7 +213,7 @@ const initDatabase = async () => {
     );
 
     if (orderStatusColumn[0]?.total === 0) {
-      await db.query(`ALTER TABLE orders ADD COLUMN order_status VARCHAR(50) NOT NULL DEFAULT 'pending'`);
+      await db.query(`ALTER TABLE orders ADD COLUMN order_status VARCHAR(50) NOT NULL DEFAULT 'cancelled'`);
     }
 
     const [paidAtColumn] = await db.query(
@@ -236,7 +236,6 @@ const initDatabase = async () => {
       UPDATE orders
       SET status = CASE
         WHEN LOWER(TRIM(status)) IN ('paid', 'completed', 'success', 'successful') THEN 'success'
-        WHEN LOWER(TRIM(status)) IN ('pending', 'processing', 'awaiting_payment', 'open', 'draft') THEN 'pending'
         WHEN LOWER(TRIM(status)) IN ('failed', 'failure', 'error', 'canceled', 'cancelled', 'cancel') THEN 'cancelled'
         ELSE 'cancelled'
       END
@@ -259,7 +258,6 @@ const initDatabase = async () => {
       UPDATE payments
       SET status = CASE
         WHEN LOWER(TRIM(status)) IN ('paid', 'completed', 'success', 'successful') THEN 'success'
-        WHEN LOWER(TRIM(status)) IN ('pending', 'processing', 'awaiting_payment', 'open', 'draft') THEN 'pending'
         WHEN LOWER(TRIM(status)) IN ('failed', 'failure', 'error', 'canceled', 'cancelled', 'cancel') THEN 'cancelled'
         ELSE 'cancelled'
       END
@@ -552,87 +550,6 @@ const initDatabase = async () => {
     }
 
     console.log("✅ Database initialization complete!");
-
-    // Periodic cleanup: expire pending orders older than 30 minutes and restore stock
-    const expirePendingOrders = async () => {
-      try {
-        const [oldOrders] = await db.query(
-          `SELECT id FROM orders
-           WHERE (order_status = 'pending' OR status = 'pending')
-             AND created_at < (NOW() - INTERVAL 30 MINUTE)
-             AND (
-               payment_status = 'cart_hold'
-               OR payment_status = 'pending'
-               OR payment_status IS NULL
-             )`,
-        );
-
-        for (const o of oldOrders) {
-          const connection = await db.getConnection();
-          try {
-            await connection.beginTransaction();
-
-            const [items] = await connection.query(
-              "SELECT product_id, quantity, name FROM order_items WHERE order_id = ?",
-              [o.id],
-            );
-
-            for (const it of items) {
-              const [products] = await connection.query(
-                "SELECT * FROM products WHERE id = ? LIMIT 1 FOR UPDATE",
-                [it.product_id],
-              );
-              if (!products.length) continue;
-              const product = products[0];
-              const sizeStock = (() => {
-                try {
-                  return JSON.parse(product.size_stock || null);
-                } catch (e) {
-                  return null;
-                }
-              })();
-
-              if (sizeStock) {
-                // Try to parse size from name
-                const m = (it.name || "").match(/\(\s*Size\s*([^\)]+)\s*\)/i);
-                if (m && m[1]) {
-                  const size = m[1].toUpperCase();
-                  const next = { ...sizeStock };
-                  next[size] = (Number(next[size] || 0) + Number(it.quantity || 0));
-                  await connection.query(
-                    "UPDATE products SET stock = ?, size_stock = ?, updated_at = NOW() WHERE id = ?",
-                    [Object.values(next).reduce((s, v) => s + Number(v || 0), 0), JSON.stringify(next), it.product_id],
-                  );
-                }
-              } else {
-                await connection.query(
-                  "UPDATE products SET stock = stock + ?, updated_at = NOW() WHERE id = ?",
-                  [it.quantity, it.product_id],
-                );
-              }
-            }
-
-            await connection.query(
-              "UPDATE orders SET status = ?, order_status = ?, payment_status = ?, cancelled_at = NOW() WHERE id = ?",
-              ["cancelled", "cancelled", "cancelled", o.id],
-            );
-
-            await connection.commit();
-            connection.release();
-          } catch (txErr) {
-            await connection.rollback();
-            connection.release();
-            console.error("[expirePendingOrders] tx error", txErr.message || txErr);
-          }
-        }
-      } catch (err) {
-        console.error("[expirePendingOrders] error", err.message || err);
-      }
-    };
-
-    setInterval(() => {
-      void expirePendingOrders();
-    }, 60 * 1000); // run every 1 minute
   } catch (error) {
     console.error("❌ Database initialization failed:", error);
     throw error;

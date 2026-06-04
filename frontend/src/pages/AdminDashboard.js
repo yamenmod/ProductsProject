@@ -84,7 +84,7 @@ function AdminDashboard({
   }, [orders, dateFrom, dateTo]);
 
   const filteredSummary = useMemo(() => {
-    const summary = { success: 0, cancelled: 0, pending: 0 };
+    const summary = { success: 0, cancelled: 0 };
 
     filteredOrders.forEach((order) => {
       summary[getOrderBucket(order)] += 1;
@@ -93,7 +93,6 @@ function AdminDashboard({
     return {
       success: summary.success,
       cancelled: summary.cancelled,
-      pending: summary.pending,
     };
   }, [filteredOrders]);
 
@@ -110,12 +109,6 @@ function AdminDashboard({
         label: ORDER_STATUS_LABELS.cancelled,
         value: filteredSummary.cancelled,
         color: statusColors.cancelled,
-      },
-      {
-        key: "pending",
-        label: ORDER_STATUS_LABELS.pending,
-        value: filteredSummary.pending,
-        color: statusColors.pending,
       },
     ],
     [filteredSummary],
@@ -394,13 +387,6 @@ function AdminDashboard({
       value: filteredSummary.cancelled,
       color: statusColors.cancelled,
       filter: "cancelled",
-    },
-    {
-      key: "pending",
-      label: ORDER_STATUS_LABELS.pending,
-      value: filteredSummary.pending,
-      color: statusColors.pending,
-      filter: "pending",
     },
   ];
 
