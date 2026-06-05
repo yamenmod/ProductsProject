@@ -393,11 +393,11 @@ function AdminDashboard({
               marginBottom: "22px",
               display: "flex",
               flexWrap: "wrap",
-              gap: "12px",
-              alignItems: "end",
+              gap: "16px",
+              alignItems: "center",
             }}
           >
-            <div style={{ minWidth: "180px", flex: "1 1 180px" }}>
+            <div style={{ minWidth: "180px", flex: "0 0 auto" }}>
               <div
                 style={{
                   color: "#65574d",
@@ -421,10 +421,12 @@ function AdminDashboard({
                   border: "1px solid rgba(31, 24, 19, 0.14)",
                   background: "rgba(255, 250, 242, 0.95)",
                   fontSize: "13px",
+                  height: "44px",
+                  boxSizing: "border-box",
                 }}
               />
             </div>
-            <div style={{ minWidth: "180px", flex: "1 1 180px" }}>
+            <div style={{ minWidth: "180px", flex: "0 0 auto" }}>
               <div
                 style={{
                   color: "#65574d",
@@ -448,6 +450,8 @@ function AdminDashboard({
                   border: "1px solid rgba(31, 24, 19, 0.14)",
                   background: "rgba(255, 250, 242, 0.95)",
                   fontSize: "13px",
+                  height: "44px",
+                  boxSizing: "border-box",
                 }}
               />
             </div>
@@ -458,7 +462,7 @@ function AdminDashboard({
                 setDateFrom("");
                 setDateTo("");
               }}
-              style={{ height: "44px" }}
+              style={{ height: "44px", flex: "0 0 auto" }}
             >
               Clear range
             </button>
@@ -475,7 +479,7 @@ function AdminDashboard({
               >
                 VAT (%)
               </div>
-              <div style={{ display: "flex", gap: "8px" }}>
+              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
                 <input
                   type="number"
                   min="1"
@@ -483,12 +487,14 @@ function AdminDashboard({
                   value={vatInput}
                   onChange={(event) => setVatInput(event.target.value)}
                   style={{
-                    width: "100%",
+                    flex: 1,
                     padding: "11px 12px",
                     borderRadius: "12px",
                     border: "1px solid rgba(31, 24, 19, 0.14)",
                     background: "rgba(255, 250, 242, 0.95)",
                     fontSize: "13px",
+                    height: "44px",
+                    boxSizing: "border-box",
                   }}
                 />
                 <button
@@ -496,7 +502,7 @@ function AdminDashboard({
                   className="ps-btn ps-btn-primary"
                   onClick={saveVatRate}
                   disabled={savingVat}
-                  style={{ height: "44px", minWidth: "88px" }}
+                  style={{ height: "44px", minWidth: "88px", flex: "0 0 auto" }}
                 >
                   {savingVat ? "Saving" : "Save"}
                 </button>
@@ -528,7 +534,7 @@ function AdminDashboard({
               >
                 Max quantity per user
               </div>
-              <div style={{ display: "flex", gap: "8px" }}>
+              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
                 <input
                   type="number"
                   min="1"
@@ -536,12 +542,14 @@ function AdminDashboard({
                   value={maxQtyInput}
                   onChange={(event) => setMaxQtyInput(event.target.value)}
                   style={{
-                    width: "100%",
+                    flex: 1,
                     padding: "11px 12px",
                     borderRadius: "12px",
                     border: "1px solid rgba(31, 24, 19, 0.14)",
                     background: "rgba(255, 250, 242, 0.95)",
                     fontSize: "13px",
+                    height: "44px",
+                    boxSizing: "border-box",
                   }}
                 />
                 <button
@@ -549,7 +557,7 @@ function AdminDashboard({
                   className="ps-btn ps-btn-primary"
                   onClick={saveMaxQtyPerUser}
                   disabled={savingMaxQty}
-                  style={{ height: "44px", minWidth: "88px" }}
+                  style={{ height: "44px", minWidth: "88px", flex: "0 0 auto" }}
                 >
                   {savingMaxQty ? "Saving" : "Save"}
                 </button>

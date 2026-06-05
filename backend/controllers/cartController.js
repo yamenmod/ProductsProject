@@ -12,7 +12,7 @@ const {
   roundMoney,
   getVatRateFromDb,
 } = require("../utils/pricing");
-const { getMaxProductsPerCart, getMaxQuantityPerProduct } = require("../utils/settings");
+const { getMaxProductsPerCart, getMaxQuantityPerProduct, getMaxQuantityPerUser } = require("../utils/settings");
 const { syncOrderStatusFields } = require("../utils/orderStatus");
 
 // Cart, checkout, payment, and admin order reporting endpoints.
@@ -547,6 +547,25 @@ const addToCart = async (req, res) => {
           });
         }
 
+        // Check max quantity per user limit
+        const maxQuantityPerUser = await getMaxQuantityPerUser();
+        const [totalQuantity] = await connection.query(
+          "SELECT COALESCE(SUM(quantity), 0) as total FROM cart_items WHERE user_id = ?",
+          [req.user.id],
+        );
+        const currentTotalQuantity = Number(totalQuantity[0]?.total || 0);
+        const newTotalQuantity = currentTotalQuantity + qty;
+
+        if (newTotalQuantity > maxQuantityPerUser) {
+          await connection.rollback();
+          connection.release();
+          return res.status(400).json({
+            message: `You cannot add more items. The maximum limit per user is ${maxQuantityPerUser}.`,
+            maxQuantityPerUser,
+            currentQuantity: currentTotalQuantity,
+          });
+        }
+
         await connection.query(
           "INSERT INTO cart_items (user_id, product_id, size, quantity) VALUES (?, ?, ?, ?)",
           [req.user.id, productId, isClothing ? normalizedSize : "", qty],
@@ -736,6 +755,25 @@ const updateCartQuantity = async (req, res) => {
             message: "You've reached the maximum quantity limit. For bulk orders, please contact us.",
             maxQuantity: maxQtyPerProduct,
             currentQuantity: nextQuantity,
+          });
+        }
+
+        // Check max quantity per user limit
+        const maxQuantityPerUser = await getMaxQuantityPerUser();
+        const [totalQuantity] = await connection.query(
+          "SELECT COALESCE(SUM(quantity), 0) as total FROM cart_items WHERE user_id = ? AND id != ?",
+          [req.user.id, existingItems[0].id],
+        );
+        const currentTotalQuantity = Number(totalQuantity[0]?.total || 0);
+        const newTotalQuantity = currentTotalQuantity + nextQuantity;
+
+        if (newTotalQuantity > maxQuantityPerUser) {
+          await connection.rollback();
+          connection.release();
+          return res.status(400).json({
+            message: `You cannot add more items. The maximum limit per user is ${maxQuantityPerUser}.`,
+            maxQuantityPerUser,
+            currentQuantity: currentTotalQuantity,
           });
         }
 

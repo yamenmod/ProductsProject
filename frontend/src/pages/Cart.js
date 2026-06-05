@@ -85,6 +85,16 @@ function Cart({
         pendingRemoveItem.id,
         pendingRemoveItem.size || "",
       );
+      // Manually update displayItems to remove the item immediately
+      setDisplayItems((prevItems) =>
+        prevItems.filter(
+          (item) =>
+            !(
+              item.id === pendingRemoveItem.id &&
+              (item.size || "") === (pendingRemoveItem.size || "")
+            )
+        )
+      );
       setPendingRemoveItem(null);
     } catch (error) {
       console.error("Remove item failed:", error.message);
@@ -102,7 +112,7 @@ function Cart({
     const nextQuantity = currentQuantity + delta;
 
     if (nextQuantity <= 0) {
-      await onRemoveFromCart?.(item.id, item.size || "");
+      setPendingRemoveItem(item);
       setErrorMessage("");
       return;
     }

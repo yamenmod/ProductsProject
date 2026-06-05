@@ -53,7 +53,27 @@ const getVatRate = async () => {
   }
 };
 
+const getMaxQuantityPerUser = async () => {
+  try {
+    const [result] = await db.query(
+      "SELECT value FROM settings WHERE key_name = 'max_quantity_per_user' LIMIT 1",
+    );
+
+    if (result.length > 0) {
+      const val = Number(result[0].value);
+      return Number.isFinite(val) && val > 0 ? val : 10;
+    }
+
+    return 10;
+  } catch (error) {
+    console.error("[settings:getMaxQuantityPerUser]", error.message);
+    return 10;
+  }
+};
+
 module.exports = {
   getMaxProductsPerCart,
+  getMaxQuantityPerProduct,
   getVatRate,
+  getMaxQuantityPerUser,
 };

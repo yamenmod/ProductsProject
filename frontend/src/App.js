@@ -234,6 +234,7 @@ function App() {
     loadCart();
   }, [session?.token]);
 
+
   // Central navigation handler used by the header and page buttons.
   // It also blocks non-admin users from opening the admin orders page.
   const handleNavigate = (page, categoryOrData) => {
