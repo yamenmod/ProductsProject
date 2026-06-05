@@ -31,8 +31,6 @@ function Cart({
   const [isPayPalLoading, setIsPayPalLoading] = useState(false);
   const [vatRate, setVatRate] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
-  const [holdOrder, setHoldOrder] = useState(null);
-  const [remainingTime, setRemainingTime] = useState(0);
 
   const normalizeCartItems = (items = []) =>
     (Array.isArray(items) ? items : []).map((item) => {
@@ -236,24 +234,6 @@ function Cart({
     loadPayPalConfig();
   }, [loadPayPalConfig]);
 
-  // Countdown timer for cart hold order
-  useEffect(() => {
-    if (!holdOrder || remainingTime <= 0) {
-      return;
-    }
-
-    const interval = setInterval(() => {
-      setRemainingTime((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [holdOrder]);
 
   const parseImageValue = (value) => {
     if (!value) {
@@ -432,10 +412,6 @@ function Cart({
         });
 
         setDisplayItems(normalizeCartItems(response.data.items || response.data));
-        setHoldOrder(response.data.holdOrder || null);
-        if (response.data.holdOrder?.remainingSeconds) {
-          setRemainingTime(response.data.holdOrder.remainingSeconds);
-        }
       } catch (error) {
         console.error("Failed to load cart page items:", error.message);
       }
@@ -457,6 +433,23 @@ function Cart({
   const tax = Math.max(0, total - subtotal);
   const vatPercent = subtotal > 0 ? Math.round((tax / subtotal) * 100) : 0;
   const resolvedVatRate = vatPercent / 100;
+
+  // Check for out-of-stock items
+  const outOfStockItems = displayItems.filter((item) => {
+    const stock = Number(item.stock || 0);
+    const sizeStock = item.size_stock ? JSON.parse(item.size_stock) : null;
+    const quantity = Number(item.quantity || 1);
+    
+    if (sizeStock && item.size) {
+      const sizeKey = item.size.toUpperCase();
+      const availableSizeStock = Number(sizeStock[sizeKey] || 0);
+      return quantity > availableSizeStock;
+    }
+    
+    return quantity > stock;
+  });
+
+  const hasOutOfStockItems = outOfStockItems.length > 0;
 
   useEffect(() => {
     if (!displayItems.length && vatRate === null) {
@@ -522,88 +515,6 @@ function Cart({
               Continue shopping
             </button>
           </div>
-
-          {holdOrder && remainingTime > 0 && (
-            <div
-              style={{
-                padding: "16px 20px",
-                background: "linear-gradient(135deg, #fff3cd 0%, #ffe69c 100%)",
-                border: "2px solid #ffc107",
-                borderRadius: "12px",
-                marginBottom: "24px",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                gap: "16px",
-              }}
-            >
-              <div>
-                <p
-                  style={{
-                    margin: "0 0 4px 0",
-                    fontSize: "13px",
-                    fontWeight: 700,
-                    color: "#856404",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.8px",
-                  }}
-                >
-                  ⏰ Stock Reserved
-                </p>
-                <p
-                  style={{
-                    margin: 0,
-                    fontSize: "14px",
-                    color: "#856404",
-                  }}
-                >
-                  Complete your purchase within 30 minutes to keep your reserved items.
-                </p>
-              </div>
-              <div
-                style={{
-                  padding: "12px 20px",
-                  background: "#fff",
-                  border: "2px solid #ffc107",
-                  borderRadius: "999px",
-                  fontSize: "24px",
-                  fontWeight: 800,
-                  color: "#856404",
-                  fontFamily: "'Bebas Neue', Impact, sans-serif",
-                  minWidth: "120px",
-                  textAlign: "center",
-                }}
-              >
-                {Math.floor(remainingTime / 60)
-                  .toString()
-                  .padStart(2, "0")}
-                :{(remainingTime % 60).toString().padStart(2, "0")}
-              </div>
-            </div>
-          )}
-
-          {holdOrder && remainingTime <= 0 && (
-            <div
-              style={{
-                padding: "16px 20px",
-                background: "#f8d7da",
-                border: "2px solid #dc3545",
-                borderRadius: "12px",
-                marginBottom: "24px",
-              }}
-            >
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: "14px",
-                  fontWeight: 600,
-                  color: "#721c24",
-                }}
-              >
-                ⚠️ Your reservation has expired. Please remove items from your cart and add them again to reserve stock.
-              </p>
-            </div>
-          )}
 
           {displayItems.length === 0 ? (
             <div
@@ -744,6 +655,33 @@ function Cart({
                           Size: {item.size}
                         </p>
                       ) : null}
+                      {(() => {
+                        const stock = Number(item.stock || 0);
+                        const sizeStock = item.size_stock ? JSON.parse(item.size_stock) : null;
+                        const quantity = Number(item.quantity || 1);
+                        let available = stock;
+                        
+                        if (sizeStock && item.size) {
+                          const sizeKey = item.size.toUpperCase();
+                          available = Number(sizeStock[sizeKey] || 0);
+                        }
+                        
+                        if (quantity > available) {
+                          return (
+                            <p
+                              style={{
+                                margin: "0 0 8px",
+                                color: "#dc3545",
+                                fontSize: "13px",
+                                fontWeight: 600,
+                              }}
+                            >
+                              ⚠️ This product is currently out of stock
+                            </p>
+                          );
+                        }
+                        return null;
+                      })()}
                       <div
                         style={{ margin: 0, color: "#1f1813", fontWeight: 700 }}
                       >
@@ -993,7 +931,7 @@ function Cart({
                   className="ps-btn ps-btn-primary"
                   onClick={openPayPalModal}
                   style={{ padding: "10px 24px", whiteSpace: "nowrap" }}
-                  disabled={displayItems.length === 0}
+                  disabled={displayItems.length === 0 || hasOutOfStockItems}
                 >
                   Buy Now
                 </button>

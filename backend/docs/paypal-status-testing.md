@@ -2,10 +2,9 @@
 
 This project now uses the following backend order statuses for PayPal:
 
-- `PENDING`: PayPal order created, capture not completed yet.
-- `SUCCESS`: PayPal capture returned `COMPLETED`.
+- `SUCCESS`: PayPal capture returned `COMPLETED`. Order becomes successful after payment completion.
+- `CANCELLED`: Checkout was explicitly cancelled using the cancel endpoint. Order becomes unsuccessful when user cancels within allowed period.
 - `UNSUCCESSFUL`: Capture failed/rejected or non-completed capture status.
-- `CANCELLED`: Checkout was explicitly cancelled using the cancel endpoint.
 
 ## Backend Log Markers
 
@@ -31,19 +30,7 @@ Expected:
 - Invoice logs appear and email is sent.
 - Final log contains `finalStatus: SUCCESS`.
 
-## Scenario 2: Close Browser Before Payment
-
-1. Start checkout (create PayPal order).
-2. Close browser/tab before approval/capture.
-
-Expected:
-
-- `orders.status = PENDING`
-- `payments.status = PENDING`
-- No capture logs.
-- No invoice logs.
-
-## Scenario 3: Click Cancel on PayPal
+## Scenario 2: Click Cancel on PayPal
 
 Option A (recommended): frontend calls `POST /api/cart/paypal/cancel` with `orderID`.
 
@@ -58,7 +45,7 @@ Option B (if capture is attempted after cancel):
 
 - Capture should fail and backend marks `UNSUCCESSFUL`.
 
-## Scenario 4: Force Failure in Sandbox
+## Scenario 3: Force Failure in Sandbox
 
 1. Start checkout and use a sandbox flow that fails capture (decline/error).
 2. Capture endpoint receives PayPal error.

@@ -1,5 +1,4 @@
 const ORDER_STATUS = {
-  PENDING: "pending",
   SUCCESS: "success",
   CANCELLED: "cancelled",
 };
@@ -28,10 +27,11 @@ const syncOrderStatusFields = (status) => {
     };
   }
 
+  // Default to cancelled if status is unrecognized
   return {
-    status: ORDER_STATUS.PENDING,
-    order_status: ORDER_STATUS.PENDING,
-    payment_status: ORDER_STATUS.PENDING,
+    status: ORDER_STATUS.CANCELLED,
+    order_status: ORDER_STATUS.CANCELLED,
+    payment_status: "cancelled",
   };
 };
 

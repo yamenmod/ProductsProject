@@ -82,7 +82,7 @@ const buildOrderEmailHtml = ({
   const safeOrderId = escapeHtml(orderId ?? "");
   const safeOrderDate = escapeHtml(formatOrderDate(orderDate));
   const safeTransactionId = escapeHtml(transactionId ?? "");
-  const statusLabel = escapeHtml(paymentStatus || "Pending");
+  const statusLabel = escapeHtml(paymentStatus || "Unsuccessful");
   const summaryRows = buildSummaryRows(items, currency);
 
   return `

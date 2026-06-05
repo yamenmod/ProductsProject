@@ -1,11 +1,10 @@
 export const STATUS_COLORS = {
   success: "#79b64a",
   cancelled: "#f07c2e",
-  pending: "#ffbf24",
 };
 
 export const getStatusColor = (bucket) =>
-  STATUS_COLORS[bucket] || STATUS_COLORS.pending;
+  STATUS_COLORS[bucket] || STATUS_COLORS.cancelled;
 
 export const getStatusTone = (bucket, selected = false) => {
   const color = getStatusColor(bucket);

@@ -158,7 +158,7 @@ function ManageOrders({
   }, [orders, searchTerm, selectedFilter, getOrderBucket, dateFrom, dateTo]);
 
   const summary = useMemo(() => {
-    const counts = { success: 0, cancelled: 0, pending: 0 };
+    const counts = { success: 0, cancelled: 0 };
 
     orders.forEach((order) => {
       counts[getOrderBucket(order)] += 1;
@@ -190,7 +190,7 @@ function ManageOrders({
     if (itemKey === "all") {
       return {
         background: isSelected
-          ? STATUS_COLORS.pending
+          ? STATUS_COLORS.cancelled
           : neutralFilterTone.background,
         color: isSelected ? "#fff" : neutralFilterTone.color,
         border: neutralFilterTone.border,
@@ -285,7 +285,7 @@ function ManageOrders({
             </h1>
             <p className="ps-lead" style={{ maxWidth: "760px" }}>
               Review every checkout and quickly spot whether the payment ended
-              up successful, cancelled, or still pending.
+              up successful or cancelled.
             </p>
           </div>
 
@@ -386,11 +386,6 @@ function ManageOrders({
                 value: summary.cancelled,
                 bucket: "cancelled",
               },
-              {
-                label: ORDER_STATUS_LABELS.pending,
-                value: summary.pending,
-                bucket: "pending",
-              },
             ].map((item) => (
               <button
                 key={item.label}
@@ -459,7 +454,6 @@ function ManageOrders({
               { key: "all", label: "All" },
               { key: "success", label: ORDER_STATUS_LABELS.success },
               { key: "cancelled", label: ORDER_STATUS_LABELS.cancelled },
-              { key: "pending", label: ORDER_STATUS_LABELS.pending },
             ].map((item) => (
               <button
                 key={item.key}
