@@ -242,6 +242,12 @@ function Products({
       return;
     }
 
+    // Check if product is out of stock
+    if ((product.stock ?? 0) < 1) {
+      setCartErrorMessage("This product is currently out of stock. We apologize for the inconvenience. Please check back later or contact us for availability updates.");
+      return;
+    }
+
     try {
       const productId = product._id || product.id;
 
@@ -277,6 +283,12 @@ function Products({
       return;
     }
 
+    // Check if product is out of stock
+    if ((product.stock ?? 0) < 1) {
+      setCartErrorMessage("This product is currently out of stock. We apologize for the inconvenience. Please check back later or contact us for availability updates.");
+      return;
+    }
+
     const added = await handleAddToCart(product, size);
     if (added) {
       onNavigate("cart");
@@ -294,6 +306,12 @@ function Products({
 
   const handlePreviewBuyNow = async () => {
     if (!previewProduct) {
+      return;
+    }
+
+    // Check if product is out of stock
+    if ((previewProduct.stock ?? 0) < 1) {
+      setCartErrorMessage("This product is currently out of stock. We apologize for the inconvenience. Please check back later or contact us for availability updates.");
       return;
     }
 
@@ -858,7 +876,6 @@ function Products({
                                     ? openPreview(product)
                                     : handleBuyNow(product)
                                 }
-                                disabled={isOutOfStock}
                               >
                                 Buy Now
                               </button>
@@ -1024,10 +1041,6 @@ function Products({
                     type="button"
                     className="ps-btn ps-btn-dark"
                     onClick={handlePreviewBuyNow}
-                    disabled={
-                      (previewProduct.stock ?? 0) < 1 ||
-                      (isClothingProduct(previewProduct) && !previewSize)
-                    }
                     style={{ flex: 1 }}
                   >
                     Buy Now

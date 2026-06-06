@@ -117,6 +117,12 @@ function Cart({
       return;
     }
 
+    // Check if trying to increase quantity on out-of-stock item
+    if (delta > 0 && (item.stock ?? 0) < nextQuantity) {
+      setErrorMessage("This product is currently out of stock. We apologize for the inconvenience. Please check back later or contact us for availability updates.");
+      return;
+    }
+
     try {
       await onUpdateCartQuantity(item.id, nextQuantity, item.size || "");
       setErrorMessage("");
@@ -128,12 +134,18 @@ function Cart({
 
   const openPayPalModal = () => {
     if (!session?.token) {
-      alert("Please sign in to complete purchases.");
+      setErrorMessage("Please sign in to complete purchases.");
       return;
     }
 
     if (!paypalConfig) {
-      alert("PayPal is not configured for this environment. Contact support.");
+      setErrorMessage("PayPal is not configured for this environment. Contact support.");
+      return;
+    }
+
+    // Check if there are out-of-stock items
+    if (hasOutOfStockItems) {
+      setErrorMessage("Some items in your cart are currently out of stock. We apologize for the inconvenience. Please remove out-of-stock items or check back later for availability updates.");
       return;
     }
 
@@ -941,7 +953,7 @@ function Cart({
                   className="ps-btn ps-btn-primary"
                   onClick={openPayPalModal}
                   style={{ padding: "10px 24px", whiteSpace: "nowrap" }}
-                  disabled={displayItems.length === 0 || hasOutOfStockItems}
+                  disabled={displayItems.length === 0}
                 >
                   Buy Now
                 </button>

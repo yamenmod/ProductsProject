@@ -306,6 +306,12 @@ function Home({
       return false;
     }
 
+    // Check if product is out of stock
+    if ((product.stock ?? 0) < 1) {
+      setCartErrorMessage("This product is currently out of stock. We apologize for the inconvenience. Please check back later or contact us for availability updates.");
+      return false;
+    }
+
     const productId = product.id || product._id;
 
     if (!productId) {
@@ -354,6 +360,12 @@ function Home({
 
   const handlePreviewBuyNow = async () => {
     if (!previewProduct) {
+      return;
+    }
+
+    // Check if product is out of stock
+    if ((previewProduct.stock ?? 0) < 1) {
+      setCartErrorMessage("This product is currently out of stock. We apologize for the inconvenience. Please check back later or contact us for availability updates.");
       return;
     }
 
@@ -852,10 +864,6 @@ function Home({
                     type="button"
                     className="ps-btn ps-btn-dark"
                     onClick={handlePreviewBuyNow}
-                    disabled={
-                      (previewProduct.stock ?? 0) < 1 ||
-                      (isClothingProduct(previewProduct) && !previewSize)
-                    }
                     style={{ flex: 1 }}
                   >
                     Buy Now

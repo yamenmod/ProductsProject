@@ -937,34 +937,6 @@ function ManageProducts({
                     }}
                   />
 
-                  <input
-                    type="number"
-                    min="1"
-                    placeholder="Max Quantity Per User"
-                    value={form.maxQuantityPerUser}
-                    onChange={(e) =>
-                      setForm({ ...form, maxQuantityPerUser: e.target.value })
-                    }
-                    style={{
-                      padding: "10px 12px",
-                      border: "1px solid #d9c3ad",
-                      borderRadius: "8px",
-                      fontSize: "13px",
-                      fontFamily: "inherit",
-                      transition: "all 0.2s ease",
-                      background: "#fffdf8",
-                    }}
-                    onFocus={(e) => {
-                      e.target.style.borderColor = "#245860";
-                      e.target.style.boxShadow =
-                        "0 0 0 3px rgba(36, 88, 96, 0.12)";
-                    }}
-                    onBlur={(e) => {
-                      e.target.style.borderColor = "#d9c3ad";
-                      e.target.style.boxShadow = "none";
-                    }}
-                  />
-
                   {isClothingCategory(form.category) && (
                     <div
                       style={{
