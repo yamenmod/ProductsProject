@@ -627,11 +627,13 @@ const removeFromCart = async (req, res) => {
       .trim()
       .toUpperCase();
 
+    console.log("[removeFromCart] DELETE request:", { userId: req.user.id, productId, size: normalizedSize });
+
     const connection = await db.getConnection();
     try {
       await connection.beginTransaction();
 
-      await connection.query(
+      const [deleteResult] = await connection.query(
         normalizedSize
           ? "DELETE FROM cart_items WHERE user_id = ? AND product_id = ? AND size = ?"
           : "DELETE FROM cart_items WHERE user_id = ? AND product_id = ?",
@@ -640,11 +642,13 @@ const removeFromCart = async (req, res) => {
           : [req.user.id, productId],
       );
 
-      await rebuildCartHoldOrder(connection, req.user.id, db);
+      console.log("[removeFromCart] DELETE affected rows:", deleteResult.affectedRows);
 
       await connection.commit();
+      console.log("[removeFromCart] Transaction committed");
       connection.release();
     } catch (transactionError) {
+      console.error("[removeFromCart] Transaction error:", transactionError);
       await connection.rollback();
       connection.release();
       return res.status(500).json({ message: "Server error" });
@@ -670,8 +674,10 @@ const removeFromCart = async (req, res) => {
       [req.user.id],
     );
 
+    console.log("[removeFromCart] Returning cart with", rows.length, "items");
     return res.status(200).json(mapCartRows(rows, vatRate));
   } catch (error) {
+    console.error("[removeFromCart] Error:", error);
     return res.status(500).json({ message: "Server error" });
   }
 };
