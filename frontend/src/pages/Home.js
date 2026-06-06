@@ -308,7 +308,7 @@ function Home({
 
     // Check if product is out of stock
     if ((product.stock ?? 0) < 1) {
-      setCartErrorMessage("This product is currently out of stock. We apologize for the inconvenience. Please check back later or contact us for availability updates.");
+      setCartErrorMessage("This product is out of stock. You've reached the stock limit. We apologize for the inconvenience. Please check back later or contact us for availability updates.");
       return false;
     }
 
@@ -365,7 +365,7 @@ function Home({
 
     // Check if product is out of stock
     if ((previewProduct.stock ?? 0) < 1) {
-      setCartErrorMessage("This product is currently out of stock. We apologize for the inconvenience. Please check back later or contact us for availability updates.");
+      setCartErrorMessage("This product is out of stock. You've reached the stock limit. We apologize for the inconvenience. Please check back later or contact us for availability updates.");
       return;
     }
 

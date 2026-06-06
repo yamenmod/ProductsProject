@@ -96,6 +96,7 @@ function Cart({
         )
       );
       setPendingRemoveItem(null);
+      setErrorMessage("");
     } catch (error) {
       console.error("Remove item failed:", error.message);
     } finally {
@@ -119,7 +120,7 @@ function Cart({
 
     // Check if trying to increase quantity on out-of-stock item
     if (delta > 0 && (item.stock ?? 0) < nextQuantity) {
-      setErrorMessage("This product is currently out of stock. We apologize for the inconvenience. Please check back later or contact us for availability updates.");
+      setErrorMessage("This product is out of stock. You've reached the stock limit. We apologize for the inconvenience. Please check back later or contact us for availability updates.");
       return;
     }
 
@@ -145,7 +146,7 @@ function Cart({
 
     // Check if there are out-of-stock items
     if (hasOutOfStockItems) {
-      setErrorMessage("Some items in your cart are currently out of stock. We apologize for the inconvenience. Please remove out-of-stock items or check back later for availability updates.");
+      setErrorMessage("Some items in your cart are out of stock. You've reached the stock limit. We apologize for the inconvenience. Please remove out-of-stock items or check back later for availability updates.");
       return;
     }
 
