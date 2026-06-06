@@ -479,6 +479,31 @@ const addToCart = async (req, res) => {
           .json({ message: "Size is required for clothing products" });
       }
 
+      // Stock validation
+      let availableStock = 0;
+      if (isClothing) {
+        availableStock = getSizeStockTotal(product.size_stock, normalizedSize);
+      } else {
+        availableStock = getAvailableStock(product.stock);
+      }
+
+      if (availableStock <= 0) {
+        await connection.rollback();
+        connection.release();
+        return res.status(400).json({ message: "This product is currently out of stock." });
+      }
+
+      // Check if requested quantity exceeds available stock
+      if (qty > availableStock) {
+        await connection.rollback();
+        connection.release();
+        return res.status(400).json({ 
+          message: `Only ${availableStock} item(s) available in stock.`,
+          availableStock,
+          requestedQuantity: qty
+        });
+      }
+
       const [users] = await connection.query(
         "SELECT id, email FROM users WHERE id = ? LIMIT 1",
         [req.user.id],
@@ -508,6 +533,18 @@ const addToCart = async (req, res) => {
             message: "You've reached the maximum quantity limit. For bulk orders, please contact us.",
             maxQuantity: maxQtyPerProduct,
             currentQuantity: existingQty,
+          });
+        }
+
+        // Check if new total quantity exceeds available stock
+        if (newTotalQty > availableStock) {
+          await connection.rollback();
+          connection.release();
+          return res.status(400).json({ 
+            message: `Only ${availableStock} item(s) available in stock.`,
+            availableStock,
+            currentQuantity: existingQty,
+            requestedQuantity: qty
           });
         }
 

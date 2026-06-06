@@ -15,6 +15,12 @@ function Products({
   onNavigate,
   onLogout,
   cartCount = 0,
+  cartSuccessMessage,
+  cartErrorMessage,
+  onClearCartSuccessMessage,
+  onClearCartErrorMessage,
+  showCartSuccessModal,
+  onCloseCartSuccessModal,
 }) {
   const slugifyCategory = (value) =>
     (value || "")
@@ -204,12 +210,22 @@ function Products({
   const [previewImageIndex, setPreviewImageIndex] = useState(0);
   const [previewSize, setPreviewSize] = useState("");
   const [cardImageIndices, setCardImageIndices] = useState({});
-  const [cartErrorMessage, setCartErrorMessage] = useState("");
   const [maxProducts, setMaxProducts] = useState(10);
   const [showBulkOrderCTA, setShowBulkOrderCTA] = useState(false);
   const swipeStartXRef = useRef(null);
 
   const sizeOptions = ["S", "M", "L", "XL", "XXL"];
+
+  useEffect(() => {
+    if (showCartSuccessModal) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [showCartSuccessModal]);
 
   const isClothingProduct = (product) => {
     const normalized = normalizeCategoryValue(product?.category);
@@ -238,54 +254,18 @@ function Products({
   }, [activeCategory]);
 
   const handleAddToCart = async (product, size = "") => {
-    if (!product || !session?.token) {
-      return;
+    if (!product) {
+      return false;
     }
 
-    // Check if product is out of stock
-    if ((product.stock ?? 0) < 1) {
-      setCartErrorMessage("This product is out of stock. You've reached the stock limit. We apologize for the inconvenience. Please check back later or contact us for availability updates.");
-      return;
-    }
-
-    try {
-      const productId = product._id || product.id;
-
-      const res = await axios.post(
-        "/api/cart",
-        { productId, quantity: 1, size: size || "" },
-        {
-          headers: {
-            Authorization: `Bearer ${session.token}`,
-            "X-Source-Page": "shop-products",
-          },
-        },
-      );
-
-      if (typeof onAddToCart === "function") {
-        const added = await onAddToCart(res.data);
-        if (added) {
-          setCartErrorMessage("");
-          setShowBulkOrderCTA(false);
-          onNavigate("cart");
-        }
-      }
-    } catch (requestError) {
-      const errorMsg = requestError.response?.data?.message || requestError.message;
-      console.error("Add to cart failed:", errorMsg);
-      setCartErrorMessage(errorMsg);
-      setShowBulkOrderCTA(errorMsg.includes("bulk orders"));
-    }
+    const productWithSize = { ...product, size: size || "" };
+    const added = await onAddToCart(productWithSize);
+    
+    return added;
   };
 
   const handleBuyNow = async (product, size = "") => {
     if (!product) {
-      return;
-    }
-
-    // Check if product is out of stock
-    if ((product.stock ?? 0) < 1) {
-      setCartErrorMessage("This product is out of stock. You've reached the stock limit. We apologize for the inconvenience. Please check back later or contact us for availability updates.");
       return;
     }
 
@@ -306,12 +286,6 @@ function Products({
 
   const handlePreviewBuyNow = async () => {
     if (!previewProduct) {
-      return;
-    }
-
-    // Check if product is out of stock
-    if ((previewProduct.stock ?? 0) < 1) {
-      setCartErrorMessage("This product is out of stock. You've reached the stock limit. We apologize for the inconvenience. Please check back later or contact us for availability updates.");
       return;
     }
 
@@ -618,6 +592,81 @@ function Products({
             </div>
           )}
 
+          {cartSuccessMessage && (
+            <div
+              style={{
+                marginBottom: "20px",
+                padding: "16px",
+                background: "#d4edda",
+                border: "1px solid #28a745",
+                borderRadius: "8px",
+                color: "#155724",
+                fontSize: "14px",
+                fontWeight: "500",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+              }}
+            >
+              <span style={{ flex: 1 }}>{cartSuccessMessage}</span>
+              <button
+                onClick={onClearCartSuccessMessage}
+                style={{
+                  background: "none",
+                  border: "none",
+                  fontSize: "18px",
+                  cursor: "pointer",
+                  color: "#155724",
+                  padding: 0,
+                }}
+              >
+                ×
+              </button>
+            </div>
+          )}
+
+          {showCartSuccessModal && (
+            <div
+              className="ps-cartConfirmBackdrop"
+              onClick={onCloseCartSuccessModal}
+            >
+              <div
+                className="ps-cartConfirmCard"
+                role="dialog"
+                aria-modal="true"
+                aria-label="Product added to cart"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <p className="ps-pill" style={{ margin: 0, width: "fit-content" }}>
+                  Success
+                </p>
+                <h2 className="ps-cartConfirmTitle">Product added to cart successfully</h2>
+                <p className="ps-cartConfirmText">
+                  The product has been added to your cart. You can continue shopping or proceed to checkout.
+                </p>
+                <div className="ps-cartConfirmActions">
+                  <button
+                    type="button"
+                    className="ps-btn ps-cartConfirmCancel"
+                    onClick={onCloseCartSuccessModal}
+                  >
+                    Continue Shopping
+                  </button>
+                  <button
+                    type="button"
+                    className="ps-btn ps-cartConfirmDelete"
+                    onClick={() => {
+                      onCloseCartSuccessModal();
+                      onNavigate("cart");
+                    }}
+                  >
+                    Go to Cart
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {cartErrorMessage && (
             <div
               style={{
@@ -644,7 +693,7 @@ function Products({
                 <span style={{ flex: 1 }}>{cartErrorMessage}</span>
                 <button
                   onClick={() => {
-                    setCartErrorMessage("");
+                    onClearCartErrorMessage();
                     setShowBulkOrderCTA(false);
                   }}
                   style={{

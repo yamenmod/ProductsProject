@@ -40,6 +40,12 @@ function SizeCharts({
   onAddToCart,
   onLogout,
   cartCount = 0,
+  cartSuccessMessage,
+  cartErrorMessage,
+  onClearCartSuccessMessage,
+  onClearCartErrorMessage,
+  showCartSuccessModal,
+  onCloseCartSuccessModal,
 }) {
   const [products, setProducts] = useState([]);
   const [previewProduct, setPreviewProduct] = useState(null);
@@ -49,6 +55,17 @@ function SizeCharts({
   const swipeStartXRef = useRef(null);
 
   const sizeOptions = ["S", "M", "L", "XL", "XXL"];
+
+  useEffect(() => {
+    if (showCartSuccessModal) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [showCartSuccessModal]);
 
   const isClothingProduct = (product) => {
     const normalized = (product?.category || "").toString().toLowerCase();
@@ -297,21 +314,12 @@ function SizeCharts({
 
   const handleAddToCart = async (product, size = "") => {
     if (!product) {
-      return;
+      return false;
     }
 
-    try {
-      if (typeof onAddToCart === "function") {
-        const added = await onAddToCart({ ...product, size: size || "" });
-        if (!added) {
-          return;
-        }
-      }
-
-      onNavigate("cart");
-    } catch (error) {
-      console.error("Add to cart failed:", error.message);
-    }
+    const productWithSize = { ...product, size: size || "" };
+    const added = await onAddToCart(productWithSize);
+    return added;
   };
 
   const renderChartTable = (rows, columns) => (
@@ -358,6 +366,116 @@ function SizeCharts({
         onLogout={onLogout}
         cartCount={cartCount}
       />
+
+      {cartSuccessMessage && (
+        <div
+          style={{
+            maxWidth: "1200px",
+            margin: "20px auto",
+            padding: "16px",
+            background: "#d4edda",
+            border: "1px solid #28a745",
+            borderRadius: "8px",
+            color: "#155724",
+            fontSize: "14px",
+            fontWeight: "500",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+          }}
+        >
+          <span style={{ flex: 1 }}>{cartSuccessMessage}</span>
+          <button
+            onClick={onClearCartSuccessMessage}
+            style={{
+              background: "none",
+              border: "none",
+              fontSize: "18px",
+              cursor: "pointer",
+              color: "#155724",
+              padding: 0,
+            }}
+          >
+            ×
+          </button>
+        </div>
+      )}
+
+      {showCartSuccessModal && (
+        <div
+          className="ps-cartConfirmBackdrop"
+          onClick={onCloseCartSuccessModal}
+        >
+          <div
+            className="ps-cartConfirmCard"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Product added to cart"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <p className="ps-pill" style={{ margin: 0, width: "fit-content" }}>
+              Success
+            </p>
+            <h2 className="ps-cartConfirmTitle">Product added to cart successfully</h2>
+            <p className="ps-cartConfirmText">
+              The product has been added to your cart. You can continue shopping or proceed to checkout.
+            </p>
+            <div className="ps-cartConfirmActions">
+              <button
+                type="button"
+                className="ps-btn ps-cartConfirmCancel"
+                onClick={onCloseCartSuccessModal}
+              >
+                Continue Shopping
+              </button>
+              <button
+                type="button"
+                className="ps-btn ps-cartConfirmDelete"
+                onClick={() => {
+                  onCloseCartSuccessModal();
+                  onNavigate("cart");
+                }}
+              >
+                Go to Cart
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {cartErrorMessage && (
+        <div
+          style={{
+            maxWidth: "1200px",
+            margin: "20px auto",
+            padding: "16px",
+            background: "#fff3cd",
+            border: "1px solid #ffc107",
+            borderRadius: "8px",
+            color: "#856404",
+            fontSize: "14px",
+            fontWeight: "500",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+          }}
+        >
+          <span style={{ flex: 1 }}>{cartErrorMessage}</span>
+          <button
+            onClick={onClearCartErrorMessage}
+            style={{
+              background: "none",
+              border: "none",
+              fontSize: "18px",
+              cursor: "pointer",
+              color: "#856404",
+              padding: 0,
+            }}
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       <main className="ps-main ps-sizeChartsPage">
         <section className="ps-shell ps-sizeChartsHero">

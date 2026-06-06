@@ -127,6 +127,9 @@ function App() {
   const [selectedProductToEdit, setSelectedProductToEdit] = useState(null);
 
   const [cartItems, setCartItems] = useState([]);
+  const [cartSuccessMessage, setCartSuccessMessage] = useState("");
+  const [cartErrorMessage, setCartErrorMessage] = useState("");
+  const [showCartSuccessModal, setShowCartSuccessModal] = useState(false);
 
   const [paymentSuccess, setPaymentSuccess] = useState(null);
 
@@ -605,7 +608,6 @@ function App() {
     }
 
 
-
     try {
 
       await axios.post(
@@ -641,13 +643,14 @@ function App() {
 
 
       setCartItems(normalizeCartItems(refreshedCart.data));
-
+      setShowCartSuccessModal(true);
       return true;
 
     } catch (error) {
 
       console.error("Add to cart failed:", error.message);
-
+      const errorMsg = error.response?.data?.message || error.message;
+      setCartErrorMessage(errorMsg);
       return false;
 
     }
@@ -1112,6 +1115,18 @@ function App() {
 
         cartCount={cartCount}
 
+        cartSuccessMessage={cartSuccessMessage}
+
+        cartErrorMessage={cartErrorMessage}
+
+        onClearCartSuccessMessage={() => setCartSuccessMessage("")}
+
+        onClearCartErrorMessage={() => setCartErrorMessage("")}
+
+        showCartSuccessModal={showCartSuccessModal}
+
+        onCloseCartSuccessModal={() => setShowCartSuccessModal(false)}
+
       />,
 
     );
@@ -1232,6 +1247,18 @@ function App() {
 
         cartCount={cartCount}
 
+        cartSuccessMessage={cartSuccessMessage}
+
+        cartErrorMessage={cartErrorMessage}
+
+        onClearCartSuccessMessage={() => setCartSuccessMessage("")}
+
+        onClearCartErrorMessage={() => setCartErrorMessage("")}
+
+        showCartSuccessModal={showCartSuccessModal}
+
+        onCloseCartSuccessModal={() => setShowCartSuccessModal(false)}
+
       />,
 
     );
@@ -1265,6 +1292,18 @@ function App() {
         onLogout={logout}
 
         cartCount={cartCount}
+
+        cartSuccessMessage={cartSuccessMessage}
+
+        cartErrorMessage={cartErrorMessage}
+
+        onClearCartSuccessMessage={() => setCartSuccessMessage("")}
+
+        onClearCartErrorMessage={() => setCartErrorMessage("")}
+
+        showCartSuccessModal={showCartSuccessModal}
+
+        onCloseCartSuccessModal={() => setShowCartSuccessModal(false)}
 
       />,
 
