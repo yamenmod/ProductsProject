@@ -611,6 +611,8 @@ function Cart({
                   vatPercent,
                 });
 
+                console.log("Cart item full data:", item);
+
                 return (
                   <div
                     key={`${item.id}-${item.size || "default"}`}
@@ -680,15 +682,33 @@ function Cart({
                       ) : null}
                       {(() => {
                         const stock = Number(item.stock || 0);
-                        const sizeStock = item.size_stock ? JSON.parse(item.size_stock) : null;
+                        let sizeStock = null;
+                        try {
+                          sizeStock = item.size_stock ? JSON.parse(item.size_stock) : null;
+                        } catch (e) {
+                          console.error("Failed to parse size_stock:", item.size_stock, e);
+                        }
                         const quantity = Number(item.quantity || 1);
                         let available = stock;
-                        
+
+                        console.log("Cart item stock check:", {
+                          productId: item.id,
+                          name: item.name,
+                          size: item.size,
+                          stock: stock,
+                          sizeStock: sizeStock,
+                          sizeStockRaw: item.size_stock,
+                          quantity: quantity,
+                        });
+
                         if (sizeStock && item.size) {
                           const sizeKey = item.size.toUpperCase();
                           available = Number(sizeStock[sizeKey] || 0);
+                          console.log("Size stock check:", { sizeKey, available, sizeStock });
                         }
-                        
+
+                        console.log("Final stock check:", { quantity, available, isOutOfStock: quantity > available });
+
                         if (quantity > available) {
                           return (
                             <p

@@ -306,8 +306,15 @@ function AdminDashboard({
     onNavigate("manage-orders", filter);
   };
 
-  const openProductEdit = (product) => {
-    onNavigate("manage-products", product);
+  const openProductEdit = async (product) => {
+    try {
+      const productId = product._id || product.id;
+      const res = await axios.get(`/api/products/${productId}`);
+      onNavigate("manage-products", res.data);
+    } catch (error) {
+      console.error("Failed to fetch product for editing:", error);
+      onNavigate("manage-products", product);
+    }
   };
 
   const cards = [

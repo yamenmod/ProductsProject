@@ -374,6 +374,7 @@ const mapCartRows = (rows, vatRate = 0) =>
       price: roundMoney(row.price),
       ...calculateVatPricing(row.price, vatRate),
       stock: Number(row.stock),
+      size_stock: row.size_stock,
       category: row.category || "",
       size: row.size || "",
       image: resolvePrimaryImage(row.image_url),
@@ -409,6 +410,7 @@ const getCart = async (req, res) => {
           p.name,
           p.price,
           p.stock,
+          p.size_stock,
           p.image_url,
           c.name AS category,
           ci.size,
@@ -424,6 +426,15 @@ const getCart = async (req, res) => {
 
     const cartItems = mapCartRows(rows, vatRate);
 
+    console.log("[cart:getCart] Returning cart items:", cartItems.map(item => ({
+      id: item.product?.id,
+      name: item.product?.name,
+      stock: item.product?.stock,
+      size_stock: item.product?.size_stock,
+      size: item.size,
+      quantity: item.quantity,
+    })));
+
     return res.status(200).json({
       items: cartItems,
       holdOrder: null,
@@ -437,6 +448,13 @@ const getCart = async (req, res) => {
 // It validates the product first, then returns the refreshed cart state.
 // Adds an item to the cart or increments its quantity.
 const addToCart = async (req, res) => {
+  console.log("[addToCart] Request received:", {
+    userId: req.user?.id,
+    productId: req.body?.productId,
+    quantity: req.body?.quantity,
+    size: req.body?.size,
+  });
+
   try {
     const vatRate = await getVatRateFromDb(db);
     const { productId, quantity, size } = req.body;
@@ -448,6 +466,8 @@ const addToCart = async (req, res) => {
 
     const qty = Number(quantity) > 0 ? Number(quantity) : 1;
     const normalizedSize = (size || "").toString().trim().toUpperCase();
+
+    console.log("[addToCart] Starting stock validation for product:", productId);
 
     const connection = await db.getConnection();
     try {
@@ -482,9 +502,11 @@ const addToCart = async (req, res) => {
       // Stock validation
       let availableStock = 0;
       if (isClothing) {
-        availableStock = getSizeStockTotal(product.size_stock, normalizedSize);
+        availableStock = getAvailableStock(product, normalizedSize);
+        console.log("Clothing product stock check:", productId, normalizedSize, "Available:", availableStock, "Size stock:", product.size_stock);
       } else {
-        availableStock = getAvailableStock(product.stock);
+        availableStock = Number(product.stock) || 0;
+        console.log("Non-clothing product stock check:", productId, "Available:", availableStock, "Stock field:", product.stock);
       }
 
       if (availableStock <= 0) {
@@ -698,6 +720,7 @@ const removeFromCart = async (req, res) => {
           p.name,
           p.price,
           p.stock,
+          p.size_stock,
           p.image_url,
           c.name AS category,
           ci.size,

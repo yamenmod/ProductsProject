@@ -637,12 +637,10 @@ const updateProduct = async (req, res) => {
             ? parseSizeStockInput(sizeStock)
             : normalizeSizeStockMap(existingProduct.size_stock)
           : null;
-    const nextStock = isClothingCategory(
-      category !== undefined ? category : existingProduct.category,
-    )
-      ? getSizeStockTotal(nextSizeStock)
-      : stock !== undefined
-        ? Number(stock)
+    const nextStock = stock !== undefined
+      ? Number(stock)
+      : isClothingCategory(category !== undefined ? category : existingProduct.category)
+        ? getSizeStockTotal(nextSizeStock)
         : Number(existingProduct.stock);
     const uploadedImagePaths = Array.isArray(req.files)
       ? req.files

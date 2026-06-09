@@ -20,6 +20,8 @@ function Home({
   onClearCartErrorMessage,
   showCartSuccessModal,
   onCloseCartSuccessModal,
+  showCartErrorModal,
+  onCloseCartErrorModal,
 }) {
   const [recentProducts, setRecentProducts] = useState([]);
   const [previewProduct, setPreviewProduct] = useState(null);
@@ -34,7 +36,7 @@ function Home({
   const sizeOptions = ["S", "M", "L", "XL", "XXL"];
 
   useEffect(() => {
-    if (showCartSuccessModal) {
+    if (showCartSuccessModal || showCartErrorModal) {
       document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "";
@@ -42,7 +44,7 @@ function Home({
     return () => {
       document.body.style.overflow = "";
     };
-  }, [showCartSuccessModal]);
+  }, [showCartSuccessModal, showCartErrorModal]);
 
   const normalizeCategoryValue = (value) =>
     (value || "")
@@ -630,6 +632,38 @@ function Home({
                 }}
               >
                 Go to Cart
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCartErrorModal && (
+        <div
+          className="ps-cartConfirmBackdrop"
+          onClick={onCloseCartErrorModal}
+        >
+          <div
+            className="ps-cartConfirmCard"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Error adding to cart"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <p className="ps-pill" style={{ margin: 0, width: "fit-content" }}>
+              Error
+            </p>
+            <h2 className="ps-cartConfirmTitle">Unable to add product to cart</h2>
+            <p className="ps-cartConfirmText">
+              {cartErrorMessage}
+            </p>
+            <div className="ps-cartConfirmActions">
+              <button
+                type="button"
+                className="ps-btn ps-cartConfirmDelete"
+                onClick={onCloseCartErrorModal}
+              >
+                Close
               </button>
             </div>
           </div>

@@ -130,6 +130,7 @@ function App() {
   const [cartSuccessMessage, setCartSuccessMessage] = useState("");
   const [cartErrorMessage, setCartErrorMessage] = useState("");
   const [showCartSuccessModal, setShowCartSuccessModal] = useState(false);
+  const [showCartErrorModal, setShowCartErrorModal] = useState(false);
 
   const [paymentSuccess, setPaymentSuccess] = useState(null);
 
@@ -651,6 +652,7 @@ function App() {
       console.error("Add to cart failed:", error.message);
       const errorMsg = error.response?.data?.message || error.message;
       setCartErrorMessage(errorMsg);
+      setShowCartErrorModal(true);
       return false;
 
     }
@@ -1127,6 +1129,10 @@ function App() {
 
         onCloseCartSuccessModal={() => setShowCartSuccessModal(false)}
 
+        showCartErrorModal={showCartErrorModal}
+
+        onCloseCartErrorModal={() => setShowCartErrorModal(false)}
+
       />,
 
     );
@@ -1259,6 +1265,10 @@ function App() {
 
         onCloseCartSuccessModal={() => setShowCartSuccessModal(false)}
 
+        showCartErrorModal={showCartErrorModal}
+
+        onCloseCartErrorModal={() => setShowCartErrorModal(false)}
+
       />,
 
     );
@@ -1304,6 +1314,10 @@ function App() {
         showCartSuccessModal={showCartSuccessModal}
 
         onCloseCartSuccessModal={() => setShowCartSuccessModal(false)}
+
+        showCartErrorModal={showCartErrorModal}
+
+        onCloseCartErrorModal={() => setShowCartErrorModal(false)}
 
       />,
 

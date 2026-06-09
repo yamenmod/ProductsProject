@@ -346,7 +346,7 @@ function ManageProducts({
     payload.append("price", Number(form.price));
     payload.append("category", form.category.trim());
     payload.append("gender", normalizeGenderValue(form.gender));
-    payload.append("stock", form.stock === "" ? 0 : Number(form.stock));
+    payload.append("stock", String(form.stock === "" ? 0 : Number(form.stock)));
     payload.append("maxQuantityPerUser", form.maxQuantityPerUser === "" ? 10 : Number(form.maxQuantityPerUser));
 
     if (isClothingCategory(form.category) && form.size) {
@@ -426,6 +426,8 @@ function ManageProducts({
 
     const uniqueExistingImages = [...new Set(existingImages)];
 
+    const productId = product._id || product.id;
+
     setForm({
       name: product.name || "",
       description: product.description || "",
@@ -435,14 +437,14 @@ function ManageProducts({
       size: product.size || "",
       image: product.image || "",
       image_urls: uniqueExistingImages,
-      stock: product.stock ?? 0,
+      stock: Number(product.stock) ?? 0,
       maxQuantityPerUser: product.max_quantity_per_user ?? 10,
       sizeStock: parseSizeStockValue(product.sizeStock || product.size_stock || {}),
       boardHeight: product.boardHeight ?? product.height ?? "",
       boardVolume: product.boardVolume ?? product.volume ?? "",
     });
     setImageFiles([]);
-    setEditId(product._id);
+    setEditId(productId);
     setShowForm(true);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
@@ -453,7 +455,7 @@ function ManageProducts({
     if (initialProductToEdit && typeof initialProductToEdit === "object") {
       handleEdit(initialProductToEdit);
     }
-  }, [initialProductToEdit, handleEdit]);
+  }, [initialProductToEdit]);
 
   const handleDelete = async (id) => {
     setSuccess("");
@@ -912,7 +914,6 @@ function ManageProducts({
                     min="0"
                     placeholder="Stock"
                     value={form.stock}
-                    disabled={isClothingCategory(form.category)}
                     onChange={(e) =>
                       setForm({ ...form, stock: e.target.value })
                     }
@@ -924,7 +925,6 @@ function ManageProducts({
                       fontFamily: "inherit",
                       transition: "all 0.2s ease",
                       background: "#fffdf8",
-                      opacity: isClothingCategory(form.category) ? 0.7 : 1,
                     }}
                     onFocus={(e) => {
                       e.target.style.borderColor = "#245860";
@@ -936,20 +936,6 @@ function ManageProducts({
                       e.target.style.boxShadow = "none";
                     }}
                   />
-
-                  {isClothingCategory(form.category) && (
-                    <div
-                      style={{
-                        gridColumn: "1 / -1",
-                        marginTop: "-6px",
-                        color: "#65574d",
-                        fontSize: "12px",
-                        fontWeight: 600,
-                      }}
-                    >
-                      Stock is derived from the size stock values below.
-                    </div>
-                  )}
 
                   {isClothingCategory(form.category) && (
                     <div
