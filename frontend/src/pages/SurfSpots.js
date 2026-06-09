@@ -639,9 +639,6 @@ function Products({
                 aria-label="Product added to cart"
                 onClick={(event) => event.stopPropagation()}
               >
-                <p className="ps-pill" style={{ margin: 0, width: "fit-content" }}>
-                  Success
-                </p>
                 <h2 className="ps-cartConfirmTitle">Product added to cart successfully</h2>
                 <p className="ps-cartConfirmText">
                   The product has been added to your cart. You can continue shopping or proceed to checkout.
@@ -1057,6 +1054,9 @@ function Products({
               <h3 className="ps-previewName">
                 {previewProduct.name || "New product"}
               </h3>
+              <p className="ps-previewDescription">
+                {previewProduct.description || "No description available yet."}
+              </p>
               <div
                 className="ps-previewPurchaseRow"
                 style={{

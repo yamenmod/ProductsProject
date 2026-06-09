@@ -12,6 +12,7 @@ function MyOrders({ session, user, onNavigate }) {
   const [loading, setLoading] = useState(false);
   const [cancelTargetId, setCancelTargetId] = useState(null);
   const [cancelling, setCancelling] = useState(false);
+  const [timeLeft, setTimeLeft] = useState({});
 
   const load = async () => {
     setLoading(true);
@@ -32,6 +33,29 @@ function MyOrders({ session, user, onNavigate }) {
     void load();
   }, []);
 
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = new Date();
+      const newTimeLeft = {};
+      orders.forEach((order) => {
+        if (order.paid_at && isSuccessfulOrder(order)) {
+          const paidAt = new Date(order.paid_at);
+          const elapsed = now - paidAt;
+          const ms2Minutes = 2 * 60 * 1000;
+          const remaining = ms2Minutes - elapsed;
+          if (remaining > 0) {
+            newTimeLeft[order.id] = Math.floor(remaining / 1000);
+          } else {
+            newTimeLeft[order.id] = 0;
+          }
+        }
+      });
+      setTimeLeft(newTimeLeft);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [orders]);
+
   const isSuccessfulOrder = (order) => getOrderBucket(order) === "success";
 
   const canCancel = (order) => {
@@ -39,8 +63,8 @@ function MyOrders({ session, user, onNavigate }) {
     if (!isSuccessfulOrder(order)) return false;
     const paidAt = new Date(order.paid_at);
     const now = new Date();
-    const ms48 = 48 * 60 * 60 * 1000;
-    return now - paidAt <= ms48;
+    const ms2Minutes = 2 * 60 * 1000;
+    return now - paidAt <= ms2Minutes;
   };
 
   const handleConfirmCancel = async () => {
@@ -181,12 +205,12 @@ function MyOrders({ session, user, onNavigate }) {
                         borderRadius: "4px",
                       }}
                     >
-                      You can cancel this order within 48 hours of purchase (expires
-                      at{" "}
-                      {new Date(
-                        new Date(o.paid_at).getTime() + 48 * 60 * 60 * 1000,
-                      ).toLocaleString()}
-                      )
+                      You can cancel this order within 2 minutes of purchase. Time
+                      remaining:{" "}
+                      <strong>
+                        {Math.floor(timeLeft[o.id] / 60)}:
+                        {String(timeLeft[o.id] % 60).padStart(2, "0")}
+                      </strong>
                     </div>
                   )}
                   {o.items && o.items.length > 0 ? (

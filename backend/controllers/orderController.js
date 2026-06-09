@@ -91,9 +91,8 @@ const cancel = async (req, res) => {
 
     const paidAt = new Date(order.paid_at);
     const now = new Date();
-    //const ms48 = 48 * 60 * 60 * 1000;
-    const ms48 = 60;
-    if (now - paidAt > ms48) {
+    const ms2Minutes = 2 * 60 * 1000;
+    if (now - paidAt > ms2Minutes) {
       return res.status(400).json({ message: "Cancellation window expired" });
     }
 

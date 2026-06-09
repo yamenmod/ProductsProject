@@ -280,9 +280,8 @@ function App() {
 
       }
 
-
-
-      if (paypalUnsuccessful) {
+      // Only show unsuccessful message if there's no token to attempt capture
+      if (paypalUnsuccessful && !token) {
 
         setPaymentSuccess({
 
@@ -897,39 +896,31 @@ function App() {
 
           <div style={{ flex: 1 }}>
 
-            <p
-
-              className="ps-pill"
-
-              style={{ margin: "0 0 10px", width: "fit-content" }}
-
-            >
-
-              Payment confirmed
-
-            </p>
-
             <h2 className="ps-cartConfirmTitle" style={{ marginBottom: "8px" }}>
 
               {paymentSuccess.title}
 
             </h2>
 
-            <p className="ps-cartConfirmText" style={{ marginBottom: "8px" }}>
+            {paymentSuccess.title !== "Payment could not be completed" && (
+              <p className="ps-cartConfirmText" style={{ marginBottom: "8px" }}>
 
-              {paymentSuccess.message}
+                {paymentSuccess.message}
 
-            </p>
+              </p>
+            )}
 
-            <p
+            {paymentSuccess.title !== "Payment could not be completed" && (
+              <p
 
-              style={{ margin: "0 0 18px", color: "#65574d", fontSize: "13px" }}
+                style={{ margin: "0 0 18px", color: "#65574d", fontSize: "13px" }}
 
-            >
+              >
 
-              Order reference: {paymentSuccess.orderId}
+                Order reference: {paymentSuccess.orderId}
 
-            </p>
+              </p>
+            )}
 
           </div>
 
@@ -1001,13 +992,37 @@ function App() {
 
             }}
 
-            style={{ padding: "12px 18px" }}
+            style={{ padding: "12px 18px", background: "#000000" }}
 
           >
 
             Continue shopping
 
           </button>
+
+          {paymentSuccess.title !== "Payment could not be completed" && (
+            <button
+
+              type="button"
+
+              className="ps-btn ps-btn-primary"
+
+              onClick={() => {
+
+                dismissPaymentSuccess();
+
+                setCurrentPage("my-orders");
+
+              }}
+
+              style={{ padding: "12px 18px", background: "#245860" }}
+
+            >
+
+              View Order
+
+            </button>
+          )}
 
           <button
 

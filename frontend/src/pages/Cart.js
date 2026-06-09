@@ -9,6 +9,16 @@ import {
   resetVatRateCache,
 } from "../utils/pricing";
 
+// Add spinner animation
+const style = document.createElement('style');
+style.textContent = `
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+`;
+document.head.appendChild(style);
+
 function Cart({
   session,
   user,
@@ -611,8 +621,6 @@ function Cart({
                   vatPercent,
                 });
 
-                console.log("Cart item full data:", item);
-
                 return (
                   <div
                     key={`${item.id}-${item.size || "default"}`}
@@ -691,23 +699,10 @@ function Cart({
                         const quantity = Number(item.quantity || 1);
                         let available = stock;
 
-                        console.log("Cart item stock check:", {
-                          productId: item.id,
-                          name: item.name,
-                          size: item.size,
-                          stock: stock,
-                          sizeStock: sizeStock,
-                          sizeStockRaw: item.size_stock,
-                          quantity: quantity,
-                        });
-
                         if (sizeStock && item.size) {
                           const sizeKey = item.size.toUpperCase();
                           available = Number(sizeStock[sizeKey] || 0);
-                          console.log("Size stock check:", { sizeKey, available, sizeStock });
                         }
-
-                        console.log("Final stock check:", { quantity, available, isOutOfStock: quantity > available });
 
                         if (quantity > available) {
                           return (
@@ -1011,12 +1006,6 @@ function Cart({
               }}
             >
               <div>
-                <p
-                  className="ps-pill"
-                  style={{ margin: "0 0 10px", width: "fit-content" }}
-                >
-                  Secure checkout
-                </p>
                 <h2
                   className="ps-cartConfirmTitle"
                   style={{ marginBottom: "8px" }}
@@ -1077,9 +1066,59 @@ function Cart({
                   border: "none",
                   boxShadow: "0 10px 18px rgba(0, 48, 135, 0.18)",
                   fontWeight: 800,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "8px",
                 }}
               >
-                Pay with PayPal
+                {isPayPalLoading ? (
+                  <>
+                    <svg
+                      style={{
+                        animation: "spin 1s linear infinite",
+                        width: "16px",
+                        height: "16px",
+                      }}
+                      viewBox="0 0 24 24"
+                      fill="none"
+                    >
+                      <circle
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                        strokeOpacity="0.3"
+                      />
+                      <path
+                        d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"
+                        fill="currentColor"
+                      />
+                    </svg>
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <svg
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M7.076 21.337H2.47a.641.641 0 0 1-.633-.74L4.944 3.906a.78.78 0 0 1 .77-.644h6.912c2.298 0 4.008.575 5.062 1.654.936.959 1.336 2.326 1.157 4.014-.006.058-.015.117-.022.176-.637 4.186-3.465 6.539-7.398 6.539h-1.925a.78.78 0 0 0-.77.644l-.742 4.698a.641.641 0 0 1-.633.74H7.076z"
+                        fill="#003087"
+                      />
+                      <path
+                        d="M21.598 6.896c-.637 4.186-3.465 6.539-7.398 6.539h-1.925a.78.78 0 0 0-.77.644l-.742 4.698a.641.641 0 0 1-.633.74H7.076l-.422 2.678a.641.641 0 0 1-.633.74H2.47a.641.641 0 0 1-.633-.74L4.944 3.906a.78.78 0 0 1 .77-.644h6.912c2.298 0 4.008.575 5.062 1.654.936.959 1.336 2.326 1.157 4.014-.006.058-.015.117-.022.176z"
+                        fill="#009cde"
+                      />
+                    </svg>
+                    Pay with PayPal
+                  </>
+                )}
               </button>
               <button
                 type="button"
