@@ -1,6 +1,6 @@
 export const ORDER_STATUS_LABELS = {
   success: "Successful",
-  cancelled: "Unsuccessful",
+  cancelled: "Cancel",
 };
 
 const normalizeStatus = (value) =>
