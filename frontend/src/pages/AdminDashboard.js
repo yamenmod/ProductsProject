@@ -50,6 +50,7 @@ function AdminDashboard({
   const [maxQtyInput, setMaxQtyInput] = useState("10");
   const [maxQtyMessage, setMaxQtyMessage] = useState("");
   const [savingMaxQty, setSavingMaxQty] = useState(false);
+  const [watchlistSearch, setWatchlistSearch] = useState("");
   const statusColors = STATUS_COLORS;
 
   const filteredOrders = useMemo(() => {
@@ -136,6 +137,7 @@ function AdminDashboard({
   const lowStockProducts = useMemo(
     () => {
       const THRESHOLD = 4;
+      const normalizedSearch = (watchlistSearch || "").toString().trim().toLowerCase();
 
       return [...products]
         .map((product) => {
@@ -160,9 +162,16 @@ function AdminDashboard({
           };
         })
         .filter((entry) => entry.overallLow || (entry.lowSizes && entry.lowSizes.length))
+        .filter((entry) => {
+          if (!normalizedSearch) return true;
+          return (entry.product?.name || "")
+            .toString()
+            .toLowerCase()
+            .includes(normalizedSearch);
+        })
         .sort((a, b) => a.stock - b.stock);
     },
-    [products],
+    [products, watchlistSearch],
   );
 
   useEffect(() => {
@@ -679,21 +688,38 @@ function AdminDashboard({
                   justifyContent: "space-between",
                   gap: "12px",
                   marginBottom: "18px",
+                  flexWrap: "wrap",
                 }}
               >
-                <div>
+                <div style={{ minWidth: 0, flex: "1 1 320px" }}>
                   <h2 style={{ margin: "0 0 8px", fontSize: "24px" }}>
                     Stock watchlist
                   </h2>
-                  <p style={{ margin: 0, color: "#5e5148" }}>
+                  <p style={{ margin: "0 0 12px", color: "#5e5148" }}>
                     Out of stock products first, then products with 1 to 4 units
                     remaining.
                   </p>
+                  <input
+                    type="search"
+                    value={watchlistSearch}
+                    onChange={(event) => setWatchlistSearch(event.target.value)}
+                    placeholder="Search watchlist by product name"
+                    style={{
+                      width: "100%",
+                      padding: "12px 14px",
+                      borderRadius: "12px",
+                      border: "1px solid rgba(31, 24, 19, 0.14)",
+                      background: "rgba(255, 250, 242, 0.95)",
+                      fontSize: "14px",
+                      boxSizing: "border-box",
+                    }}
+                  />
                 </div>
                 <button
                   type="button"
                   className="ps-btn ps-btn-primary"
                   onClick={() => onNavigate("manage-products")}
+                  style={{ height: "44px", whiteSpace: "nowrap" }}
                 >
                   Open products
                 </button>
