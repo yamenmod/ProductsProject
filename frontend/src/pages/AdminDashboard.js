@@ -134,15 +134,34 @@ function AdminDashboard({
   }, [filteredOrders]);
 
   const lowStockProducts = useMemo(
-    () =>
-      [...products]
-        .filter((product) => {
+    () => {
+      const THRESHOLD = 4;
+
+      return [...products]
+        .map((product) => {
           const stock = Number(product?.stock ?? 0);
-          return stock >= 0 && stock <= 4;
+          const sizeStock = product?.sizeStock || product?.size_stock || null;
+
+          let lowSizes = null;
+
+          if (sizeStock && typeof sizeStock === "object") {
+            lowSizes = Object.entries(sizeStock)
+              .filter(([, qty]) => Number(qty) >= 0 && Number(qty) <= THRESHOLD)
+              .map(([size, qty]) => ({ size, qty: Number(qty) }));
+          }
+
+          const overallLow = stock >= 0 && stock <= THRESHOLD;
+
+          return {
+            product,
+            overallLow,
+            lowSizes: lowSizes && lowSizes.length ? lowSizes : [],
+            stock,
+          };
         })
-        .sort(
-          (left, right) => Number(left?.stock ?? 0) - Number(right?.stock ?? 0),
-        ),
+        .filter((entry) => entry.overallLow || (entry.lowSizes && entry.lowSizes.length))
+        .sort((a, b) => a.stock - b.stock);
+    },
     [products],
   );
 
@@ -684,11 +703,13 @@ function AdminDashboard({
                 <p className="ps-lead">Loading inventory...</p>
               ) : lowStockProducts.length ? (
                 <div style={{ display: "grid", gap: "10px" }}>
-                  {lowStockProducts.map((product) => {
-                    const stock = Number(product.stock ?? 0);
+                  {lowStockProducts.map((entry) => {
+                    const product = entry.product || {};
+                    const stock = Number(entry.stock ?? 0);
+                    const hasLowSizes = Array.isArray(entry.lowSizes) && entry.lowSizes.length;
                     const statusLabel =
-                      stock === 0 ? "Out of stock" : "Low stock";
-                    const statusColor = stock === 0 ? "#a83f34" : "#245860";
+                      stock === 0 && !hasLowSizes ? "Out of stock" : "Low stock";
+                    const statusColor = stock === 0 && !hasLowSizes ? "#a83f34" : "#245860";
 
                     return (
                       <div
@@ -712,6 +733,7 @@ function AdminDashboard({
                             {statusLabel}
                           </span>
                         </div>
+
                         <div
                           style={{
                             display: "flex",
@@ -723,7 +745,16 @@ function AdminDashboard({
                         >
                           <div style={{ color: "#5e5148", fontSize: "13px" }}>
                             {product.category || "Uncategorized"}
+                            {hasLowSizes ? (
+                              <div style={{ marginTop: 6 }}>
+                                <strong style={{ fontSize: 13 }}>Low sizes:</strong>{" "}
+                                {entry.lowSizes
+                                  .map((s) => `${s.size}(${s.qty})`)
+                                  .join(", ")}
+                              </div>
+                            ) : null}
                           </div>
+
                           <div
                             style={{
                               display: "flex",
@@ -739,9 +770,11 @@ function AdminDashboard({
                             >
                               Edit
                             </button>
-                            <span style={{ color: "#245860", fontWeight: 700 }}>
-                              Stock {stock}
-                            </span>
+                            {!hasLowSizes ? (
+                              <span style={{ color: "#245860", fontWeight: 700 }}>
+                                Stock {stock}
+                              </span>
+                            ) : null}
                           </div>
                         </div>
                       </div>
