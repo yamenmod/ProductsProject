@@ -46,7 +46,7 @@ function AdminDashboard({
   const [vatInput, setVatInput] = useState("0");
   const [vatMessage, setVatMessage] = useState("");
   const [savingVat, setSavingVat] = useState(false);
-  const [maxQtyPerUser, setMaxQtyPerUser] = useState(10);
+  const [maxQtyPerProduct, setMaxQtyPerProduct] = useState(10);
   const [maxQtyInput, setMaxQtyInput] = useState("10");
   const [maxQtyMessage, setMaxQtyMessage] = useState("");
   const [savingMaxQty, setSavingMaxQty] = useState(false);
@@ -231,14 +231,14 @@ function AdminDashboard({
   }, [session?.token]);
 
   useEffect(() => {
-    const loadMaxQtyPerUser = async () => {
+    const loadMaxQtyPerProduct = async () => {
       if (!session?.token) {
         return;
       }
 
       try {
         const response = await axios.get(
-          "/api/admin/settings/max_quantity_per_user",
+          "/api/admin/settings/max_quantity_per_product",
           {
             headers: { Authorization: `Bearer ${session.token}` },
           },
@@ -246,14 +246,14 @@ function AdminDashboard({
 
         const value = Number(response.data?.value || 10);
         const normalized = Number.isFinite(value) && value > 0 ? value : 10;
-        setMaxQtyPerUser(normalized);
+        setMaxQtyPerProduct(normalized);
         setMaxQtyInput(String(normalized));
       } catch (maxQtyError) {
-        console.error("Unable to load max quantity per user:", maxQtyError.message);
+        console.error("Unable to load max quantity per product:", maxQtyError.message);
       }
     };
 
-    loadMaxQtyPerUser();
+    loadMaxQtyPerProduct();
   }, [session?.token]);
 
   const saveVatRate = async () => {
@@ -294,11 +294,11 @@ function AdminDashboard({
     }
   };
 
-  const saveMaxQtyPerUser = async () => {
+  const saveMaxQtyPerProduct = async () => {
     const parsed = Number(maxQtyInput);
 
     if (!Number.isFinite(parsed) || parsed < 1 || parsed > 1000) {
-      setMaxQtyMessage("Max quantity per user must be between 1 and 1000.");
+      setMaxQtyMessage("Max quantity per product must be between 1 and 1000.");
       return;
     }
 
@@ -307,7 +307,7 @@ function AdminDashboard({
       setMaxQtyMessage("");
 
       const response = await axios.put(
-        "/api/admin/settings/max_quantity_per_user",
+        "/api/admin/settings/max_quantity_per_product",
         { value: parsed },
         {
           headers: { Authorization: `Bearer ${session.token}` },
@@ -315,11 +315,11 @@ function AdminDashboard({
       );
 
       const saved = Number(response.data?.value || parsed);
-      setMaxQtyPerUser(saved);
+      setMaxQtyPerProduct(saved);
       setMaxQtyInput(String(saved));
-      setMaxQtyMessage(`Max quantity per user updated to ${saved}.`);
+      setMaxQtyMessage(`Max quantity per product updated to ${saved}.`);
     } catch (saveError) {
-      setMaxQtyMessage(saveError.response?.data?.error || "Unable to update max quantity per user.");
+      setMaxQtyMessage(saveError.response?.data?.error || "Unable to update max quantity per product.");
     } finally {
       setSavingMaxQty(false);
     }
@@ -567,7 +567,7 @@ function AdminDashboard({
                   marginBottom: "6px",
                 }}
               >
-                Max quantity per user
+                Max quantity per product
               </div>
               <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
                 <input
@@ -590,7 +590,7 @@ function AdminDashboard({
                 <button
                   type="button"
                   className="ps-btn ps-btn-primary"
-                  onClick={saveMaxQtyPerUser}
+                  onClick={saveMaxQtyPerProduct}
                   disabled={savingMaxQty}
                   style={{ height: "44px", minWidth: "88px", flex: "0 0 auto" }}
                 >
@@ -608,7 +608,7 @@ function AdminDashboard({
                   marginTop: "6px",
                 }}
               >
-                {maxQtyMessage || `Current limit: ${maxQtyPerUser}`}
+                {maxQtyMessage || `Current limit: ${maxQtyPerProduct}`}
               </div>
             </div>
           </div>

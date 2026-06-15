@@ -41,6 +41,7 @@ function Cart({
   const [isPayPalLoading, setIsPayPalLoading] = useState(false);
   const [vatRate, setVatRate] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
+  const [itemError, setItemError] = useState(null);
 
   const normalizeCartItems = (items = []) =>
     (Array.isArray(items) ? items : []).map((item) => {
@@ -125,21 +126,32 @@ function Cart({
     if (nextQuantity <= 0) {
       setPendingRemoveItem(item);
       setErrorMessage("");
+      setItemError(null);
       return;
     }
 
+    // Clear previous item error when trying to change quantity
+    setItemError(null);
+
     // Check if trying to increase quantity on out-of-stock item
     if (delta > 0 && (item.stock ?? 0) < nextQuantity) {
-      setErrorMessage("This product is out of stock. You've reached the stock limit. We apologize for the inconvenience. Please check back later or contact us for availability updates.");
+      setItemError({
+        itemId: item.id,
+        message: "This product is out of stock. You've reached the stock limit. We apologize for the inconvenience. Please check back later or contact us for availability updates.",
+      });
       return;
     }
 
     try {
       await onUpdateCartQuantity(item.id, nextQuantity, item.size || "");
       setErrorMessage("");
+      setItemError(null);
     } catch (err) {
       const msg = err.response?.data?.message || err.message || "Failed to update quantity";
-      setErrorMessage(msg);
+      setItemError({
+        itemId: item.id,
+        message: msg,
+      });
     }
   };
 
@@ -774,31 +786,21 @@ function Cart({
                           gap: "6px",
                         }}
                       >
-                        {(item.quantity || 1) >= 10 && (
+                        {itemError?.itemId === item.id && (
                           <div
                             style={{
-                              padding: "6px 10px",
+                              padding: "8px 12px",
                               background: "#fff3cd",
                               border: "1px solid #ffc107",
                               borderRadius: "6px",
                               color: "#856404",
-                              fontSize: "11px",
+                              fontSize: "12px",
                               fontWeight: "500",
                               textAlign: "right",
+                              maxWidth: "200px",
                             }}
                           >
-                            For bulk orders, please{" "}
-                            <span
-                              style={{
-                                color: "#245860",
-                                textDecoration: "underline",
-                                cursor: "pointer",
-                              }}
-                              onClick={() => onNavigate("contact")}
-                            >
-                              contact us
-                            </span>
-                            .
+                            {itemError.message}
                           </div>
                         )}
                         <div

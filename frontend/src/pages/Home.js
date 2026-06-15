@@ -22,7 +22,7 @@ function Home({
   onCloseCartSuccessModal,
   showCartErrorModal,
   onCloseCartErrorModal,
-  maxQuantityPerUser = 10,
+  maxQuantityPerProduct = 10,
 }) {
   const [recentProducts, setRecentProducts] = useState([]);
   const [previewProduct, setPreviewProduct] = useState(null);
@@ -665,66 +665,6 @@ function Home({
               </button>
             </div>
           </div>
-        </div>
-      )}
-
-      {cartErrorMessage && (
-        <div
-          style={{
-            maxWidth: "1200px",
-            margin: "20px auto",
-            padding: "16px",
-            background: "#fff3cd",
-            border: "1px solid #ffc107",
-            borderRadius: "8px",
-            color: "#856404",
-            fontSize: "14px",
-            fontWeight: "500",
-            display: "flex",
-            flexDirection: "column",
-            gap: "12px",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "flex-start",
-            }}
-          >
-            <span style={{ flex: 1 }}>{cartErrorMessage}</span>
-            <button
-              onClick={() => {
-                onClearCartErrorMessage();
-                setShowBulkOrderCTA(false);
-              }}
-              style={{
-                background: "none",
-                border: "none",
-                fontSize: "18px",
-                cursor: "pointer",
-                color: "#856404",
-                padding: 0,
-                marginLeft: "8px",
-              }}
-            >
-              ×
-            </button>
-          </div>
-          {showBulkOrderCTA && (
-            <button
-              type="button"
-              className="ps-btn ps-btn-primary"
-              onClick={() => onNavigate("contact")}
-              style={{
-                padding: "10px 16px",
-                fontSize: "13px",
-                alignSelf: "flex-start",
-              }}
-            >
-              Contact us for bulk orders
-            </button>
-          )}
         </div>
       )}
 

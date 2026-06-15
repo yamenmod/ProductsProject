@@ -131,7 +131,7 @@ function App() {
   const [cartErrorMessage, setCartErrorMessage] = useState("");
   const [showCartSuccessModal, setShowCartSuccessModal] = useState(false);
   const [showCartErrorModal, setShowCartErrorModal] = useState(false);
-  const [maxQuantityPerUser, setMaxQuantityPerUser] = useState(10);
+  const [maxQuantityPerProduct, setMaxQuantityPerProduct] = useState(10);
 
   const [paymentSuccess, setPaymentSuccess] = useState(null);
 
@@ -181,17 +181,17 @@ function App() {
 
   useEffect(() => {
 
-    const loadMaxQuantityPerUser = async () => {
+    const loadMaxQuantityPerProduct = async () => {
       try {
-        const response = await axios.get("/api/admin/settings/max_quantity_per_user");
+        const response = await axios.get("/api/admin/settings/max_quantity_per_product");
         const value = Number(response.data?.value || 10);
-        setMaxQuantityPerUser(value);
+        setMaxQuantityPerProduct(value);
       } catch (error) {
-        console.error("Failed to load max quantity per user:", error);
+        console.error("Failed to load max quantity per product:", error);
       }
     };
 
-    loadMaxQuantityPerUser();
+    loadMaxQuantityPerProduct();
 
     const savedSession = localStorage.getItem("session");
 
@@ -1161,7 +1161,7 @@ function App() {
 
         onCloseCartErrorModal={() => setShowCartErrorModal(false)}
 
-        maxQuantityPerUser={maxQuantityPerUser}
+        maxQuantityPerProduct={maxQuantityPerProduct}
 
       />,
 
@@ -1299,7 +1299,7 @@ function App() {
 
         onCloseCartErrorModal={() => setShowCartErrorModal(false)}
 
-        maxQuantityPerUser={maxQuantityPerUser}
+        maxQuantityPerProduct={maxQuantityPerProduct}
 
       />,
 
@@ -1351,7 +1351,7 @@ function App() {
 
         onCloseCartErrorModal={() => setShowCartErrorModal(false)}
 
-        maxQuantityPerUser={maxQuantityPerUser}
+        maxQuantityPerProduct={maxQuantityPerProduct}
 
       />,
 

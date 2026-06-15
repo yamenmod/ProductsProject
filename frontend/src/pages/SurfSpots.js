@@ -23,7 +23,7 @@ function Products({
   onCloseCartSuccessModal,
   showCartErrorModal,
   onCloseCartErrorModal,
-  maxQuantityPerUser = 10,
+  maxQuantityPerProduct = 10,
 }) {
   const slugifyCategory = (value) =>
     (value || "")
@@ -213,7 +213,7 @@ function Products({
   const [previewImageIndex, setPreviewImageIndex] = useState(0);
   const [previewSize, setPreviewSize] = useState("");
   const [cardImageIndices, setCardImageIndices] = useState({});
-  const [maxProducts, setMaxProducts] = useState(maxQuantityPerUser);
+  const [maxProducts, setMaxProducts] = useState(maxQuantityPerProduct);
   const [showBulkOrderCTA, setShowBulkOrderCTA] = useState(false);
   const swipeStartXRef = useRef(null);
 
@@ -696,65 +696,6 @@ function Products({
                   </button>
                 </div>
               </div>
-            </div>
-          )}
-
-          {cartErrorMessage && (
-            <div
-              style={{
-                marginBottom: "20px",
-                padding: "16px",
-                background: "#fff3cd",
-                border: "1px solid #ffc107",
-                borderRadius: "8px",
-                color: "#856404",
-                fontSize: "14px",
-                fontWeight: "500",
-                display: "flex",
-                flexDirection: "column",
-                gap: "12px",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "flex-start",
-                }}
-              >
-                <span style={{ flex: 1 }}>{cartErrorMessage}</span>
-                <button
-                  onClick={() => {
-                    onClearCartErrorMessage();
-                    setShowBulkOrderCTA(false);
-                  }}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    fontSize: "18px",
-                    cursor: "pointer",
-                    color: "#856404",
-                    padding: 0,
-                    marginLeft: "8px",
-                  }}
-                >
-                  ×
-                </button>
-              </div>
-              {showBulkOrderCTA && (
-                <button
-                  type="button"
-                  className="ps-btn ps-btn-primary"
-                  onClick={() => onNavigate("contact")}
-                  style={{
-                    padding: "10px 16px",
-                    fontSize: "13px",
-                    alignSelf: "flex-start",
-                  }}
-                >
-                  Contact us for bulk orders
-                </button>
-              )}
             </div>
           )}
 
