@@ -48,6 +48,7 @@ function SizeCharts({
   onCloseCartSuccessModal,
   showCartErrorModal,
   onCloseCartErrorModal,
+  maxQuantityPerUser = 10,
 }) {
   const [products, setProducts] = useState([]);
   const [previewProduct, setPreviewProduct] = useState(null);

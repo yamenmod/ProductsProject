@@ -22,6 +22,7 @@ function Home({
   onCloseCartSuccessModal,
   showCartErrorModal,
   onCloseCartErrorModal,
+  maxQuantityPerUser = 10,
 }) {
   const [recentProducts, setRecentProducts] = useState([]);
   const [previewProduct, setPreviewProduct] = useState(null);

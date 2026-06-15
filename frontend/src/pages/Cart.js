@@ -787,7 +787,18 @@ function Cart({
                               textAlign: "right",
                             }}
                           >
-                            For bulk orders, please contact us.
+                            For bulk orders, please{" "}
+                            <span
+                              style={{
+                                color: "#245860",
+                                textDecoration: "underline",
+                                cursor: "pointer",
+                              }}
+                              onClick={() => onNavigate("contact")}
+                            >
+                              contact us
+                            </span>
+                            .
                           </div>
                         )}
                         <div

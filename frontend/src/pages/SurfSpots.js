@@ -23,6 +23,7 @@ function Products({
   onCloseCartSuccessModal,
   showCartErrorModal,
   onCloseCartErrorModal,
+  maxQuantityPerUser = 10,
 }) {
   const slugifyCategory = (value) =>
     (value || "")
@@ -212,7 +213,7 @@ function Products({
   const [previewImageIndex, setPreviewImageIndex] = useState(0);
   const [previewSize, setPreviewSize] = useState("");
   const [cardImageIndices, setCardImageIndices] = useState({});
-  const [maxProducts, setMaxProducts] = useState(10);
+  const [maxProducts, setMaxProducts] = useState(maxQuantityPerUser);
   const [showBulkOrderCTA, setShowBulkOrderCTA] = useState(false);
   const swipeStartXRef = useRef(null);
 

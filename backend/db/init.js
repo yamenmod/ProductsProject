@@ -549,6 +549,17 @@ const initDatabase = async () => {
       );
     }
 
+    // Initialize max_quantity_per_user if not already set
+    const [existingMaxQtyPerUser] = await db.query(
+      "SELECT * FROM settings WHERE key_name = 'max_quantity_per_user'",
+    );
+
+    if (!existingMaxQtyPerUser || existingMaxQtyPerUser.length === 0) {
+      await db.query(
+        "INSERT INTO settings (key_name, value) VALUES ('max_quantity_per_user', '10')",
+      );
+    }
+
     console.log("✅ Database initialization complete!");
   } catch (error) {
     console.error("❌ Database initialization failed:", error);

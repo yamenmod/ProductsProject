@@ -131,6 +131,7 @@ function App() {
   const [cartErrorMessage, setCartErrorMessage] = useState("");
   const [showCartSuccessModal, setShowCartSuccessModal] = useState(false);
   const [showCartErrorModal, setShowCartErrorModal] = useState(false);
+  const [maxQuantityPerUser, setMaxQuantityPerUser] = useState(10);
 
   const [paymentSuccess, setPaymentSuccess] = useState(null);
 
@@ -179,6 +180,18 @@ function App() {
   // If a session exists, admin users are taken to the admin dashboard.
 
   useEffect(() => {
+
+    const loadMaxQuantityPerUser = async () => {
+      try {
+        const response = await axios.get("/api/admin/settings/max_quantity_per_user");
+        const value = Number(response.data?.value || 10);
+        setMaxQuantityPerUser(value);
+      } catch (error) {
+        console.error("Failed to load max quantity per user:", error);
+      }
+    };
+
+    loadMaxQuantityPerUser();
 
     const savedSession = localStorage.getItem("session");
 
@@ -1148,6 +1161,8 @@ function App() {
 
         onCloseCartErrorModal={() => setShowCartErrorModal(false)}
 
+        maxQuantityPerUser={maxQuantityPerUser}
+
       />,
 
     );
@@ -1284,6 +1299,8 @@ function App() {
 
         onCloseCartErrorModal={() => setShowCartErrorModal(false)}
 
+        maxQuantityPerUser={maxQuantityPerUser}
+
       />,
 
     );
@@ -1333,6 +1350,8 @@ function App() {
         showCartErrorModal={showCartErrorModal}
 
         onCloseCartErrorModal={() => setShowCartErrorModal(false)}
+
+        maxQuantityPerUser={maxQuantityPerUser}
 
       />,
 
