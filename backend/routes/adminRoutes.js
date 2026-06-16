@@ -43,4 +43,10 @@ router.get("/vat-rate", (req, res) => {
   return getSetting(req, res);
 });
 
+// Public endpoint to get max quantity per product (no auth required)
+router.get("/max-quantity-per-product", (req, res) => {
+  req.params.key = "max_quantity_per_product";
+  return getSetting(req, res);
+});
+
 module.exports = router;

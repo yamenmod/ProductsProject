@@ -183,8 +183,9 @@ function App() {
 
     const loadMaxQuantityPerProduct = async () => {
       try {
-        const response = await axios.get("/api/admin/settings/max_quantity_per_product");
+        const response = await axios.get("/api/admin/max-quantity-per-product");
         const value = Number(response.data?.value || 10);
+        console.log("[App] Loaded maxQuantityPerProduct from API:", value);
         setMaxQuantityPerProduct(value);
       } catch (error) {
         console.error("Failed to load max quantity per product:", error);
@@ -1388,6 +1389,8 @@ function App() {
         onUpdateCartQuantity={handleUpdateCartQuantity}
 
         cartCount={cartCount}
+
+        maxQuantityPerProduct={maxQuantityPerProduct}
 
       />,
 

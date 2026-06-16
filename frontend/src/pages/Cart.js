@@ -31,6 +31,7 @@ function Cart({
   onRemoveFromCart,
   onUpdateCartQuantity,
   cartCount = 0,
+  maxQuantityPerProduct,
 }) {
   const [displayItems, setDisplayItems] = useState(cartItems);
   const [pendingRemoveItem, setPendingRemoveItem] = useState(null);
@@ -42,6 +43,8 @@ function Cart({
   const [vatRate, setVatRate] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [itemError, setItemError] = useState(null);
+
+  console.log("[Cart] maxQuantityPerProduct prop:", maxQuantityPerProduct);
 
   const normalizeCartItems = (items = []) =>
     (Array.isArray(items) ? items : []).map((item) => {
@@ -133,6 +136,15 @@ function Cart({
     // Clear previous item error when trying to change quantity
     setItemError(null);
 
+    // Client-side check for max quantity per product
+    if (delta > 0 && nextQuantity > maxQuantityPerProduct) {
+      setItemError({
+        itemId: item.id,
+        message: `You cannot add more items. The maximum limit per user is ${maxQuantityPerProduct}.`,
+      });
+      return;
+    }
+
     // Check if trying to increase quantity on out-of-stock item
     if (delta > 0 && (item.stock ?? 0) < nextQuantity) {
       setItemError({
@@ -147,7 +159,9 @@ function Cart({
       setErrorMessage("");
       setItemError(null);
     } catch (err) {
+      console.log("[Cart] Quantity update error:", err);
       const msg = err.response?.data?.message || err.message || "Failed to update quantity";
+      console.log("[Cart] Error message:", msg);
       setItemError({
         itemId: item.id,
         message: msg,
