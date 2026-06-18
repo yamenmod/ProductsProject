@@ -12,7 +12,7 @@ const {
   roundMoney,
   getVatRateFromDb,
 } = require("../utils/pricing");
-const { getMaxProductsPerCart, getMaxQuantityPerProduct } = require("../utils/settings");
+const { getMaxQuantityPerCart } = require("../utils/settings");
 const { syncOrderStatusFields } = require("../utils/orderStatus");
 
 // Cart, checkout, payment, and admin order reporting endpoints.
@@ -390,19 +390,6 @@ const getCart = async (req, res) => {
   try {
     const vatRate = await getVatRateFromDb(db);
 
-    // Cleanup expired cart hold orders
-    const connection = await db.getConnection();
-    try {
-      await connection.beginTransaction();
-      await cleanupExpiredCartHoldOrders(connection);
-      await connection.commit();
-    } catch (cleanupError) {
-      await connection.rollback();
-      console.error("[cart:getCart] cleanup error:", cleanupError.message);
-    } finally {
-      connection.release();
-    }
-
     const [rows] = await db.query(
       `
         SELECT
@@ -440,6 +427,9 @@ const getCart = async (req, res) => {
 // Adds an item to the cart or increments its quantity.
 const addToCart = async (req, res) => {
   try {
+    console.log("[ADD_TO_CART] Request body:", req.body);
+    console.log("[ADD_TO_CART] User ID:", req.user?.id);
+
     const vatRate = await getVatRateFromDb(db);
     const { productId, quantity, size } = req.body;
     const sourcePage = req.headers["x-source-page"] || "unknown";
@@ -522,17 +512,17 @@ const addToCart = async (req, res) => {
       );
 
       if (existingItems.length) {
-        // Check max quantity per product (use global setting)
-        const maxQtyPerProduct = await getMaxQuantityPerProduct();
+        // Check max quantity per cart (use global setting)
+        const maxQtyPerCart = await getMaxQuantityPerCart();
         const existingQty = Number(existingItems[0].quantity || 0);
         const newTotalQty = existingQty + qty;
 
-        if (newTotalQty > maxQtyPerProduct) {
+        if (newTotalQty > maxQtyPerCart) {
           await connection.rollback();
           connection.release();
           return res.status(400).json({
-            message: `You cannot add more items. The maximum limit per user is ${maxQtyPerProduct}.`,
-            maxQuantity: maxQtyPerProduct,
+            message: `You cannot add more items. The maximum limit per cart is ${maxQtyPerCart}.`,
+            maxQuantity: maxQtyPerCart,
             currentQuantity: existingQty,
           });
         }
@@ -554,33 +544,33 @@ const addToCart = async (req, res) => {
           [qty, existingItems[0].id],
         );
       } else {
-        // Check max quantity per product on new item (use global setting)
-        const maxQtyPerProduct = await getMaxQuantityPerProduct();
-        if (qty > maxQtyPerProduct) {
+        // Check max quantity per cart (use global setting)
+        const maxQtyPerCart = await getMaxQuantityPerCart();
+        if (qty > maxQtyPerCart) {
           await connection.rollback();
           connection.release();
           return res.status(400).json({
-            message: `You cannot add more items. The maximum limit per user is ${maxQtyPerProduct}.`,
-            maxQuantity: maxQtyPerProduct,
+            message: `You cannot add more items. The maximum limit per cart is ${maxQtyPerCart}.`,
+            maxQuantity: maxQtyPerCart,
             currentQuantity: 0,
           });
         }
 
-        // Check max products per cart limit for new products
-        const maxProducts = await getMaxProductsPerCart();
-        const [distinctProducts] = await connection.query(
-          "SELECT COUNT(DISTINCT product_id) as count FROM cart_items WHERE user_id = ?",
+        // Check total cart quantity limit
+        const [totalQty] = await connection.query(
+          "SELECT SUM(quantity) as total FROM cart_items WHERE user_id = ?",
           [req.user.id],
         );
-        const currentDistinctCount = Number(distinctProducts[0]?.count || 0);
+        const currentTotalQty = Number(totalQty[0]?.total || 0);
+        const newTotalQty = currentTotalQty + qty;
 
-        if (currentDistinctCount >= maxProducts) {
+        if (newTotalQty > maxQtyPerCart) {
           await connection.rollback();
           connection.release();
           return res.status(400).json({
-            message: `You can add up to ${maxProducts} different products to your cart. If you need more products, please contact us.`,
-            maxProducts,
-            currentCount: currentDistinctCount,
+            message: `You can add up to ${maxQtyPerCart} total items to your cart.`,
+            maxQuantity: maxQtyPerCart,
+            currentQuantity: currentTotalQty,
           });
         }
 
@@ -771,14 +761,14 @@ const updateCartQuantity = async (req, res) => {
           return res.status(404).json({ message: "Cart item not found" });
         }
 
-        // Check max quantity per product (use global setting)
-        const maxQtyPerProduct = await getMaxQuantityPerProduct();
-        if (nextQuantity > maxQtyPerProduct) {
+        // Check max quantity per cart (use global setting)
+        const maxQtyPerCart = await getMaxQuantityPerCart();
+        if (nextQuantity > maxQtyPerCart) {
           await connection.rollback();
           connection.release();
           return res.status(400).json({
-            message: `You cannot add more items. The maximum limit per user is ${maxQtyPerProduct}.`,
-            maxQuantity: maxQtyPerProduct,
+            message: `You cannot add more items. The maximum limit per cart is ${maxQtyPerCart}.`,
+            maxQuantity: maxQtyPerCart,
             currentQuantity: nextQuantity,
           });
         }

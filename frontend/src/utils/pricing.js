@@ -20,7 +20,7 @@ const fetchVatRate = async () => {
 
   vatRateFetchPromise = (async () => {
     try {
-      const response = await axios.get("/api/admin/vat-rate");
+      const response = await axios.get("/api/admin/settings/vat_rate");
       console.log("[vat:settings-response]", response.data);
       if (response.data && response.data.value) {
         const rate = parseFloat(response.data.value);

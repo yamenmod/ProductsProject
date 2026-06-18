@@ -38,14 +38,26 @@ router.put("/settings/:key", authMiddleware, adminMiddleware, updateSetting);
 router.get("/orders", authMiddleware, adminMiddleware, getAllOrders);
 
 // Public endpoint to get current VAT rate (no auth required)
-router.get("/vat-rate", (req, res) => {
+router.get("/settings/vat_rate", (req, res) => {
   req.params.key = "vat_rate";
   return getSetting(req, res);
 });
 
-// Public endpoint to get max quantity per product (no auth required)
+// Public endpoint to get max quantity per cart (no auth required)
+router.get("/settings/max_quantity_per_cart", (req, res) => {
+  req.params.key = "max_quantity_per_cart";
+  return getSetting(req, res);
+});
+
+// Legacy endpoint for max quantity per product (redirect to new setting)
 router.get("/max-quantity-per-product", (req, res) => {
-  req.params.key = "max_quantity_per_product";
+  req.params.key = "max_quantity_per_cart";
+  return getSetting(req, res);
+});
+
+// Legacy endpoint for vat rate (redirect to new setting)
+router.get("/vat-rate", (req, res) => {
+  req.params.key = "vat_rate";
   return getSetting(req, res);
 });
 

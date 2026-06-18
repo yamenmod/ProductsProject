@@ -238,7 +238,7 @@ function AdminDashboard({
 
       try {
         const response = await axios.get(
-          "/api/admin/settings/max_quantity_per_product",
+          "/api/admin/settings/max_quantity_per_cart",
           {
             headers: { Authorization: `Bearer ${session.token}` },
           },
@@ -298,7 +298,7 @@ function AdminDashboard({
     const parsed = Number(maxQtyInput);
 
     if (!Number.isFinite(parsed) || parsed < 1 || parsed > 1000) {
-      setMaxQtyMessage("Max quantity per product must be between 1 and 1000.");
+      setMaxQtyMessage("Max quantity per cart must be between 1 and 1000.");
       return;
     }
 
@@ -307,7 +307,7 @@ function AdminDashboard({
       setMaxQtyMessage("");
 
       const response = await axios.put(
-        "/api/admin/settings/max_quantity_per_product",
+        "/api/admin/settings/max_quantity_per_cart",
         { value: parsed },
         {
           headers: { Authorization: `Bearer ${session.token}` },
@@ -317,9 +317,9 @@ function AdminDashboard({
       const saved = Number(response.data?.value || parsed);
       setMaxQtyPerProduct(saved);
       setMaxQtyInput(String(saved));
-      setMaxQtyMessage(`Max quantity per product updated to ${saved}.`);
+      setMaxQtyMessage(`Max quantity per cart updated to ${saved}.`);
     } catch (saveError) {
-      setMaxQtyMessage(saveError.response?.data?.error || "Unable to update max quantity per product.");
+      setMaxQtyMessage(saveError.response?.data?.error || "Unable to update max quantity per cart.");
     } finally {
       setSavingMaxQty(false);
     }

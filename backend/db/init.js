@@ -103,73 +103,14 @@ const initDatabase = async () => {
     );
 
     await db.query(`
-    CREATE TABLE IF NOT EXISTS cart_items (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      user_id INT NOT NULL,
-      product_id INT NOT NULL,
-      size VARCHAR(10) NOT NULL DEFAULT '',
-      quantity INT NOT NULL DEFAULT 1,
-      UNIQUE KEY unique_user_product_size (user_id, product_id, size),
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-      FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
-    )
-  `);
-
-    const [cartTableRows] = await db.query(
-      `
-      SELECT COUNT(*) AS total
-      FROM information_schema.tables
-      WHERE table_schema = DATABASE()
-        AND table_name = 'cart_items'
-    `,
-    );
-
-    if (cartTableRows[0]?.total > 0) {
-      const [cartSizeColumnRows] = await db.query(
-        `
-        SELECT COUNT(*) AS total
-        FROM information_schema.columns
-        WHERE table_schema = DATABASE()
-          AND table_name = 'cart_items'
-          AND column_name = 'size'
-      `,
-      );
-
-      if (cartSizeColumnRows[0]?.total === 0) {
-        await db.query(`
-        ALTER TABLE cart_items
-        ADD COLUMN size VARCHAR(10) NOT NULL DEFAULT '' AFTER product_id
-      `);
-      }
-
-      const [cartUniqueRows] = await db.query(
-        `
-        SELECT COUNT(*) AS total
-        FROM information_schema.statistics
-        WHERE table_schema = DATABASE()
-          AND table_name = 'cart_items'
-          AND index_name = 'unique_user_product_size'
-      `,
-      );
-
-      if (cartUniqueRows[0]?.total === 0) {
-        await db.query(`
-        ALTER TABLE cart_items
-        DROP INDEX unique_user_product,
-        ADD UNIQUE KEY unique_user_product_size (user_id, product_id, size)
-      `);
-      }
-    }
-
-    await db.query(`
     CREATE TABLE IF NOT EXISTS orders (
       id INT AUTO_INCREMENT PRIMARY KEY,
       user_id INT NOT NULL,
       total DECIMAL(10, 2) NOT NULL DEFAULT 0,
       customer_email VARCHAR(255) NULL DEFAULT NULL,
-      status VARCHAR(50) NOT NULL DEFAULT 'cancelled',
-      payment_status VARCHAR(50) NOT NULL DEFAULT 'cancelled',
-      order_status VARCHAR(50) NOT NULL DEFAULT 'cancelled',
+      status VARCHAR(50) NOT NULL DEFAULT 'unsuccessful',
+      payment_status VARCHAR(50) NOT NULL DEFAULT 'unsuccessful',
+      order_status VARCHAR(50) NOT NULL DEFAULT 'unsuccessful',
       paid_at DATETIME NULL DEFAULT NULL,
       cancelled_at DATETIME NULL DEFAULT NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -196,7 +137,7 @@ const initDatabase = async () => {
 
     await db.query(`
       ALTER TABLE orders
-      MODIFY COLUMN status VARCHAR(50) NOT NULL DEFAULT 'cancelled'
+      MODIFY COLUMN status VARCHAR(50) NOT NULL DEFAULT 'unsuccessful'
     `);
 
     // Ensure payment_status and order_status exist and are normalized
@@ -205,7 +146,9 @@ const initDatabase = async () => {
     );
 
     if (paymentStatusColumn[0]?.total === 0) {
-      await db.query(`ALTER TABLE orders ADD COLUMN payment_status VARCHAR(50) NOT NULL DEFAULT 'cancelled'`);
+      await db.query(`ALTER TABLE orders ADD COLUMN payment_status VARCHAR(50) NOT NULL DEFAULT 'unsuccessful'`);
+    } else {
+      await db.query(`ALTER TABLE orders MODIFY COLUMN payment_status VARCHAR(50) NOT NULL DEFAULT 'unsuccessful'`);
     }
 
     const [orderStatusColumn] = await db.query(
@@ -213,7 +156,9 @@ const initDatabase = async () => {
     );
 
     if (orderStatusColumn[0]?.total === 0) {
-      await db.query(`ALTER TABLE orders ADD COLUMN order_status VARCHAR(50) NOT NULL DEFAULT 'cancelled'`);
+      await db.query(`ALTER TABLE orders ADD COLUMN order_status VARCHAR(50) NOT NULL DEFAULT 'unsuccessful'`);
+    } else {
+      await db.query(`ALTER TABLE orders MODIFY COLUMN order_status VARCHAR(50) NOT NULL DEFAULT 'unsuccessful'`);
     }
 
     const [paidAtColumn] = await db.query(
@@ -235,9 +180,27 @@ const initDatabase = async () => {
     await db.query(`
       UPDATE orders
       SET status = CASE
-        WHEN LOWER(TRIM(status)) IN ('paid', 'completed', 'success', 'successful') THEN 'success'
-        WHEN LOWER(TRIM(status)) IN ('failed', 'failure', 'error', 'canceled', 'cancelled', 'cancel') THEN 'cancelled'
-        ELSE 'cancelled'
+        WHEN LOWER(TRIM(status)) IN ('paid', 'completed', 'success', 'successful') THEN 'successful'
+        WHEN LOWER(TRIM(status)) IN ('failed', 'failure', 'error', 'canceled', 'cancelled', 'cancel', 'unsuccessful') THEN 'unsuccessful'
+        ELSE 'unsuccessful'
+      END
+    `);
+
+    await db.query(`
+      UPDATE orders
+      SET payment_status = CASE
+        WHEN LOWER(TRIM(payment_status)) IN ('paid', 'completed', 'success', 'successful') THEN 'paid'
+        WHEN LOWER(TRIM(payment_status)) IN ('failed', 'failure', 'error', 'canceled', 'cancelled', 'cancel', 'unsuccessful') THEN 'unsuccessful'
+        ELSE 'unsuccessful'
+      END
+    `);
+
+    await db.query(`
+      UPDATE orders
+      SET order_status = CASE
+        WHEN LOWER(TRIM(order_status)) IN ('paid', 'completed', 'success', 'successful') THEN 'successful'
+        WHEN LOWER(TRIM(order_status)) IN ('failed', 'failure', 'error', 'canceled', 'cancelled', 'cancel', 'unsuccessful') THEN 'unsuccessful'
+        ELSE 'unsuccessful'
       END
     `);
 
@@ -255,15 +218,6 @@ const initDatabase = async () => {
   `);
 
     await db.query(`
-      UPDATE payments
-      SET status = CASE
-        WHEN LOWER(TRIM(status)) IN ('paid', 'completed', 'success', 'successful') THEN 'success'
-        WHEN LOWER(TRIM(status)) IN ('failed', 'failure', 'error', 'canceled', 'cancelled', 'cancel') THEN 'cancelled'
-        ELSE 'cancelled'
-      END
-    `);
-
-    await db.query(`
     CREATE TABLE IF NOT EXISTS payments (
       id INT AUTO_INCREMENT PRIMARY KEY,
       user_id INT NOT NULL,
@@ -278,6 +232,15 @@ const initDatabase = async () => {
       FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE SET NULL
     )
   `);
+
+    await db.query(`
+      UPDATE payments
+      SET status = CASE
+        WHEN LOWER(TRIM(status)) IN ('paid', 'completed', 'success', 'successful') THEN 'paid'
+        WHEN LOWER(TRIM(status)) IN ('failed', 'failure', 'error', 'canceled', 'cancelled', 'cancel', 'unsuccessful') THEN 'unsuccessful'
+        ELSE 'unsuccessful'
+      END
+    `);
 
     const [productTableRows] = await db.query(
       `
@@ -467,7 +430,6 @@ const initDatabase = async () => {
       description TEXT NULL,
       price DECIMAL(10, 2) NOT NULL DEFAULT 0,
       stock INT NOT NULL DEFAULT 0,
-      max_quantity_per_user INT NOT NULL DEFAULT 10,
       category_id INT NULL,
       gender ENUM('male', 'female', 'unisex') NOT NULL DEFAULT 'unisex',
       image_url MEDIUMTEXT NULL,
@@ -485,23 +447,65 @@ const initDatabase = async () => {
   `);
     console.log("✅ Products table verified/created");
 
-    // Ensure max_quantity_per_user column exists (for existing tables)
-    const [maxQtyColumnRows] = await db.query(
+    // Create cart_items table after products table exists
+    await db.query(`
+    CREATE TABLE IF NOT EXISTS cart_items (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT NOT NULL,
+      product_id INT NOT NULL,
+      size VARCHAR(10) NOT NULL DEFAULT '',
+      quantity INT NOT NULL DEFAULT 1,
+      UNIQUE KEY unique_user_product_size (user_id, product_id, size),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+    )
+  `);
+    console.log("✅ Cart items table verified/created");
+
+    const [cartTableRows] = await db.query(
       `
       SELECT COUNT(*) AS total
-      FROM information_schema.columns
+      FROM information_schema.tables
       WHERE table_schema = DATABASE()
-        AND table_name = 'products'
-        AND column_name = 'max_quantity_per_user'
-      `,
+        AND table_name = 'cart_items'
+    `,
     );
 
-    if (maxQtyColumnRows[0]?.total === 0) {
-      await db.query(`
-      ALTER TABLE products
-      ADD COLUMN max_quantity_per_user INT NOT NULL DEFAULT 10
-    `);
-      console.log("✅ max_quantity_per_user column added");
+    if (cartTableRows[0]?.total > 0) {
+      const [cartSizeColumnRows] = await db.query(
+        `
+        SELECT COUNT(*) AS total
+        FROM information_schema.columns
+        WHERE table_schema = DATABASE()
+          AND table_name = 'cart_items'
+          AND column_name = 'size'
+      `,
+      );
+
+      if (cartSizeColumnRows[0]?.total === 0) {
+        await db.query(`
+        ALTER TABLE cart_items
+        ADD COLUMN size VARCHAR(10) NOT NULL DEFAULT '' AFTER product_id
+      `);
+      }
+
+      const [cartUniqueRows] = await db.query(
+        `
+        SELECT COUNT(*) AS total
+        FROM information_schema.statistics
+        WHERE table_schema = DATABASE()
+          AND table_name = 'cart_items'
+          AND index_name = 'unique_user_product_size'
+      `,
+      );
+
+      if (cartUniqueRows[0]?.total === 0) {
+        await db.query(`
+        ALTER TABLE cart_items
+        DROP INDEX unique_user_product,
+        ADD UNIQUE KEY unique_user_product_size (user_id, product_id, size)
+      `);
+      }
     }
 
     // Create settings table for VAT and other configs
@@ -527,25 +531,14 @@ const initDatabase = async () => {
       );
     }
 
-    // Initialize max_products_per_cart if not already set
-    const [existingMaxProducts] = await db.query(
-      "SELECT * FROM settings WHERE key_name = 'max_products_per_cart'",
+    // Initialize max_quantity_per_cart if not already set
+    const [existingMaxQtyCart] = await db.query(
+      "SELECT * FROM settings WHERE key_name = 'max_quantity_per_cart'",
     );
 
-    if (!existingMaxProducts || existingMaxProducts.length === 0) {
+    if (!existingMaxQtyCart || existingMaxQtyCart.length === 0) {
       await db.query(
-        "INSERT INTO settings (key_name, value) VALUES ('max_products_per_cart', '10')",
-      );
-    }
-
-    // Initialize max_quantity_per_product if not already set
-    const [existingMaxQty] = await db.query(
-      "SELECT * FROM settings WHERE key_name = 'max_quantity_per_product'",
-    );
-
-    if (!existingMaxQty || existingMaxQty.length === 0) {
-      await db.query(
-        "INSERT INTO settings (key_name, value) VALUES ('max_quantity_per_product', '10')",
+        "INSERT INTO settings (key_name, value) VALUES ('max_quantity_per_cart', '10')",
       );
     }
 
