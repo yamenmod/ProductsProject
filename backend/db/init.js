@@ -177,10 +177,19 @@ const initDatabase = async () => {
       await db.query(`ALTER TABLE orders ADD COLUMN cancelled_at DATETIME NULL DEFAULT NULL`);
     }
 
+    const [completedAtColumn] = await db.query(
+      `SELECT COUNT(*) AS total FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'orders' AND column_name = 'completed_at'`,
+    );
+
+    if (completedAtColumn[0]?.total === 0) {
+      await db.query(`ALTER TABLE orders ADD COLUMN completed_at DATETIME NULL DEFAULT NULL`);
+    }
+
     await db.query(`
       UPDATE orders
       SET status = CASE
-        WHEN LOWER(TRIM(status)) IN ('paid', 'completed', 'success', 'successful') THEN 'successful'
+        WHEN LOWER(TRIM(status)) = 'completed' THEN 'completed'
+        WHEN LOWER(TRIM(status)) IN ('paid', 'success', 'successful') THEN 'successful'
         WHEN LOWER(TRIM(status)) IN ('failed', 'failure', 'error', 'canceled', 'cancelled', 'cancel', 'unsuccessful') THEN 'unsuccessful'
         ELSE 'unsuccessful'
       END
@@ -189,7 +198,8 @@ const initDatabase = async () => {
     await db.query(`
       UPDATE orders
       SET payment_status = CASE
-        WHEN LOWER(TRIM(payment_status)) IN ('paid', 'completed', 'success', 'successful') THEN 'paid'
+        WHEN LOWER(TRIM(payment_status)) = 'completed' THEN 'paid'
+        WHEN LOWER(TRIM(payment_status)) IN ('paid', 'success', 'successful') THEN 'paid'
         WHEN LOWER(TRIM(payment_status)) IN ('failed', 'failure', 'error', 'canceled', 'cancelled', 'cancel', 'unsuccessful') THEN 'unsuccessful'
         ELSE 'unsuccessful'
       END
@@ -198,7 +208,8 @@ const initDatabase = async () => {
     await db.query(`
       UPDATE orders
       SET order_status = CASE
-        WHEN LOWER(TRIM(order_status)) IN ('paid', 'completed', 'success', 'successful') THEN 'successful'
+        WHEN LOWER(TRIM(order_status)) = 'completed' THEN 'completed'
+        WHEN LOWER(TRIM(order_status)) IN ('paid', 'success', 'successful') THEN 'successful'
         WHEN LOWER(TRIM(order_status)) IN ('failed', 'failure', 'error', 'canceled', 'cancelled', 'cancel', 'unsuccessful') THEN 'unsuccessful'
         ELSE 'unsuccessful'
       END

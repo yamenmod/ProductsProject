@@ -38,8 +38,8 @@ function AdminDashboard({
     return `${year}-${month}-${day}`;
   };
 
-  const [dateFrom, setDateFrom] = useState(getLastMonthInputValue);
-  const [dateTo, setDateTo] = useState(getTodayInputValue);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [vatRatePercent, setVatRatePercent] = useState(0);
@@ -81,17 +81,18 @@ function AdminDashboard({
   }, [orders, dateFrom, dateTo]);
 
   const filteredSummary = useMemo(() => {
-    const summary = { success: 0, cancelled: 0 };
+    const summary = { success: 0, cancelled: 0, completed: 0 };
 
-    filteredOrders.forEach((order) => {
+    orders.forEach((order) => {
       summary[getOrderBucket(order)] += 1;
     });
 
     return {
       success: summary.success,
       cancelled: summary.cancelled,
+      completed: summary.completed,
     };
-  }, [filteredOrders]);
+  }, [orders]);
 
   const statusChartData = useMemo(
     () => [
@@ -106,6 +107,12 @@ function AdminDashboard({
         label: ORDER_STATUS_LABELS.cancelled,
         value: filteredSummary.cancelled,
         color: statusColors.cancelled,
+      },
+      {
+        key: "completed",
+        label: ORDER_STATUS_LABELS.completed,
+        value: filteredSummary.completed,
+        color: statusColors.success,
       },
     ],
     [filteredSummary],
@@ -359,6 +366,13 @@ function AdminDashboard({
       value: filteredSummary.cancelled,
       color: statusColors.cancelled,
       filter: "cancelled",
+    },
+    {
+      key: "completed",
+      label: ORDER_STATUS_LABELS.completed,
+      value: filteredSummary.completed,
+      color: statusColors.success,
+      filter: "completed",
     },
   ];
 

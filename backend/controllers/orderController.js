@@ -193,9 +193,42 @@ const getAllOrders = async (req, res) => {
   }
 };
 
+// Marks an order as completed (admin only)
+const markAsCompleted = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+
+    if (!orderId) {
+      return res.status(400).json({ message: "Order ID is required" });
+    }
+
+    const [orders] = await db.query(
+      "SELECT id FROM orders WHERE id = ? LIMIT 1",
+      [orderId],
+    );
+
+    if (!orders.length) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    await db.query(
+      "UPDATE orders SET status = 'completed', order_status = 'completed', completed_at = NOW() WHERE id = ?",
+      [orderId],
+    );
+
+    console.log(`[orders:markAsCompleted] Order ${orderId} marked as completed`);
+
+    return res.status(200).json({ message: "Order marked as completed" });
+  } catch (error) {
+    console.error("[orders:markAsCompleted]", error.message || error);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
 module.exports = {
   getMyOrders,
   paySuccess,
   cancel,
   getAllOrders,
+  markAsCompleted,
 };

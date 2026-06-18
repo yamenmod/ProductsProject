@@ -1,6 +1,7 @@
 export const ORDER_STATUS_LABELS = {
   success: "Successful",
-  cancelled: "Cancel",
+  cancelled: "Cancelled",
+  completed: "Completed",
 };
 
 const normalizeStatus = (value) =>
@@ -9,7 +10,11 @@ const normalizeStatus = (value) =>
 export const getOrderBucket = (order) => {
   const status = normalizeStatus(order?.status || order?.order_status);
 
-  if (["paid", "success", "successful", "completed"].includes(status)) {
+  if (status === "completed") {
+    return "completed";
+  }
+
+  if (["paid", "success", "successful"].includes(status)) {
     return "success";
   }
 

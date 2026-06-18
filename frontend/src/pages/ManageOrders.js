@@ -158,7 +158,7 @@ function ManageOrders({
   }, [orders, searchTerm, selectedFilter, getOrderBucket, dateFrom, dateTo]);
 
   const summary = useMemo(() => {
-    const counts = { success: 0, cancelled: 0 };
+    const counts = { success: 0, cancelled: 0, completed: 0 };
 
     orders.forEach((order) => {
       counts[getOrderBucket(order)] += 1;
@@ -385,6 +385,11 @@ function ManageOrders({
                 label: ORDER_STATUS_LABELS.cancelled,
                 value: summary.cancelled,
                 bucket: "cancelled",
+              },
+              {
+                label: ORDER_STATUS_LABELS.completed,
+                value: summary.completed,
+                bucket: "completed",
               },
             ].map((item) => (
               <button
@@ -981,6 +986,44 @@ function ManageOrders({
                         </span>
                       </div>
                     </div>
+
+                    {/* Action Buttons */}
+                    {getOrderBucket(selectedOrderDetail.order) === "success" && (
+                      <div style={{ marginTop: "24px" }}>
+                        <button
+                          type="button"
+                          className="ps-btn ps-btn-primary"
+                          onClick={async () => {
+                            try {
+                              await axios.patch(
+                                `/api/admin/orders/${selectedOrderDetail.order.id}/complete`,
+                                {},
+                                {
+                                  headers: {
+                                    Authorization: `Bearer ${session.token}`,
+                                  },
+                                },
+                              );
+                              alert("Order marked as completed");
+                              setSelectedOrderDetail(null);
+                              // Refresh orders
+                              const response = await axios.get("/api/cart/admin/orders", {
+                                headers: {
+                                  Authorization: `Bearer ${session.token}`,
+                                },
+                              });
+                              setOrders(response.data);
+                            } catch (error) {
+                              console.error("Failed to mark order as completed:", error);
+                              alert("Failed to mark order as completed");
+                            }
+                          }}
+                          style={{ width: "100%" }}
+                        >
+                          Mark as Completed
+                        </button>
+                      </div>
+                    )}
                   </>
                 )}
               </div>

@@ -10,7 +10,7 @@ const {
   getAllSettings,
   updateSetting,
 } = require("../controllers/settingsController");
-const { getAllOrders } = require("../controllers/orderController");
+const { getAllOrders, markAsCompleted } = require("../controllers/orderController");
 
 const router = express.Router();
 
@@ -36,6 +36,7 @@ router.put("/settings/:key", authMiddleware, adminMiddleware, updateSetting);
 
 // Admin orders overview
 router.get("/orders", authMiddleware, adminMiddleware, getAllOrders);
+router.patch("/orders/:orderId/complete", authMiddleware, adminMiddleware, markAsCompleted);
 
 // Public endpoint to get current VAT rate (no auth required)
 router.get("/settings/vat_rate", (req, res) => {

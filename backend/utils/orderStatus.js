@@ -1,6 +1,7 @@
 const ORDER_STATUS = {
   SUCCESS: "success",
   CANCELLED: "cancelled",
+  COMPLETED: "completed",
 };
 
 const CART_HOLD_PAYMENT_STATUS = "cart_hold";
@@ -11,7 +12,15 @@ const normalizeStatus = (value) =>
 const syncOrderStatusFields = (status) => {
   const normalized = normalizeStatus(status);
 
-  if (["paid", "success", "successful", "completed"].includes(normalized)) {
+  if (normalized === "completed") {
+    return {
+      status: ORDER_STATUS.COMPLETED,
+      order_status: ORDER_STATUS.COMPLETED,
+      payment_status: "paid",
+    };
+  }
+
+  if (["paid", "success", "successful"].includes(normalized)) {
     return {
       status: ORDER_STATUS.SUCCESS,
       order_status: ORDER_STATUS.SUCCESS,
