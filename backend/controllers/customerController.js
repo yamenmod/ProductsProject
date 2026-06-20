@@ -27,6 +27,7 @@ const getCustomers = async (req, res) => {
 
 // Deletes a non-admin customer account from the users table.
 // Admin accounts are protected so the current operator cannot remove themselves.
+// Orders related to the customer are preserved by setting user_id to NULL.
 const deleteCustomer = async (req, res) => {
   try {
     // Reject missing or self-targeted deletes before touching the database.
@@ -53,6 +54,13 @@ const deleteCustomer = async (req, res) => {
       return res.status(400).json({ message: "Admin accounts cannot be deleted" });
     }
 
+    // Set user_id to NULL in all orders for this user to preserve order history
+    await db.query(
+      "UPDATE orders SET user_id = NULL WHERE user_id = ?",
+      [userId],
+    );
+
+    // Now delete the user
     await db.query("DELETE FROM users WHERE id = ?", [userId]);
 
     return res.status(200).json({ message: "Customer deleted successfully" });

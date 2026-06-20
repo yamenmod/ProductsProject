@@ -28,6 +28,13 @@ const deleteUser = async (req, res) => {
         .json({ message: "You cannot delete the logged-in admin account" });
     }
 
+    // Set user_id to NULL in all orders for this user to preserve order history
+    await db.query(
+      "UPDATE orders SET user_id = NULL WHERE user_id = ?",
+      [userId],
+    );
+
+    // Now delete the user
     const [result] = await db.query("DELETE FROM users WHERE id = ?", [userId]);
 
     if (!result.affectedRows) {

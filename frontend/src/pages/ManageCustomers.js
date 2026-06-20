@@ -17,6 +17,9 @@ function ManageCustomers({
   const [error, setError] = useState("");
   const [actionMessage, setActionMessage] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [pendingUserId, setPendingUserId] = useState(null);
+  const [pendingUsername, setPendingUsername] = useState("");
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
@@ -91,6 +94,38 @@ function ManageCustomers({
           deleteError.message ||
           "Unable to remove customer",
       );
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (pendingUserId === session.user.id) {
+      setActionMessage("You cannot delete your own admin account.");
+      setShowConfirmModal(false);
+      setPendingUserId(null);
+      setPendingUsername("");
+      return;
+    }
+
+    try {
+      await axios.delete(`/api/admin/users/${pendingUserId}`, {
+        headers: {
+          Authorization: `Bearer ${session.token}`,
+        },
+      });
+      setActionMessage("Customer removed successfully.");
+      setShowConfirmModal(false);
+      setPendingUserId(null);
+      setPendingUsername("");
+      loadUsers();
+    } catch (deleteError) {
+      setActionMessage(
+        deleteError.response?.data?.message ||
+          deleteError.message ||
+          "Unable to remove customer",
+      );
+      setShowConfirmModal(false);
+      setPendingUserId(null);
+      setPendingUsername("");
     }
   };
 
@@ -183,7 +218,11 @@ function ManageCustomers({
                           type="button"
                           className="ps-btn ps-btn-secondary"
                           disabled={user.id === session.user.id}
-                          onClick={() => handleDelete(user.id)}
+                          onClick={() => {
+                            setPendingUserId(user.id);
+                            setPendingUsername(user.username);
+                            setShowConfirmModal(true);
+                          }}
                           style={{ fontSize: "12px" }}
                         >
                           {user.id === session.user.id ? "Current admin" : "Delete"}
@@ -202,6 +241,47 @@ function ManageCustomers({
           </div>
         </div>
       </main>
+
+      {/* Confirmation Modal */}
+      {showConfirmModal && (
+        <div
+          className="ps-cartConfirmBackdrop"
+          onClick={() => setShowConfirmModal(false)}
+        >
+          <div
+            className="ps-cartConfirmCard"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Confirm delete user"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 className="ps-cartConfirmTitle">Delete Customer?</h2>
+            <p className="ps-cartConfirmText">
+              Are you sure you want to delete {pendingUsername}? This action cannot be undone.
+            </p>
+            <div className="ps-cartConfirmActions">
+              <button
+                type="button"
+                className="ps-btn ps-cartConfirmCancel"
+                onClick={() => {
+                  setShowConfirmModal(false);
+                  setPendingUserId(null);
+                  setPendingUsername("");
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="ps-btn ps-cartConfirmDelete"
+                onClick={handleConfirmDelete}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <Footer />
     </div>
