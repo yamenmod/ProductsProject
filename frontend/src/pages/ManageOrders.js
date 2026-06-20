@@ -48,6 +48,10 @@ function ManageOrders({
   const [selectedFilter, setSelectedFilter] = useState(initialFilter || "all");
   const [selectedOrderDetail, setSelectedOrderDetail] = useState(null);
   const [loadingOrderDetail, setLoadingOrderDetail] = useState(false);
+  const [showCompletionModal, setShowCompletionModal] = useState(false);
+  const [completedOrderId, setCompletedOrderId] = useState(null);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [pendingOrderId, setPendingOrderId] = useState(null);
   const neutralFilterTone = {
     background: "rgba(255, 250, 242, 0.88)",
     color: "#1f1813",
@@ -110,6 +114,37 @@ function ManageOrders({
 
   const handleOrderRowClick = (order) => {
     loadOrderDetail(order.id);
+  };
+
+  const handleMarkAsCompleted = async (orderId) => {
+    try {
+      await axios.patch(
+        `/api/admin/orders/${orderId}/complete`,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${session.token}`,
+          },
+        },
+      );
+      setCompletedOrderId(orderId);
+      setShowCompletionModal(true);
+      setShowConfirmModal(false);
+      setPendingOrderId(null);
+      setSelectedOrderDetail(null);
+      // Refresh orders
+      const response = await axios.get("/api/cart/admin/orders", {
+        headers: {
+          Authorization: `Bearer ${session.token}`,
+        },
+      });
+      setOrders(response.data);
+    } catch (error) {
+      console.error("Failed to mark order as completed:", error);
+      alert("Failed to mark order as completed");
+      setShowConfirmModal(false);
+      setPendingOrderId(null);
+    }
   };
 
   const selectedVatPercent = Math.round(
@@ -501,6 +536,7 @@ function ManageOrders({
                     <th style={{ padding: "12px 10px" }}>Total</th>
                     <th style={{ padding: "12px 10px" }}>Payment</th>
                     <th style={{ padding: "12px 10px" }}>Date</th>
+                    <th style={{ padding: "12px 10px" }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -576,6 +612,26 @@ function ManageOrders({
                           }}
                         >
                           {formatDate(order.createdAt || order.created_at)}
+                        </td>
+                        <td style={{ padding: "14px 10px" }}>
+                          {bucket === "success" && (
+                            <button
+                              type="button"
+                              className="ps-btn ps-btn-primary"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setPendingOrderId(order.id);
+                                setShowConfirmModal(true);
+                              }}
+                              style={{
+                                padding: "6px 12px",
+                                fontSize: "11px",
+                                height: "auto",
+                              }}
+                            >
+                              Mark as Completed
+                            </button>
+                          )}
                         </td>
                       </tr>
                     );
@@ -993,30 +1049,9 @@ function ManageOrders({
                         <button
                           type="button"
                           className="ps-btn ps-btn-primary"
-                          onClick={async () => {
-                            try {
-                              await axios.patch(
-                                `/api/admin/orders/${selectedOrderDetail.order.id}/complete`,
-                                {},
-                                {
-                                  headers: {
-                                    Authorization: `Bearer ${session.token}`,
-                                  },
-                                },
-                              );
-                              alert("Order marked as completed");
-                              setSelectedOrderDetail(null);
-                              // Refresh orders
-                              const response = await axios.get("/api/cart/admin/orders", {
-                                headers: {
-                                  Authorization: `Bearer ${session.token}`,
-                                },
-                              });
-                              setOrders(response.data);
-                            } catch (error) {
-                              console.error("Failed to mark order as completed:", error);
-                              alert("Failed to mark order as completed");
-                            }
+                          onClick={() => {
+                            setPendingOrderId(selectedOrderDetail.order.id);
+                            setShowConfirmModal(true);
                           }}
                           style={{ width: "100%" }}
                         >
@@ -1030,6 +1065,79 @@ function ManageOrders({
             </div>
           </div>
         </>
+      )}
+
+      {/* Confirmation Modal */}
+      {showConfirmModal && (
+        <div
+          className="ps-cartConfirmBackdrop"
+          onClick={() => setShowConfirmModal(false)}
+        >
+          <div
+            className="ps-cartConfirmCard"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Confirm mark as completed"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 className="ps-cartConfirmTitle">Mark Order as Completed?</h2>
+            <p className="ps-cartConfirmText">
+              Are you sure you want to mark order #{pendingOrderId} as completed?
+            </p>
+            <div className="ps-cartConfirmActions">
+              <button
+                type="button"
+                className="ps-btn ps-cartConfirmCancel"
+                onClick={() => {
+                  setShowConfirmModal(false);
+                  setPendingOrderId(null);
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="ps-btn ps-cartConfirmDelete"
+                onClick={() => handleMarkAsCompleted(pendingOrderId)}
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Order Completion Confirmation Modal */}
+      {showCompletionModal && (
+        <div
+          className="ps-cartConfirmBackdrop"
+          onClick={() => setShowCompletionModal(false)}
+        >
+          <div
+            className="ps-cartConfirmCard"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Order completed"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <p className="ps-pill" style={{ margin: 0, width: "fit-content" }}>
+              Success
+            </p>
+            <h2 className="ps-cartConfirmTitle">Order Completed</h2>
+            <p className="ps-cartConfirmText">
+              Order #{completedOrderId} has been successfully marked as completed.
+            </p>
+            <div className="ps-cartConfirmActions">
+              <button
+                type="button"
+                className="ps-btn ps-cartConfirmDelete"
+                onClick={() => setShowCompletionModal(false)}
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       <Footer />

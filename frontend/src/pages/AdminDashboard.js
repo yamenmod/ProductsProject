@@ -38,8 +38,8 @@ function AdminDashboard({
     return `${year}-${month}-${day}`;
   };
 
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const [dateFrom, setDateFrom] = useState(getLastMonthInputValue());
+  const [dateTo, setDateTo] = useState(getTodayInputValue());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [vatRatePercent, setVatRatePercent] = useState(0);
@@ -112,7 +112,7 @@ function AdminDashboard({
         key: "completed",
         label: ORDER_STATUS_LABELS.completed,
         value: filteredSummary.completed,
-        color: statusColors.success,
+        color: statusColors.completed,
       },
     ],
     [filteredSummary],
@@ -371,7 +371,7 @@ function AdminDashboard({
       key: "completed",
       label: ORDER_STATUS_LABELS.completed,
       value: filteredSummary.completed,
-      color: statusColors.success,
+      color: statusColors.completed,
       filter: "completed",
     },
   ];
@@ -443,10 +443,10 @@ function AdminDashboard({
               display: "flex",
               flexWrap: "wrap",
               gap: "16px",
-              alignItems: "center",
+              alignItems: "flex-end",
             }}
           >
-            <div style={{ minWidth: "180px", flex: "0 0 auto" }}>
+            <div style={{ minWidth: "180px", flex: "1 1 180px" }}>
               <div
                 style={{
                   color: "#65574d",
@@ -475,7 +475,7 @@ function AdminDashboard({
                 }}
               />
             </div>
-            <div style={{ minWidth: "180px", flex: "0 0 auto" }}>
+            <div style={{ minWidth: "180px", flex: "1 1 180px" }}>
               <div
                 style={{
                   color: "#65574d",
@@ -515,116 +515,6 @@ function AdminDashboard({
             >
               Clear range
             </button>
-            <div style={{ minWidth: "220px", flex: "1 1 220px" }}>
-              <div
-                style={{
-                  color: "#65574d",
-                  fontSize: "12px",
-                  fontWeight: 800,
-                  letterSpacing: "1px",
-                  textTransform: "uppercase",
-                  marginBottom: "6px",
-                }}
-              >
-                VAT (%)
-              </div>
-              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                <input
-                  type="number"
-                  min="1"
-                  max="99"
-                  value={vatInput}
-                  onChange={(event) => setVatInput(event.target.value)}
-                  style={{
-                    flex: 1,
-                    padding: "11px 12px",
-                    borderRadius: "12px",
-                    border: "1px solid rgba(31, 24, 19, 0.14)",
-                    background: "rgba(255, 250, 242, 0.95)",
-                    fontSize: "13px",
-                    height: "44px",
-                    boxSizing: "border-box",
-                  }}
-                />
-                <button
-                  type="button"
-                  className="ps-btn ps-btn-primary"
-                  onClick={saveVatRate}
-                  disabled={savingVat}
-                  style={{ height: "44px", minWidth: "88px", flex: "0 0 auto" }}
-                >
-                  {savingVat ? "Saving" : "Save"}
-                </button>
-              </div>
-              <div
-                style={{
-                  fontSize: "12px",
-                  color: vatMessage
-                    ? vatMessage.includes("updated")
-                      ? "#245860"
-                      : "#a83f34"
-                    : "#65574d",
-                  marginTop: "6px",
-                }}
-              >
-                {vatMessage || `Current VAT: ${vatRatePercent}%`}
-              </div>
-            </div>
-            <div style={{ minWidth: "220px", flex: "1 1 220px" }}>
-              <div
-                style={{
-                  color: "#65574d",
-                  fontSize: "12px",
-                  fontWeight: 800,
-                  letterSpacing: "1px",
-                  textTransform: "uppercase",
-                  marginBottom: "6px",
-                }}
-              >
-                Max quantity per product
-              </div>
-              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                <input
-                  type="number"
-                  min="1"
-                  max="1000"
-                  value={maxQtyInput}
-                  onChange={(event) => setMaxQtyInput(event.target.value)}
-                  style={{
-                    flex: 1,
-                    padding: "11px 12px",
-                    borderRadius: "12px",
-                    border: "1px solid rgba(31, 24, 19, 0.14)",
-                    background: "rgba(255, 250, 242, 0.95)",
-                    fontSize: "13px",
-                    height: "44px",
-                    boxSizing: "border-box",
-                  }}
-                />
-                <button
-                  type="button"
-                  className="ps-btn ps-btn-primary"
-                  onClick={saveMaxQtyPerProduct}
-                  disabled={savingMaxQty}
-                  style={{ height: "44px", minWidth: "88px", flex: "0 0 auto" }}
-                >
-                  {savingMaxQty ? "Saving" : "Save"}
-                </button>
-              </div>
-              <div
-                style={{
-                  fontSize: "12px",
-                  color: maxQtyMessage
-                    ? maxQtyMessage.includes("updated")
-                      ? "#245860"
-                      : "#a83f34"
-                    : "#65574d",
-                  marginTop: "6px",
-                }}
-              >
-                {maxQtyMessage || `Current limit: ${maxQtyPerProduct}`}
-              </div>
-            </div>
           </div>
 
           <div
@@ -942,6 +832,129 @@ function AdminDashboard({
                   <p style={{ margin: 0, color: "#991b1b" }}>{error}</p>
                 </div>
               ) : null}
+            </div>
+          </div>
+
+          <div
+            className="ps-surface"
+            style={{
+              padding: "18px 20px",
+              marginTop: "24px",
+              display: "flex",
+              flexWrap: "wrap",
+              gap: "16px",
+              alignItems: "center",
+            }}
+          >
+            <div style={{ minWidth: "220px", flex: "1 1 220px" }}>
+              <div
+                style={{
+                  color: "#65574d",
+                  fontSize: "12px",
+                  fontWeight: 800,
+                  letterSpacing: "1px",
+                  textTransform: "uppercase",
+                  marginBottom: "6px",
+                }}
+              >
+                VAT (%)
+              </div>
+              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                <input
+                  type="number"
+                  min="1"
+                  max="99"
+                  value={vatInput}
+                  onChange={(event) => setVatInput(event.target.value)}
+                  style={{
+                    flex: 1,
+                    padding: "11px 12px",
+                    borderRadius: "12px",
+                    border: "1px solid rgba(31, 24, 19, 0.14)",
+                    background: "rgba(255, 250, 242, 0.95)",
+                    fontSize: "13px",
+                    height: "44px",
+                    boxSizing: "border-box",
+                  }}
+                />
+                <button
+                  type="button"
+                  className="ps-btn ps-btn-primary"
+                  onClick={saveVatRate}
+                  disabled={savingVat}
+                  style={{ height: "44px", minWidth: "88px", flex: "0 0 auto" }}
+                >
+                  {savingVat ? "Saving" : "Save"}
+                </button>
+              </div>
+              <div
+                style={{
+                  fontSize: "12px",
+                  color: vatMessage
+                    ? vatMessage.includes("updated")
+                      ? "#245860"
+                      : "#a83f34"
+                    : "#65574d",
+                  marginTop: "6px",
+                }}
+              >
+                {vatMessage || `Current VAT: ${vatRatePercent}%`}
+              </div>
+            </div>
+            <div style={{ minWidth: "220px", flex: "1 1 220px" }}>
+              <div
+                style={{
+                  color: "#65574d",
+                  fontSize: "12px",
+                  fontWeight: 800,
+                  letterSpacing: "1px",
+                  textTransform: "uppercase",
+                  marginBottom: "6px",
+                }}
+              >
+                Max quantity per product
+              </div>
+              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                <input
+                  type="number"
+                  min="1"
+                  max="1000"
+                  value={maxQtyInput}
+                  onChange={(event) => setMaxQtyInput(event.target.value)}
+                  style={{
+                    flex: 1,
+                    padding: "11px 12px",
+                    borderRadius: "12px",
+                    border: "1px solid rgba(31, 24, 19, 0.14)",
+                    background: "rgba(255, 250, 242, 0.95)",
+                    fontSize: "13px",
+                    height: "44px",
+                    boxSizing: "border-box",
+                  }}
+                />
+                <button
+                  type="button"
+                  className="ps-btn ps-btn-primary"
+                  onClick={saveMaxQtyPerProduct}
+                  disabled={savingMaxQty}
+                  style={{ height: "44px", minWidth: "88px", flex: "0 0 auto" }}
+                >
+                  {savingMaxQty ? "Saving" : "Save"}
+                </button>
+              </div>
+              <div
+                style={{
+                  fontSize: "12px",
+                  color: maxQtyMessage
+                    ? maxQtyMessage.includes("updated")
+                      ? "#245860"
+                      : "#a83f34"
+                    : "#65574d",
+                  marginTop: "6px",
+                }}
+              >
+                {maxQtyMessage || `Current limit: ${maxQtyPerProduct}`}
+              </div>
             </div>
           </div>
         </div>

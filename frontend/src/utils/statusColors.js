@@ -1,6 +1,7 @@
 export const STATUS_COLORS = {
   success: "#79b64a",
   cancelled: "#f07c2e",
+  completed: "#6FBEB2",
 };
 
 export const getStatusColor = (bucket) =>
