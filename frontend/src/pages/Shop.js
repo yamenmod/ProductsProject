@@ -1,3 +1,8 @@
+/**
+ * Shop Page
+ * Product catalog page displaying all available products
+ * Features category navigation and product card display with hover effects
+ */
 import React, { useState } from "react";
 import Header from "../components/Header";
 import Footer from "../components/Footer";

@@ -1,4 +1,9 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
+﻿/**
+ * Admin Dashboard Page
+ * Main admin interface showing order statistics, stock watchlist, and settings
+ * Features date filtering, order status cards, and VAT/max quantity configuration
+ */
+import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import Header from "../components/Header";
 import Footer from "../components/Footer";

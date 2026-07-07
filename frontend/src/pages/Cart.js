@@ -1,3 +1,8 @@
+/**
+ * Cart Page
+ * Shopping cart page displaying items, quantities, and pricing
+ * Features PayPal checkout, quantity management, and VAT calculation
+ */
 import React, { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import Header from "../components/Header";

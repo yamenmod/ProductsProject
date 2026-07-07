@@ -1,8 +1,14 @@
+/**
+ * Size Charts Page
+ * Displays size reference tables for men's and women's clothing
+ * Helps customers choose the right size based on height, weight, and measurements
+ */
 import React, { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 
+// Men's size chart data with height, weight, chest, waist, sleeve, and inseam measurements
 const menSizeChartRows = [
   ["XS", "5'6\"-5'8\"", "120-135", '34"-36"', '28"-30"', '21"', '25.5"'],
   ["S", "5'7\"-5'9\"", "135-155", '36"-38"', '29"-31"', '21.25"', '26.75"'],

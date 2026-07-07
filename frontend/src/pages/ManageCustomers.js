@@ -1,3 +1,8 @@
+/**
+ * Manage Customers Page
+ * Admin-only page for viewing and managing customer accounts
+ * Features search functionality and customer deletion with confirmation
+ */
 import React, { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import Header from "../components/Header";

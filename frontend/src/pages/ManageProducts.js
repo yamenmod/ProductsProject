@@ -1,3 +1,8 @@
+/**
+ * Manage Products Page
+ * Admin-only page for creating, editing, and deleting products
+ * Features form validation, size stock management, and image handling
+ */
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import Header from "../components/Header";

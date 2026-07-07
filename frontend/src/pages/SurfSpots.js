@@ -1,3 +1,8 @@
+/**
+ * SurfSpots Page (Products)
+ * Category-specific product page with horizontal scrolling rails
+ * Features product preview modal, size selection, and add to cart functionality
+ */
 import React, { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import Header from "../components/Header";

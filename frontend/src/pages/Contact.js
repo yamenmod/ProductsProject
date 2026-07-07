@@ -1,3 +1,8 @@
+/**
+ * Contact Page
+ * Contact information page for bulk orders and customer support
+ * Displays contact details for users who need to place large orders
+ */
 import React from "react";
 import Header from "../components/Header";
 import Footer from "../components/Footer";

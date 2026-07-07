@@ -1,3 +1,8 @@
+/**
+ * Welcome Page
+ * Landing page for first-time visitors with animated ocean theme
+ * Features a "Get Started" button to begin the shopping experience
+ */
 import React from "react";
 
 function Welcome({ onGetStarted }) {

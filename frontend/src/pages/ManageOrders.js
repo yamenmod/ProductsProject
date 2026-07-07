@@ -1,4 +1,9 @@
-﻿import React, { useCallback, useEffect, useMemo, useState } from "react";
+﻿/**
+ * Manage Orders Page
+ * Admin-only page for viewing and managing all orders
+ * Features date filtering, search, order details modal, and mark as completed functionality
+ */
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import Header from "../components/Header";
 import Footer from "../components/Footer";

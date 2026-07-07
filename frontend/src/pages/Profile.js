@@ -1,8 +1,14 @@
+/**
+ * Profile Page
+ * User profile page for viewing and editing account details
+ * Features weight/height management and profile information updates
+ */
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 
+// Utility function to sanitize numeric input (weight/height)
 const sanitizeNumericInput = (value) => {
   const nextValue = (value || "").toString().replace(/[^0-9.]/g, "");
   const parts = nextValue.split(".");

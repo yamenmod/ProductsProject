@@ -1,10 +1,15 @@
+/**
+ * Home Page
+ * Main landing page displaying recent products with horizontal scrolling rails
+ * Features product preview modal, size selection, and add to cart functionality
+ */
 import React, { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import Assistant from "../components/Assistant";
 
-function Home({
+function Home({ // home
   user,
   session,
   preferredGender,

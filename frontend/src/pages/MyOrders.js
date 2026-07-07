@@ -1,3 +1,8 @@
+/**
+ * My Orders Page
+ * Customer page for viewing their own order history
+ * Features order status display, cancellation functionality, and countdown timer
+ */
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { getStatusColor, getStatusTone } from "../utils/statusColors";

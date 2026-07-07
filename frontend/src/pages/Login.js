@@ -1,6 +1,12 @@
+/**
+ * Login/Register Page
+ * Authentication page for user login and registration
+ * Supports both login and new user registration with optional profile details
+ */
 import React, { useState } from "react";
 import axios from "axios";
 
+// Utility function to sanitize numeric input (weight/height)
 const sanitizeNumericInput = (value) => {
   const nextValue = (value || "").toString().replace(/[^0-9.]/g, "");
   const decimalParts = nextValue.split(".");
