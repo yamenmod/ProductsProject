@@ -173,8 +173,10 @@ const cancel = async (req, res) => {
 const getAllOrders = async (req, res) => {
   try {
     const [orders] = await db.query(
-      "SELECT id, user_id, total, payment_status, order_status, created_at, paid_at, cancelled_at FROM orders ORDER BY created_at DESC",
+      "SELECT id, user_id, total, status, payment_status, order_status, created_at, paid_at, cancelled_at, completed_at FROM orders ORDER BY created_at DESC",
     );
+
+    console.log("Orders from DB:", orders.map(o => ({ id: o.id, status: o.status, completed_at: o.completed_at })));
 
     const results = [];
     for (const o of orders) {
@@ -183,8 +185,14 @@ const getAllOrders = async (req, res) => {
         [o.id],
       );
 
-      results.push({ ...o, items });
+      results.push({ 
+        ...o, 
+        items,
+        completedAt: o.completed_at 
+      });
     }
+
+    console.log("Orders response:", results.map(o => ({ id: o.id, completedAt: o.completedAt })));
 
     return res.status(200).json(results);
   } catch (error) {

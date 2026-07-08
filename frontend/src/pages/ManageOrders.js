@@ -163,20 +163,41 @@ function ManageOrders({
       : null;
     const toTime = dateTo ? new Date(`${dateTo}T23:59:59.999`).getTime() : null;
 
+    const isWithinRange = (timestamp) => {
+      if (!Number.isFinite(timestamp)) {
+        return false;
+      }
+
+      if (fromTime !== null && timestamp < fromTime) {
+        return false;
+      }
+
+      if (toTime !== null && timestamp > toTime) {
+        return false;
+      }
+
+      return true;
+    };
+
     return orders.filter((order) => {
       const createdAt = new Date(
         order?.createdAt || order?.created_at || 0,
+      ).getTime();
+      const completedAt = new Date(
+        order?.completedAt || order?.completed_at || 0,
       ).getTime();
 
       if (Number.isNaN(createdAt)) {
         return false;
       }
 
-      if (fromTime !== null && createdAt < fromTime) {
-        return false;
-      }
-
-      if (toTime !== null && createdAt > toTime) {
+      // Keep completed orders visible when their completion timestamp
+      // falls inside the selected date range, even if created earlier.
+      if (
+        (fromTime !== null || toTime !== null) &&
+        !isWithinRange(createdAt) &&
+        !isWithinRange(completedAt)
+      ) {
         return false;
       }
 
@@ -499,6 +520,7 @@ function ManageOrders({
               { key: "all", label: "All" },
               { key: "success", label: ORDER_STATUS_LABELS.success },
               { key: "cancelled", label: ORDER_STATUS_LABELS.cancelled },
+              { key: "completed", label: ORDER_STATUS_LABELS.completed },
             ].map((item) => (
               <button
                 key={item.key}
@@ -541,6 +563,7 @@ function ManageOrders({
                     <th style={{ padding: "12px 10px" }}>Total</th>
                     <th style={{ padding: "12px 10px" }}>Payment</th>
                     <th style={{ padding: "12px 10px" }}>Date</th>
+                    <th style={{ padding: "12px 10px" }}>Completed</th>
                     <th style={{ padding: "12px 10px" }}>Actions</th>
                   </tr>
                 </thead>
@@ -617,6 +640,15 @@ function ManageOrders({
                           }}
                         >
                           {formatDate(order.createdAt || order.created_at)}
+                        </td>
+                        <td
+                          style={{
+                            padding: "14px 10px",
+                            color: "#65574d",
+                            fontSize: "13px",
+                          }}
+                        >
+                          {formatDate(order.completedAt || order.completed_at)}
                         </td>
                         <td style={{ padding: "14px 10px" }}>
                           {bucket === "success" && (
@@ -744,6 +776,22 @@ function ManageOrders({
                       >
                         {formatDate(selectedOrderDetail.order.createdAt)}
                       </p>
+                      {selectedOrderDetail.order.completed_at ||
+                        (selectedOrderDetail.order.completedAt && (
+                          <p
+                            style={{
+                              color: "#65574d",
+                              fontSize: "12px",
+                              margin: "4px 0 0 0",
+                            }}
+                          >
+                            Completed:{" "}
+                            {formatDate(
+                              selectedOrderDetail.order.completed_at ||
+                                selectedOrderDetail.order.completedAt,
+                            )}
+                          </p>
+                        ))}
                     </div>
 
                     {/* Order Summary */}
@@ -1049,7 +1097,8 @@ function ManageOrders({
                     </div>
 
                     {/* Action Buttons */}
-                    {getOrderBucket(selectedOrderDetail.order) === "success" && (
+                    {getOrderBucket(selectedOrderDetail.order) ===
+                      "success" && (
                       <div style={{ marginTop: "24px" }}>
                         <button
                           type="button"
@@ -1087,7 +1136,8 @@ function ManageOrders({
           >
             <h2 className="ps-cartConfirmTitle">Mark Order as Completed?</h2>
             <p className="ps-cartConfirmText">
-              Are you sure you want to mark order #{pendingOrderId} as completed?
+              Are you sure you want to mark order #{pendingOrderId} as
+              completed?
             </p>
             <div className="ps-cartConfirmActions">
               <button
@@ -1130,7 +1180,8 @@ function ManageOrders({
             </p>
             <h2 className="ps-cartConfirmTitle">Order Completed</h2>
             <p className="ps-cartConfirmText">
-              Order #{completedOrderId} has been successfully marked as completed.
+              Order #{completedOrderId} has been successfully marked as
+              completed.
             </p>
             <div className="ps-cartConfirmActions">
               <button

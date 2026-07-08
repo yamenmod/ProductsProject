@@ -146,9 +146,13 @@ const initDatabase = async () => {
     );
 
     if (paymentStatusColumn[0]?.total === 0) {
-      await db.query(`ALTER TABLE orders ADD COLUMN payment_status VARCHAR(50) NOT NULL DEFAULT 'unsuccessful'`);
+      await db.query(
+        `ALTER TABLE orders ADD COLUMN payment_status VARCHAR(50) NOT NULL DEFAULT 'unsuccessful'`,
+      );
     } else {
-      await db.query(`ALTER TABLE orders MODIFY COLUMN payment_status VARCHAR(50) NOT NULL DEFAULT 'unsuccessful'`);
+      await db.query(
+        `ALTER TABLE orders MODIFY COLUMN payment_status VARCHAR(50) NOT NULL DEFAULT 'unsuccessful'`,
+      );
     }
 
     const [orderStatusColumn] = await db.query(
@@ -156,9 +160,13 @@ const initDatabase = async () => {
     );
 
     if (orderStatusColumn[0]?.total === 0) {
-      await db.query(`ALTER TABLE orders ADD COLUMN order_status VARCHAR(50) NOT NULL DEFAULT 'unsuccessful'`);
+      await db.query(
+        `ALTER TABLE orders ADD COLUMN order_status VARCHAR(50) NOT NULL DEFAULT 'unsuccessful'`,
+      );
     } else {
-      await db.query(`ALTER TABLE orders MODIFY COLUMN order_status VARCHAR(50) NOT NULL DEFAULT 'unsuccessful'`);
+      await db.query(
+        `ALTER TABLE orders MODIFY COLUMN order_status VARCHAR(50) NOT NULL DEFAULT 'unsuccessful'`,
+      );
     }
 
     const [paidAtColumn] = await db.query(
@@ -166,7 +174,9 @@ const initDatabase = async () => {
     );
 
     if (paidAtColumn[0]?.total === 0) {
-      await db.query(`ALTER TABLE orders ADD COLUMN paid_at DATETIME NULL DEFAULT NULL`);
+      await db.query(
+        `ALTER TABLE orders ADD COLUMN paid_at DATETIME NULL DEFAULT NULL`,
+      );
     }
 
     const [cancelledAtColumn] = await db.query(
@@ -174,7 +184,9 @@ const initDatabase = async () => {
     );
 
     if (cancelledAtColumn[0]?.total === 0) {
-      await db.query(`ALTER TABLE orders ADD COLUMN cancelled_at DATETIME NULL DEFAULT NULL`);
+      await db.query(
+        `ALTER TABLE orders ADD COLUMN cancelled_at DATETIME NULL DEFAULT NULL`,
+      );
     }
 
     const [completedAtColumn] = await db.query(
@@ -182,7 +194,9 @@ const initDatabase = async () => {
     );
 
     if (completedAtColumn[0]?.total === 0) {
-      await db.query(`ALTER TABLE orders ADD COLUMN completed_at DATETIME NULL DEFAULT NULL`);
+      await db.query(
+        `ALTER TABLE orders ADD COLUMN completed_at DATETIME NULL DEFAULT NULL`,
+      );
     }
 
     await db.query(`
@@ -213,6 +227,13 @@ const initDatabase = async () => {
         WHEN LOWER(TRIM(order_status)) IN ('failed', 'failure', 'error', 'canceled', 'cancelled', 'cancel', 'unsuccessful') THEN 'unsuccessful'
         ELSE 'unsuccessful'
       END
+    `);
+
+    await db.query(`
+      UPDATE orders
+      SET completed_at = created_at
+      WHERE completed_at IS NULL
+        AND LOWER(TRIM(COALESCE(order_status, status, ''))) = 'completed'
     `);
 
     await db.query(`

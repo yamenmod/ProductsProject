@@ -43,7 +43,8 @@ const isClothingProduct = (category) => {
 const normalizeOrderStatusFromCapture = (captureStatus, captureUnitStatus) => {
   const normalizedStatus = String(captureStatus || "").toUpperCase();
   const normalizedUnitStatus = String(captureUnitStatus || "").toUpperCase();
-  return (normalizedStatus === "COMPLETED" || normalizedUnitStatus === "COMPLETED")
+  return normalizedStatus === "COMPLETED" ||
+    normalizedUnitStatus === "COMPLETED"
     ? ORDER_STATUS.SUCCESS
     : ORDER_STATUS.CANCELLED;
 };
@@ -269,17 +270,24 @@ const quickCheckout = async (req, res) => {
         currentSizeStock && normalizedSize
           ? "SELECT COALESCE(SUM(quantity),0) AS reserved FROM cart_items WHERE product_id = ? AND size = ?"
           : "SELECT COALESCE(SUM(quantity),0) AS reserved FROM cart_items WHERE product_id = ?",
-        currentSizeStock && normalizedSize ? [productId, normalizedSize] : [productId],
+        currentSizeStock && normalizedSize
+          ? [productId, normalizedSize]
+          : [productId],
       );
       const reservedCart = Number(rc[0].reserved || 0);
 
       let reservedOrders = 0;
 
-      const available = Math.max(0, totalStock - (reservedCart + reservedOrders));
+      const available = Math.max(
+        0,
+        totalStock - (reservedCart + reservedOrders),
+      );
       if (qty > available) {
         await connection.rollback();
         connection.release();
-        return res.status(400).json({ message: `Not enough stock for ${product.name}` });
+        return res
+          .status(400)
+          .json({ message: `Not enough stock for ${product.name}` });
       }
 
       if (isClothing && currentSizeStock) {
@@ -331,7 +339,10 @@ const quickCheckout = async (req, res) => {
           userId: req.user.id,
         });
       } catch (emailErr) {
-        console.error("[quickCheckout] order confirmation email failed", emailErr.message || emailErr);
+        console.error(
+          "[quickCheckout] order confirmation email failed",
+          emailErr.message || emailErr,
+        );
       }
 
       return res.status(200).json({
@@ -482,17 +493,19 @@ const addToCart = async (req, res) => {
       if (availableStock <= 0) {
         await connection.rollback();
         connection.release();
-        return res.status(400).json({ message: "This product is currently out of stock." });
+        return res
+          .status(400)
+          .json({ message: "This product is currently out of stock." });
       }
 
       // Check if requested quantity exceeds available stock
       if (qty > availableStock) {
         await connection.rollback();
         connection.release();
-        return res.status(400).json({ 
+        return res.status(400).json({
           message: `Only ${availableStock} item(s) available in stock.`,
           availableStock,
-          requestedQuantity: qty
+          requestedQuantity: qty,
         });
       }
 
@@ -531,11 +544,11 @@ const addToCart = async (req, res) => {
         if (newTotalQty > availableStock) {
           await connection.rollback();
           connection.release();
-          return res.status(400).json({ 
+          return res.status(400).json({
             message: `Only ${availableStock} item(s) available in stock.`,
             availableStock,
             currentQuantity: existingQty,
-            requestedQuantity: qty
+            requestedQuantity: qty,
           });
         }
 
@@ -614,7 +627,9 @@ const addToCart = async (req, res) => {
     } catch (transactionError) {
       await connection.rollback();
       connection.release();
-      console.error(`[cart:add] transaction error: ${transactionError.message}`);
+      console.error(
+        `[cart:add] transaction error: ${transactionError.message}`,
+      );
       return res.status(500).json({ message: "Server error" });
     }
   } catch (error) {
@@ -635,7 +650,11 @@ const removeFromCart = async (req, res) => {
       .trim()
       .toUpperCase();
 
-    console.log("[removeFromCart] DELETE request:", { userId: req.user.id, productId, size: normalizedSize });
+    console.log("[removeFromCart] DELETE request:", {
+      userId: req.user.id,
+      productId,
+      size: normalizedSize,
+    });
 
     const connection = await db.getConnection();
     try {
@@ -650,7 +669,10 @@ const removeFromCart = async (req, res) => {
           : [req.user.id, productId],
       );
 
-      console.log("[removeFromCart] DELETE affected rows:", deleteResult.affectedRows);
+      console.log(
+        "[removeFromCart] DELETE affected rows:",
+        deleteResult.affectedRows,
+      );
 
       await connection.commit();
       console.log("[removeFromCart] Transaction committed");
@@ -773,10 +795,10 @@ const updateCartQuantity = async (req, res) => {
           });
         }
 
-        await connection.query("UPDATE cart_items SET quantity = ? WHERE id = ?", [
-          nextQuantity,
-          existingItems[0].id,
-        ]);
+        await connection.query(
+          "UPDATE cart_items SET quantity = ? WHERE id = ?",
+          [nextQuantity, existingItems[0].id],
+        );
       }
 
       // Stock validation will happen at checkout time
@@ -808,7 +830,9 @@ const updateCartQuantity = async (req, res) => {
     } catch (transactionError) {
       await connection.rollback();
       connection.release();
-      console.error(`[cart:updateQty] transaction error: ${transactionError.message}`);
+      console.error(
+        `[cart:updateQty] transaction error: ${transactionError.message}`,
+      );
       return res.status(500).json({ message: "Server error" });
     }
   } catch (error) {
@@ -1039,13 +1063,18 @@ const createPaypalOrder = async (req, res) => {
 
       for (const item of cartRows) {
         const product = item;
-        const normalizedSize = (item.size || "").toString().trim().toUpperCase();
+        const normalizedSize = (item.size || "")
+          .toString()
+          .trim()
+          .toUpperCase();
         const qty = Number(item.quantity || 0);
         const sizeStock = normalizeSizeStockMap(product.size_stock);
 
         let available = 0;
         if (sizeStock) {
-          available = normalizedSize ? Number(sizeStock[normalizedSize] || 0) : getSizeStockTotal(sizeStock);
+          available = normalizedSize
+            ? Number(sizeStock[normalizedSize] || 0)
+            : getSizeStockTotal(sizeStock);
         } else {
           available = Number(product.stock || 0);
         }
@@ -1228,17 +1257,24 @@ const capturePaypalOrder = async (req, res) => {
           if (!products.length) {
             await connection.rollback();
             connection.release();
-            return res.status(404).json({ message: `Product ${item.id} not found` });
+            return res
+              .status(404)
+              .json({ message: `Product ${item.id} not found` });
           }
 
           const product = products[0];
           const sizeStock = normalizeSizeStockMap(product.size_stock);
-          const normalizedSize = (item.size || "").toString().trim().toUpperCase();
+          const normalizedSize = (item.size || "")
+            .toString()
+            .trim()
+            .toUpperCase();
           const qty = Number(item.quantity || 0);
 
           let available = 0;
           if (sizeStock) {
-            available = normalizedSize ? Number(sizeStock[normalizedSize] || 0) : getSizeStockTotal(sizeStock);
+            available = normalizedSize
+              ? Number(sizeStock[normalizedSize] || 0)
+              : getSizeStockTotal(sizeStock);
           } else {
             available = Number(product.stock || 0);
           }
@@ -1254,10 +1290,15 @@ const capturePaypalOrder = async (req, res) => {
           // Deduct stock
           if (sizeStock && normalizedSize) {
             const nextSizeStock = { ...sizeStock };
-            nextSizeStock[normalizedSize] = Number(nextSizeStock[normalizedSize] || 0) - qty;
+            nextSizeStock[normalizedSize] =
+              Number(nextSizeStock[normalizedSize] || 0) - qty;
             await connection.query(
               "UPDATE products SET stock = ?, size_stock = ?, updated_at = NOW() WHERE id = ?",
-              [getSizeStockTotal(nextSizeStock), serializeSizeStock(nextSizeStock), product.id],
+              [
+                getSizeStockTotal(nextSizeStock),
+                serializeSizeStock(nextSizeStock),
+                product.id,
+              ],
             );
           } else {
             await connection.query(
@@ -1475,9 +1516,7 @@ const markPaypalOrderAsUnsuccessful = async ({
   }
 
   // Determine status based on reason: always use CANCELLED for both cancellations and failures
-  const finalStatus =
-    status ||
-    ORDER_STATUS.CANCELLED;
+  const finalStatus = status || ORDER_STATUS.CANCELLED;
 
   let whereClause = "p.paypal_order_id = ?";
   const whereParams = [orderID];
@@ -1718,12 +1757,20 @@ const getAdminOrders = async (req, res) => {
           o.total,
           o.status,
           o.order_status,
+          o.completed_at,
+          COALESCE(
+            o.completed_at,
+            CASE
+              WHEN LOWER(TRIM(COALESCE(o.order_status, o.status, ''))) = 'completed' THEN o.created_at
+              ELSE NULL
+            END
+          ) AS completed_at_resolved,
           o.created_at,
           COUNT(oi.id) AS item_count
         FROM orders o
         JOIN users u ON u.id = o.user_id
         LEFT JOIN order_items oi ON oi.order_id = o.id
-        GROUP BY o.id, o.user_id, u.username, u.email, o.total, o.status, o.order_status, o.created_at
+        GROUP BY o.id, o.user_id, u.username, u.email, o.total, o.status, o.order_status, o.completed_at, o.created_at
         ORDER BY o.created_at DESC, o.id DESC
       `,
     );
@@ -1738,6 +1785,8 @@ const getAdminOrders = async (req, res) => {
         status: row.status || row.order_status,
         order_status: row.order_status || row.status,
         itemCount: Number(row.item_count),
+        completedAt: row.completed_at_resolved,
+        completed_at: row.completed_at_resolved,
         createdAt: row.created_at,
       })),
     );
@@ -1758,7 +1807,23 @@ const getOrderItems = async (req, res) => {
     // First, verify the order exists and admin has access
     const [orders] = await db.query(
       `
-        SELECT o.id, o.user_id, o.total, o.status, o.created_at, o.customer_email, u.username, u.email
+        SELECT
+          o.id,
+          o.user_id,
+          o.total,
+          o.status,
+          o.created_at,
+          o.completed_at,
+          COALESCE(
+            o.completed_at,
+            CASE
+              WHEN LOWER(TRIM(COALESCE(o.order_status, o.status, ''))) = 'completed' THEN o.created_at
+              ELSE NULL
+            END
+          ) AS completed_at_resolved,
+          o.customer_email,
+          u.username,
+          u.email
         FROM orders o
         JOIN users u ON u.id = o.user_id
         WHERE o.id = ?
@@ -1816,6 +1881,7 @@ const getOrderItems = async (req, res) => {
         total: Number(order.total),
         status: order.status,
         createdAt: order.created_at,
+        completedAt: order.completed_at_resolved || order.completed_at,
         payment: payments[0]
           ? {
               paypalOrderId: payments[0].paypal_order_id,
