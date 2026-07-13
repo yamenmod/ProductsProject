@@ -218,8 +218,6 @@ function Products({
   const [previewImageIndex, setPreviewImageIndex] = useState(0);
   const [previewSize, setPreviewSize] = useState("");
   const [cardImageIndices, setCardImageIndices] = useState({});
-  const [maxProducts, setMaxProducts] = useState(maxQuantityPerProduct);
-  const [showBulkOrderCTA, setShowBulkOrderCTA] = useState(false);
   const swipeStartXRef = useRef(null);
 
   const sizeOptions = ["S", "M", "L", "XL", "XXL"];
@@ -268,7 +266,7 @@ function Products({
 
     const productWithSize = { ...product, size: size || "" };
     const added = await onAddToCart(productWithSize);
-    
+
     return added;
   };
 
@@ -645,9 +643,12 @@ function Products({
                 aria-label="Product added to cart"
                 onClick={(event) => event.stopPropagation()}
               >
-                <h2 className="ps-cartConfirmTitle">Product added to cart successfully</h2>
+                <h2 className="ps-cartConfirmTitle">
+                  Product added to cart successfully
+                </h2>
                 <p className="ps-cartConfirmText">
-                  The product has been added to your cart. You can continue shopping or proceed to checkout.
+                  The product has been added to your cart. You can continue
+                  shopping or proceed to checkout.
                 </p>
                 <div className="ps-cartConfirmActions">
                   <button
@@ -684,13 +685,16 @@ function Products({
                 aria-label="Error adding to cart"
                 onClick={(event) => event.stopPropagation()}
               >
-                <p className="ps-pill" style={{ margin: 0, width: "fit-content" }}>
+                <p
+                  className="ps-pill"
+                  style={{ margin: 0, width: "fit-content" }}
+                >
                   Error
                 </p>
-                <h2 className="ps-cartConfirmTitle">Unable to add product to cart</h2>
-                <p className="ps-cartConfirmText">
-                  {cartErrorMessage}
-                </p>
+                <h2 className="ps-cartConfirmTitle">
+                  Unable to add product to cart
+                </h2>
+                <p className="ps-cartConfirmText">{cartErrorMessage}</p>
                 <div className="ps-cartConfirmActions">
                   <button
                     type="button"

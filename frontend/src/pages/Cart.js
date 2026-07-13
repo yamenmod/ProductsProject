@@ -15,7 +15,7 @@ import {
 } from "../utils/pricing";
 
 // Add spinner animation
-const style = document.createElement('style');
+const style = document.createElement("style");
 style.textContent = `
   @keyframes spin {
     from { transform: rotate(0deg); }
@@ -111,8 +111,8 @@ function Cart({
             !(
               item.id === pendingRemoveItem.id &&
               (item.size || "") === (pendingRemoveItem.size || "")
-            )
-        )
+            ),
+        ),
       );
       setPendingRemoveItem(null);
       setErrorMessage("");
@@ -154,7 +154,8 @@ function Cart({
     if (delta > 0 && (item.stock ?? 0) < nextQuantity) {
       setItemError({
         itemId: item.id,
-        message: "This product is out of stock. You've reached the stock limit. We apologize for the inconvenience. Please check back later or contact us for availability updates.",
+        message:
+          "This product is out of stock. You've reached the stock limit. We apologize for the inconvenience. Please check back later or contact us for availability updates.",
       });
       return;
     }
@@ -165,7 +166,10 @@ function Cart({
       setItemError(null);
     } catch (err) {
       console.log("[Cart] Quantity update error:", err);
-      const msg = err.response?.data?.message || err.message || "Failed to update quantity";
+      const msg =
+        err.response?.data?.message ||
+        err.message ||
+        "Failed to update quantity";
       console.log("[Cart] Error message:", msg);
       setItemError({
         itemId: item.id,
@@ -181,13 +185,17 @@ function Cart({
     }
 
     if (!paypalConfig) {
-      setErrorMessage("PayPal is not configured for this environment. Contact support.");
+      setErrorMessage(
+        "PayPal is not configured for this environment. Contact support.",
+      );
       return;
     }
 
     // Check if there are out-of-stock items
     if (hasOutOfStockItems) {
-      setErrorMessage("Some items in your cart are out of stock. You've reached the stock limit. We apologize for the inconvenience. Please remove out-of-stock items or check back later for availability updates.");
+      setErrorMessage(
+        "Some items in your cart are out of stock. You've reached the stock limit. We apologize for the inconvenience. Please remove out-of-stock items or check back later for availability updates.",
+      );
       return;
     }
 
@@ -236,24 +244,6 @@ function Cart({
     }
   };
 
-  const refreshCart = async () => {
-    if (!session?.token) {
-      return;
-    }
-
-    try {
-      const response = await axios.get("/api/cart", {
-        headers: {
-          Authorization: `Bearer ${session.token}`,
-        },
-      });
-
-      setDisplayItems(normalizeCartItems(response.data));
-    } catch (error) {
-      console.error("Failed to refresh cart:", error.message);
-    }
-  };
-
   const loadPayPalConfig = useCallback(async () => {
     if (!session?.token || displayItems.length === 0) {
       return;
@@ -297,7 +287,6 @@ function Cart({
   useEffect(() => {
     loadPayPalConfig();
   }, [loadPayPalConfig]);
-
 
   const parseImageValue = (value) => {
     if (!value) {
@@ -475,7 +464,9 @@ function Cart({
           },
         });
 
-        setDisplayItems(normalizeCartItems(response.data.items || response.data));
+        setDisplayItems(
+          normalizeCartItems(response.data.items || response.data),
+        );
       } catch (error) {
         console.error("Failed to load cart page items:", error.message);
       }
@@ -503,13 +494,13 @@ function Cart({
     const stock = Number(item.stock || 0);
     const sizeStock = item.size_stock ? JSON.parse(item.size_stock) : null;
     const quantity = Number(item.quantity || 1);
-    
+
     if (sizeStock && item.size) {
       const sizeKey = item.size.toUpperCase();
       const availableSizeStock = Number(sizeStock[sizeKey] || 0);
       return quantity > availableSizeStock;
     }
-    
+
     return quantity > stock;
   });
 
@@ -723,9 +714,15 @@ function Cart({
                         const stock = Number(item.stock || 0);
                         let sizeStock = null;
                         try {
-                          sizeStock = item.size_stock ? JSON.parse(item.size_stock) : null;
+                          sizeStock = item.size_stock
+                            ? JSON.parse(item.size_stock)
+                            : null;
                         } catch (e) {
-                          console.error("Failed to parse size_stock:", item.size_stock, e);
+                          console.error(
+                            "Failed to parse size_stock:",
+                            item.size_stock,
+                            e,
+                          );
                         }
                         const quantity = Number(item.quantity || 1);
                         let available = stock;

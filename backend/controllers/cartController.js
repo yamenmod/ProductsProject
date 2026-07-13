@@ -30,6 +30,7 @@ const FRONTEND_BASE_URL = (
   process.env.FRONTEND_BASE_URL || "http://localhost:3000"
 ).trim();
 
+// Canonical status buckets reused across checkout and payment flows.
 const ORDER_STATUS = {
   SUCCESS: "success",
   CANCELLED: "cancelled",
@@ -40,6 +41,7 @@ const isClothingProduct = (category) => {
   return normalized.includes("clothing") || normalized.includes("wetsuit");
 };
 
+// Translate PayPal capture states into internal order status buckets.
 const normalizeOrderStatusFromCapture = (captureStatus, captureUnitStatus) => {
   const normalizedStatus = String(captureStatus || "").toUpperCase();
   const normalizedUnitStatus = String(captureUnitStatus || "").toUpperCase();
@@ -211,10 +213,8 @@ const resolvePrimaryImage = (value) => {
   return `/uploads/${trimmedValue.replace(/^\/+/, "")}`;
 };
 
-// quickCheckout allows purchasing a single product immediately without
-// mutating the user's cart. It mirrors the checkout logic but for one
-// specified product and quantity in the request body.
-// Purchases one product immediately without adding it to the cart.
+// quickCheckout purchases one product immediately without touching cart_items.
+// This supports "buy now" behavior while keeping stock handling transactional.
 const quickCheckout = async (req, res) => {
   try {
     const { productId, quantity, size } = req.body;
@@ -840,9 +840,8 @@ const updateCartQuantity = async (req, res) => {
   }
 };
 
-// Converts the user's cart into a paid order and clears the cart afterward.
-// This is the checkout flow that creates the order records seen by admin.
-// Finalizes the cart into an order and sends the receipt email.
+// Converts the active cart hold into a finalized successful order.
+// The transaction guarantees status and cart cleanup stay consistent.
 const checkout = async (req, res) => {
   try {
     const [users] = await db.query(
@@ -959,9 +958,7 @@ const checkout = async (req, res) => {
   }
 };
 
-// Returns every order for the admin dashboard.
-// The admin page uses this list to show customer, amount, and payment status.
-// Exposes the PayPal config needed by the frontend checkout flow.
+// Exposes PayPal client-side configuration required by frontend checkout.
 const createPaypalConfig = async (req, res) => {
   try {
     if (!PAYPAL_CLIENT_ID) {
@@ -981,7 +978,7 @@ const createPaypalConfig = async (req, res) => {
   }
 };
 
-// Starts a PayPal order using the current cart total.
+// Starts a PayPal order from the current cart and reserves stock via DB checks.
 const createPaypalOrder = async (req, res) => {
   try {
     logPayPalFlow("checkout-start", {
@@ -1123,7 +1120,7 @@ const createPaypalOrder = async (req, res) => {
   }
 };
 
-// Captures a completed PayPal order and persists the payment.
+// Captures approved PayPal checkout and persists order + payment atomically.
 const capturePaypalOrder = async (req, res) => {
   try {
     const { orderID } = req.body;
@@ -1505,6 +1502,8 @@ const capturePaypalOrder = async (req, res) => {
   }
 };
 
+// Shared fallback path for failed/cancelled PayPal flows.
+// Updates both orders and payments so admin views stay coherent.
 const markPaypalOrderAsUnsuccessful = async ({
   orderID,
   userId = null,
@@ -1573,6 +1572,7 @@ const markPaypalOrderAsUnsuccessful = async ({
   };
 };
 
+// Handles PayPal success redirects and finalizes capture server-side if needed.
 const handlePaypalSuccessReturn = async (req, res) => {
   const orderID = (req.query.token || req.query.orderID || "")
     .toString()
@@ -1659,6 +1659,7 @@ const handlePaypalSuccessReturn = async (req, res) => {
   }
 };
 
+// Handles PayPal cancel redirects and marks the related order as cancelled.
 const handlePaypalCancelReturn = async (req, res) => {
   const orderID = (req.query.token || req.query.orderID || "")
     .toString()
@@ -1700,6 +1701,7 @@ const handlePaypalCancelReturn = async (req, res) => {
   }
 };
 
+// Called by frontend when user cancels checkout before capture completes.
 const cancelPaypalOrder = async (req, res) => {
   try {
     const { orderID } = req.body;
@@ -1744,7 +1746,8 @@ const cancelPaypalOrder = async (req, res) => {
   }
 };
 
-// Returns every order for the admin dashboard view.
+// Returns compact rows for admin dashboards and Manage Orders page.
+// completed_at_resolved covers legacy completed rows missing completed_at.
 const getAdminOrders = async (req, res) => {
   try {
     const [rows] = await db.query(
@@ -1795,7 +1798,7 @@ const getAdminOrders = async (req, res) => {
   }
 };
 
-// Returns the items that belong to one admin order.
+// Returns expanded admin order detail: items, payment details, and pricing.
 const getOrderItems = async (req, res) => {
   try {
     const orderId = req.params.orderId;

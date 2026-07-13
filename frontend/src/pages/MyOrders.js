@@ -3,7 +3,7 @@
  * Customer page for viewing their own order history
  * Features order status display, cancellation functionality, and countdown timer
  */
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import { getStatusColor, getStatusTone } from "../utils/statusColors";
 import {
@@ -19,7 +19,7 @@ function MyOrders({ session, user, onNavigate }) {
   const [cancelling, setCancelling] = useState(false);
   const [timeLeft, setTimeLeft] = useState({});
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const resp = await axios.get("/api/orders/my-orders", {
@@ -32,11 +32,11 @@ function MyOrders({ session, user, onNavigate }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [session.token]);
 
   useEffect(() => {
     void load();
-  }, []);
+  }, [load]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -118,7 +118,9 @@ function MyOrders({ session, user, onNavigate }) {
   return (
     <div style={{ padding: "40px 20px", minHeight: "100vh" }}>
       <div style={{ maxWidth: "900px", margin: "0 auto" }}>
-        <h2 style={{ marginBottom: "30px", color: "#1f1813", fontSize: "32px" }}>
+        <h2
+          style={{ marginBottom: "30px", color: "#1f1813", fontSize: "32px" }}
+        >
           My Orders
         </h2>
         {loading ? (
@@ -172,7 +174,9 @@ function MyOrders({ session, user, onNavigate }) {
                     </div>
                   </div>
                   <div style={{ textAlign: "right" }}>
-                    <div style={{ marginBottom: "8px" }}>{renderStatusBadge(o)}</div>
+                    <div style={{ marginBottom: "8px" }}>
+                      {renderStatusBadge(o)}
+                    </div>
                     <div
                       style={{
                         fontSize: "14px",
@@ -193,7 +197,11 @@ function MyOrders({ session, user, onNavigate }) {
                   }}
                 >
                   <h4
-                    style={{ margin: "0 0 8px 0", fontSize: "13px", color: "#1f1813" }}
+                    style={{
+                      margin: "0 0 8px 0",
+                      fontSize: "13px",
+                      color: "#1f1813",
+                    }}
                   >
                     Items:
                   </h4>
@@ -210,8 +218,8 @@ function MyOrders({ session, user, onNavigate }) {
                         borderRadius: "4px",
                       }}
                     >
-                      You can cancel this order within 2 minutes of purchase. Time
-                      remaining:{" "}
+                      You can cancel this order within 2 minutes of purchase.
+                      Time remaining:{" "}
                       <strong>
                         {Math.floor(timeLeft[o.id] / 60)}:
                         {String(timeLeft[o.id] % 60).padStart(2, "0")}
@@ -299,10 +307,22 @@ function MyOrders({ session, user, onNavigate }) {
             <h3 style={{ margin: "0 0 12px 0", color: "#1f1813" }}>
               Cancel order?
             </h3>
-            <p style={{ margin: "0 0 20px 0", color: "#65574d", lineHeight: 1.5 }}>
+            <p
+              style={{
+                margin: "0 0 20px 0",
+                color: "#65574d",
+                lineHeight: 1.5,
+              }}
+            >
               Are you sure you want to cancel your order?
             </p>
-            <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
+            <div
+              style={{
+                display: "flex",
+                gap: "10px",
+                justifyContent: "flex-end",
+              }}
+            >
               <button
                 type="button"
                 className="ps-btn ps-btn-secondary"

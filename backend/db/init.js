@@ -199,6 +199,7 @@ const initDatabase = async () => {
       );
     }
 
+    // Normalize legacy order status values into the current finite set.
     await db.query(`
       UPDATE orders
       SET status = CASE
@@ -209,6 +210,7 @@ const initDatabase = async () => {
       END
     `);
 
+    // Keep payment_status aligned with current paid/unsuccessful vocabulary.
     await db.query(`
       UPDATE orders
       SET payment_status = CASE
@@ -219,6 +221,7 @@ const initDatabase = async () => {
       END
     `);
 
+    // Keep order_status aligned with current successful/cancelled/completed model.
     await db.query(`
       UPDATE orders
       SET order_status = CASE
@@ -229,6 +232,7 @@ const initDatabase = async () => {
       END
     `);
 
+    // Backfill completion timestamps for old rows created before completed_at existed.
     await db.query(`
       UPDATE orders
       SET completed_at = created_at

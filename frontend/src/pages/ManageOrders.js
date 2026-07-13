@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Manage Orders Page
  * Admin-only page for viewing and managing all orders
  * Features date filtering, search, order details modal, and mark as completed functionality
@@ -216,17 +216,45 @@ function ManageOrders({
 
       return matchesSearch && matchesFilter;
     });
-  }, [orders, searchTerm, selectedFilter, getOrderBucket, dateFrom, dateTo]);
+  }, [orders, searchTerm, selectedFilter, dateFrom, dateTo]);
 
   const summary = useMemo(() => {
     const counts = { success: 0, cancelled: 0, completed: 0 };
 
+    const fromTime = dateFrom
+      ? new Date(`${dateFrom}T00:00:00`).getTime()
+      : null;
+    const toTime = dateTo ? new Date(`${dateTo}T23:59:59.999`).getTime() : null;
+
+    const isWithinRange = (timestamp) => {
+      if (!Number.isFinite(timestamp)) {
+        return false;
+      }
+
+      if (fromTime !== null && timestamp < fromTime) {
+        return false;
+      }
+
+      if (toTime !== null && timestamp > toTime) {
+        return false;
+      }
+
+      return true;
+    };
+
     orders.forEach((order) => {
-      counts[getOrderBucket(order)] += 1;
+      const createdAt = new Date(
+        order?.createdAt || order?.created_at || 0,
+      ).getTime();
+
+      // Only count orders within the date range
+      if (isWithinRange(createdAt)) {
+        counts[getOrderBucket(order)] += 1;
+      }
     });
 
     return counts;
-  }, [orders, getOrderBucket]);
+  }, [orders, dateFrom, dateTo]);
 
   const formatDate = (value) => {
     if (!value) {

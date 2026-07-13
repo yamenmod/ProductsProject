@@ -138,11 +138,15 @@ function ManageProducts({
     }
 
     return sizeOptions.reduce((next, size) => {
-      const rawValue = source[size] ?? source[size.toLowerCase()] ?? source[size.toUpperCase()];
+      const rawValue =
+        source[size] ??
+        source[size.toLowerCase()] ??
+        source[size.toUpperCase()];
       const stockValue = Number(rawValue);
-      next[size] = Number.isFinite(stockValue) && stockValue >= 0
-        ? Math.floor(stockValue)
-        : 0;
+      next[size] =
+        Number.isFinite(stockValue) && stockValue >= 0
+          ? Math.floor(stockValue)
+          : 0;
       return next;
     }, {});
   };
@@ -334,8 +338,9 @@ function ManageProducts({
     }
 
     if (isClothingCategory(form.category)) {
-      const hasValidSizeStock = Object.values(form.sizeStock || {})
-        .every((stock) => Number.isFinite(Number(stock)) && Number(stock) >= 0);
+      const hasValidSizeStock = Object.values(form.sizeStock || {}).every(
+        (stock) => Number.isFinite(Number(stock)) && Number(stock) >= 0,
+      );
 
       if (!hasValidSizeStock) {
         setError(
@@ -352,7 +357,10 @@ function ManageProducts({
     payload.append("category", form.category.trim());
     payload.append("gender", normalizeGenderValue(form.gender));
     payload.append("stock", String(form.stock === "" ? 0 : Number(form.stock)));
-    payload.append("maxQuantityPerUser", form.maxQuantityPerUser === "" ? 10 : Number(form.maxQuantityPerUser));
+    payload.append(
+      "maxQuantityPerUser",
+      form.maxQuantityPerUser === "" ? 10 : Number(form.maxQuantityPerUser),
+    );
 
     if (isClothingCategory(form.category) && form.size) {
       payload.append("size", form.size);
@@ -444,7 +452,9 @@ function ManageProducts({
       image_urls: uniqueExistingImages,
       stock: Number(product.stock) ?? 0,
       maxQuantityPerUser: product.max_quantity_per_user ?? 10,
-      sizeStock: parseSizeStockValue(product.sizeStock || product.size_stock || {}),
+      sizeStock: parseSizeStockValue(
+        product.sizeStock || product.size_stock || {},
+      ),
       boardHeight: product.boardHeight ?? product.height ?? "",
       boardVolume: product.boardVolume ?? product.volume ?? "",
     });
@@ -460,6 +470,9 @@ function ManageProducts({
     if (initialProductToEdit && typeof initialProductToEdit === "object") {
       handleEdit(initialProductToEdit);
     }
+    // handleEdit is intentionally omitted to avoid retriggering edit mode
+    // on each render when function identity changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialProductToEdit]);
 
   const handleDelete = async (id) => {
@@ -947,7 +960,8 @@ function ManageProducts({
                       style={{
                         gridColumn: "1 / -1",
                         display: "grid",
-                        gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+                        gridTemplateColumns:
+                          "repeat(auto-fit, minmax(160px, 1fr))",
                         gap: "12px",
                         marginTop: "8px",
                       }}
@@ -979,9 +993,10 @@ function ManageProducts({
                                 ...form,
                                 sizeStock: {
                                   ...form.sizeStock,
-                                  [size]: Number.isFinite(nextValue) && nextValue >= 0
-                                    ? Math.floor(nextValue)
-                                    : 0,
+                                  [size]:
+                                    Number.isFinite(nextValue) && nextValue >= 0
+                                      ? Math.floor(nextValue)
+                                      : 0,
                                 },
                               });
                             }}

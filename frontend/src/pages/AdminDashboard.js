@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Admin Dashboard Page
  * Main admin interface showing order statistics, stock watchlist, and settings
  * Features date filtering, order status cards, and VAT/max quantity configuration
@@ -88,7 +88,7 @@ function AdminDashboard({
   const filteredSummary = useMemo(() => {
     const summary = { success: 0, cancelled: 0, completed: 0 };
 
-    orders.forEach((order) => {
+    filteredOrders.forEach((order) => {
       summary[getOrderBucket(order)] += 1;
     });
 
@@ -97,7 +97,7 @@ function AdminDashboard({
       cancelled: summary.cancelled,
       completed: summary.completed,
     };
-  }, [orders]);
+  }, [filteredOrders]);
 
   const statusChartData = useMemo(
     () => [
@@ -120,71 +120,56 @@ function AdminDashboard({
         color: statusColors.completed,
       },
     ],
-    [filteredSummary],
+    [
+      filteredSummary,
+      statusColors.success,
+      statusColors.cancelled,
+      statusColors.completed,
+    ],
   );
 
-  const orderTrend = useMemo(() => {
-    const grouped = new Map();
+  const lowStockProducts = useMemo(() => {
+    const THRESHOLD = 4;
+    const normalizedSearch = (watchlistSearch || "")
+      .toString()
+      .trim()
+      .toLowerCase();
 
-    filteredOrders.forEach((order) => {
-      const date = new Date(order?.createdAt || order?.created_at || 0);
+    return [...products]
+      .map((product) => {
+        const stock = Number(product?.stock ?? 0);
+        const sizeStock = product?.sizeStock || product?.size_stock || null;
 
-      if (Number.isNaN(date.getTime())) {
-        return;
-      }
+        let lowSizes = null;
 
-      const label = date.toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-      });
+        if (sizeStock && typeof sizeStock === "object") {
+          lowSizes = Object.entries(sizeStock)
+            .filter(([, qty]) => Number(qty) >= 0 && Number(qty) <= THRESHOLD)
+            .map(([size, qty]) => ({ size, qty: Number(qty) }));
+        }
 
-      grouped.set(label, (grouped.get(label) || 0) + 1);
-    });
+        const overallLow = stock >= 0 && stock <= THRESHOLD;
 
-    return Array.from(grouped.entries())
-      .map(([label, value]) => ({ label, value }))
-      .slice(-7);
-  }, [filteredOrders]);
-
-  const lowStockProducts = useMemo(
-    () => {
-      const THRESHOLD = 4;
-      const normalizedSearch = (watchlistSearch || "").toString().trim().toLowerCase();
-
-      return [...products]
-        .map((product) => {
-          const stock = Number(product?.stock ?? 0);
-          const sizeStock = product?.sizeStock || product?.size_stock || null;
-
-          let lowSizes = null;
-
-          if (sizeStock && typeof sizeStock === "object") {
-            lowSizes = Object.entries(sizeStock)
-              .filter(([, qty]) => Number(qty) >= 0 && Number(qty) <= THRESHOLD)
-              .map(([size, qty]) => ({ size, qty: Number(qty) }));
-          }
-
-          const overallLow = stock >= 0 && stock <= THRESHOLD;
-
-          return {
-            product,
-            overallLow,
-            lowSizes: lowSizes && lowSizes.length ? lowSizes : [],
-            stock,
-          };
-        })
-        .filter((entry) => entry.overallLow || (entry.lowSizes && entry.lowSizes.length))
-        .filter((entry) => {
-          if (!normalizedSearch) return true;
-          return (entry.product?.name || "")
-            .toString()
-            .toLowerCase()
-            .includes(normalizedSearch);
-        })
-        .sort((a, b) => a.stock - b.stock);
-    },
-    [products, watchlistSearch],
-  );
+        return {
+          product,
+          overallLow,
+          lowSizes: lowSizes && lowSizes.length ? lowSizes : [],
+          stock,
+        };
+      })
+      .filter(
+        (entry) =>
+          entry.overallLow || (entry.lowSizes && entry.lowSizes.length),
+      )
+      .filter((entry) => {
+        if (!normalizedSearch) return true;
+        return (entry.product?.name || "")
+          .toString()
+          .toLowerCase()
+          .includes(normalizedSearch);
+      })
+      .sort((a, b) => a.stock - b.stock);
+  }, [products, watchlistSearch]);
 
   useEffect(() => {
     const loadStats = async () => {
@@ -261,7 +246,10 @@ function AdminDashboard({
         setMaxQtyPerProduct(normalized);
         setMaxQtyInput(String(normalized));
       } catch (maxQtyError) {
-        console.error("Unable to load max quantity per product:", maxQtyError.message);
+        console.error(
+          "Unable to load max quantity per product:",
+          maxQtyError.message,
+        );
       }
     };
 
@@ -331,7 +319,10 @@ function AdminDashboard({
       setMaxQtyInput(String(saved));
       setMaxQtyMessage(`Max quantity per cart updated to ${saved}.`);
     } catch (saveError) {
-      setMaxQtyMessage(saveError.response?.data?.error || "Unable to update max quantity per cart.");
+      setMaxQtyMessage(
+        saveError.response?.data?.error ||
+          "Unable to update max quantity per cart.",
+      );
     } finally {
       setSavingMaxQty(false);
     }
@@ -641,10 +632,14 @@ function AdminDashboard({
                   {lowStockProducts.map((entry) => {
                     const product = entry.product || {};
                     const stock = Number(entry.stock ?? 0);
-                    const hasLowSizes = Array.isArray(entry.lowSizes) && entry.lowSizes.length;
+                    const hasLowSizes =
+                      Array.isArray(entry.lowSizes) && entry.lowSizes.length;
                     const statusLabel =
-                      stock === 0 && !hasLowSizes ? "Out of stock" : "Low stock";
-                    const statusColor = stock === 0 && !hasLowSizes ? "#a83f34" : "#245860";
+                      stock === 0 && !hasLowSizes
+                        ? "Out of stock"
+                        : "Low stock";
+                    const statusColor =
+                      stock === 0 && !hasLowSizes ? "#a83f34" : "#245860";
 
                     return (
                       <div
@@ -682,7 +677,9 @@ function AdminDashboard({
                             {product.category || "Uncategorized"}
                             {hasLowSizes ? (
                               <div style={{ marginTop: 6 }}>
-                                <strong style={{ fontSize: 13 }}>Low sizes:</strong>{" "}
+                                <strong style={{ fontSize: 13 }}>
+                                  Low sizes:
+                                </strong>{" "}
                                 {entry.lowSizes
                                   .map((s) => `${s.size}(${s.qty})`)
                                   .join(", ")}
@@ -706,7 +703,9 @@ function AdminDashboard({
                               Edit
                             </button>
                             {!hasLowSizes ? (
-                              <span style={{ color: "#245860", fontWeight: 700 }}>
+                              <span
+                                style={{ color: "#245860", fontWeight: 700 }}
+                              >
                                 Stock {stock}
                               </span>
                             ) : null}
@@ -864,7 +863,9 @@ function AdminDashboard({
               >
                 VAT (%)
               </div>
-              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+              <div
+                style={{ display: "flex", gap: "8px", alignItems: "center" }}
+              >
                 <input
                   type="number"
                   min="1"
@@ -919,7 +920,9 @@ function AdminDashboard({
               >
                 Max quantity per product
               </div>
-              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+              <div
+                style={{ display: "flex", gap: "8px", alignItems: "center" }}
+              >
                 <input
                   type="number"
                   min="1"

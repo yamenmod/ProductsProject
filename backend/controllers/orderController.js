@@ -6,7 +6,7 @@ const {
 } = require("../utils/sizeStock");
 const { ORDER_STATUS, syncOrderStatusFields } = require("../utils/orderStatus");
 
-
+// Returns the authenticated user's historical orders with their line items.
 const getMyOrders = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -36,13 +36,18 @@ const getMyOrders = async (req, res) => {
   }
 };
 
+// Legacy/manual endpoint that marks an order as paid-successful.
 const paySuccess = async (req, res) => {
   try {
     const orderId = Number(req.params.id);
     if (!orderId) return res.status(400).json({ message: "Order id required" });
 
-    const [orders] = await db.query("SELECT * FROM orders WHERE id = ? LIMIT 1", [orderId]);
-    if (!orders.length) return res.status(404).json({ message: "Order not found" });
+    const [orders] = await db.query(
+      "SELECT * FROM orders WHERE id = ? LIMIT 1",
+      [orderId],
+    );
+    if (!orders.length)
+      return res.status(404).json({ message: "Order not found" });
 
     const order = orders[0];
 
@@ -53,20 +58,27 @@ const paySuccess = async (req, res) => {
       [synced.status, synced.payment_status, synced.order_status, orderId],
     );
 
-    return res.status(200).json({ message: "Order marked as paid and successful" });
+    return res
+      .status(200)
+      .json({ message: "Order marked as paid and successful" });
   } catch (error) {
     console.error("[orders:paySuccess]", error.message || error);
     return res.status(500).json({ message: "Server error" });
   }
 };
 
+// Cancels a successful paid order and restores stock quantities.
 const cancel = async (req, res) => {
   try {
     const orderId = Number(req.params.id);
     if (!orderId) return res.status(400).json({ message: "Order id required" });
 
-    const [orders] = await db.query("SELECT * FROM orders WHERE id = ? LIMIT 1", [orderId]);
-    if (!orders.length) return res.status(404).json({ message: "Order not found" });
+    const [orders] = await db.query(
+      "SELECT * FROM orders WHERE id = ? LIMIT 1",
+      [orderId],
+    );
+    if (!orders.length)
+      return res.status(404).json({ message: "Order not found" });
 
     const order = orders[0];
 
@@ -75,18 +87,23 @@ const cancel = async (req, res) => {
       return res.status(403).json({ message: "Forbidden" });
     }
 
-    // Must be paid and within 48 hours
+    // Must be paid and still inside the configured cancellation window.
     const orderBucket =
-      order.order_status === ORDER_STATUS.SUCCESS || order.status === ORDER_STATUS.SUCCESS
+      order.order_status === ORDER_STATUS.SUCCESS ||
+      order.status === ORDER_STATUS.SUCCESS
         ? ORDER_STATUS.SUCCESS
         : order.order_status || order.status;
 
     if (orderBucket !== ORDER_STATUS.SUCCESS) {
-      return res.status(400).json({ message: "Only successful orders can be cancelled" });
+      return res
+        .status(400)
+        .json({ message: "Only successful orders can be cancelled" });
     }
 
     if (!order.paid_at) {
-      return res.status(400).json({ message: "Only paid orders can be cancelled" });
+      return res
+        .status(400)
+        .json({ message: "Only paid orders can be cancelled" });
     }
 
     const paidAt = new Date(order.paid_at);
@@ -131,10 +148,14 @@ const cancel = async (req, res) => {
 
           if (size) {
             const next = { ...sizeStock };
-            next[size] = (Number(next[size] || 0) + Number(it.quantity || 0));
+            next[size] = Number(next[size] || 0) + Number(it.quantity || 0);
             await connection.query(
               "UPDATE products SET stock = ?, size_stock = ?, updated_at = NOW() WHERE id = ?",
-              [getSizeStockTotal(next), serializeSizeStock(next), it.product_id],
+              [
+                getSizeStockTotal(next),
+                serializeSizeStock(next),
+                it.product_id,
+              ],
             );
           } else {
             // If size not found, skip
@@ -157,7 +178,9 @@ const cancel = async (req, res) => {
       await connection.commit();
       connection.release();
 
-      return res.status(200).json({ message: "Order cancelled and stock restored" });
+      return res
+        .status(200)
+        .json({ message: "Order cancelled and stock restored" });
     } catch (txErr) {
       await connection.rollback();
       connection.release();
@@ -170,13 +193,12 @@ const cancel = async (req, res) => {
   }
 };
 
+// Returns full order list for admin pages and reporting views.
 const getAllOrders = async (req, res) => {
   try {
     const [orders] = await db.query(
       "SELECT id, user_id, total, status, payment_status, order_status, created_at, paid_at, cancelled_at, completed_at FROM orders ORDER BY created_at DESC",
     );
-
-    console.log("Orders from DB:", orders.map(o => ({ id: o.id, status: o.status, completed_at: o.completed_at })));
 
     const results = [];
     for (const o of orders) {
@@ -185,14 +207,12 @@ const getAllOrders = async (req, res) => {
         [o.id],
       );
 
-      results.push({ 
-        ...o, 
+      results.push({
+        ...o,
         items,
-        completedAt: o.completed_at 
+        completedAt: o.completed_at,
       });
     }
-
-    console.log("Orders response:", results.map(o => ({ id: o.id, completedAt: o.completedAt })));
 
     return res.status(200).json(results);
   } catch (error) {
@@ -224,7 +244,9 @@ const markAsCompleted = async (req, res) => {
       [orderId],
     );
 
-    console.log(`[orders:markAsCompleted] Order ${orderId} marked as completed`);
+    console.log(
+      `[orders:markAsCompleted] Order ${orderId} marked as completed`,
+    );
 
     return res.status(200).json({ message: "Order marked as completed" });
   } catch (error) {
