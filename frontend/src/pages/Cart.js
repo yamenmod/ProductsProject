@@ -48,8 +48,45 @@ function Cart({
   const [vatRate, setVatRate] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [itemError, setItemError] = useState(null);
+  const [maxQuantityLimit, setMaxQuantityLimit] = useState(() => {
+    const fallback = Number(maxQuantityPerProduct);
+    return Number.isFinite(fallback) && fallback > 0 ? fallback : 10;
+  });
 
   console.log("[Cart] maxQuantityPerProduct prop:", maxQuantityPerProduct);
+
+  useEffect(() => {
+    const fallback = Number(maxQuantityPerProduct);
+    if (Number.isFinite(fallback) && fallback > 0) {
+      setMaxQuantityLimit(fallback);
+    }
+  }, [maxQuantityPerProduct]);
+
+  useEffect(() => {
+    let isActive = true;
+
+    const loadMaxQuantityLimit = async () => {
+      try {
+        const response = await axios.get(
+          "/api/admin/settings/max_quantity_per_cart",
+        );
+        const value = Number(response.data?.value);
+        const normalized = Number.isFinite(value) && value > 0 ? value : 10;
+
+        if (isActive) {
+          setMaxQuantityLimit(normalized);
+        }
+      } catch (error) {
+        console.error("Failed to load max quantity limit:", error.message);
+      }
+    };
+
+    loadMaxQuantityLimit();
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
 
   const normalizeCartItems = (items = []) =>
     (Array.isArray(items) ? items : []).map((item) => {
@@ -141,11 +178,11 @@ function Cart({
     // Clear previous item error when trying to change quantity
     setItemError(null);
 
-    // Client-side check for max quantity per product
-    if (delta > 0 && nextQuantity > maxQuantityPerProduct) {
+    // Client-side check for max quantity per cart
+    if (delta > 0 && nextQuantity > maxQuantityLimit) {
       setItemError({
         itemId: item.id,
-        message: `You cannot add more items. The maximum limit per user is ${maxQuantityPerProduct}.`,
+        message: `You have reached the maximum quantity limit of ${maxQuantityLimit} items per cart.`,
       });
       return;
     }

@@ -534,7 +534,7 @@ const addToCart = async (req, res) => {
           await connection.rollback();
           connection.release();
           return res.status(400).json({
-            message: `You cannot add more items. The maximum limit per cart is ${maxQtyPerCart}.`,
+            message: `You have reached the maximum quantity limit of ${maxQtyPerCart} items per cart.`,
             maxQuantity: maxQtyPerCart,
             currentQuantity: existingQty,
           });
@@ -559,16 +559,7 @@ const addToCart = async (req, res) => {
       } else {
         // Check max quantity per cart (use global setting)
         const maxQtyPerCart = await getMaxQuantityPerCart();
-        if (qty > maxQtyPerCart) {
-          await connection.rollback();
-          connection.release();
-          return res.status(400).json({
-            message: `You cannot add more items. The maximum limit per cart is ${maxQtyPerCart}.`,
-            maxQuantity: maxQtyPerCart,
-            currentQuantity: 0,
-          });
-        }
-
+        
         // Check total cart quantity limit
         const [totalQty] = await connection.query(
           "SELECT SUM(quantity) as total FROM cart_items WHERE user_id = ?",
@@ -581,7 +572,7 @@ const addToCart = async (req, res) => {
           await connection.rollback();
           connection.release();
           return res.status(400).json({
-            message: `You can add up to ${maxQtyPerCart} total items to your cart.`,
+            message: `You have reached the maximum quantity limit of ${maxQtyPerCart} items per cart.`,
             maxQuantity: maxQtyPerCart,
             currentQuantity: currentTotalQty,
           });
@@ -789,7 +780,7 @@ const updateCartQuantity = async (req, res) => {
           await connection.rollback();
           connection.release();
           return res.status(400).json({
-            message: `You cannot add more items. The maximum limit per cart is ${maxQtyPerCart}.`,
+            message: `You have reached the maximum quantity limit of ${maxQtyPerCart} items per cart.`,
             maxQuantity: maxQtyPerCart,
             currentQuantity: nextQuantity,
           });

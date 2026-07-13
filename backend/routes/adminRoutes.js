@@ -10,7 +10,10 @@ const {
   getAllSettings,
   updateSetting,
 } = require("../controllers/settingsController");
-const { getAllOrders, markAsCompleted } = require("../controllers/orderController");
+const {
+  getAllOrders,
+  markAsCompleted,
+} = require("../controllers/orderController");
 
 const router = express.Router();
 
@@ -28,15 +31,6 @@ router.delete(
   adminMiddleware,
   deleteCustomer,
 );
-
-// Settings endpoints (admin only)
-router.get("/settings", authMiddleware, adminMiddleware, getAllSettings);
-router.get("/settings/:key", authMiddleware, adminMiddleware, getSetting);
-router.put("/settings/:key", authMiddleware, adminMiddleware, updateSetting);
-
-// Admin orders overview
-router.get("/orders", authMiddleware, adminMiddleware, getAllOrders);
-router.patch("/orders/:orderId/complete", authMiddleware, adminMiddleware, markAsCompleted);
 
 // Public endpoint to get current VAT rate (no auth required)
 router.get("/settings/vat_rate", (req, res) => {
@@ -61,5 +55,19 @@ router.get("/vat-rate", (req, res) => {
   req.params.key = "vat_rate";
   return getSetting(req, res);
 });
+
+// Settings endpoints (admin only)
+router.get("/settings", authMiddleware, adminMiddleware, getAllSettings);
+router.get("/settings/:key", authMiddleware, adminMiddleware, getSetting);
+router.put("/settings/:key", authMiddleware, adminMiddleware, updateSetting);
+
+// Admin orders overview
+router.get("/orders", authMiddleware, adminMiddleware, getAllOrders);
+router.patch(
+  "/orders/:orderId/complete",
+  authMiddleware,
+  adminMiddleware,
+  markAsCompleted,
+);
 
 module.exports = router;
