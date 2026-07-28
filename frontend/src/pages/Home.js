@@ -8,6 +8,7 @@ import axios from "axios";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import Assistant from "../components/Assistant";
+import "./Home.css";
 
 function Home({
   // home
@@ -410,19 +411,10 @@ function Home({
 
                 return (
                   <article className="ps-dropCard" key={productId}>
-                    <div
-                      className="ps-dropImageWrap"
-                      style={{ position: "relative" }}
-                    >
+                    <div className="ps-dropImageWrap" style={{ position: "relative" }}>
                       <button
                         type="button"
-                        style={{
-                          border: 0,
-                          padding: 0,
-                          background: "transparent",
-                          width: "100%",
-                          cursor: "pointer",
-                        }}
+                        className="home-card-image-button"
                         onClick={() => openPreview(product)}
                       >
                         <span className="ps-dropBadge">NEW</span>
@@ -437,50 +429,20 @@ function Home({
                         <>
                           <button
                             type="button"
+                            className="home-card-image-nav home-card-image-nav-left"
                             onClick={() =>
                               goToCardImage(productId, productImages.length, -1)
                             }
-                            style={{
-                              position: "absolute",
-                              left: "10px",
-                              top: "50%",
-                              transform: "translateY(-50%)",
-                              width: "28px",
-                              height: "28px",
-                              borderRadius: "999px",
-                              border: 0,
-                              background: "rgba(10, 16, 20, 0.75)",
-                              color: "#fff",
-                              cursor: "pointer",
-                              fontSize: "18px",
-                              lineHeight: 1,
-                              zIndex: 2,
-                            }}
                             aria-label="Previous product image"
                           >
                             ‹
                           </button>
                           <button
                             type="button"
+                            className="home-card-image-nav home-card-image-nav-right"
                             onClick={() =>
                               goToCardImage(productId, productImages.length, 1)
                             }
-                            style={{
-                              position: "absolute",
-                              right: "10px",
-                              top: "50%",
-                              transform: "translateY(-50%)",
-                              width: "28px",
-                              height: "28px",
-                              borderRadius: "999px",
-                              border: 0,
-                              background: "rgba(10, 16, 20, 0.75)",
-                              color: "#fff",
-                              cursor: "pointer",
-                              fontSize: "18px",
-                              lineHeight: 1,
-                              zIndex: 2,
-                            }}
                             aria-label="Next product image"
                           >
                             ›
@@ -501,10 +463,7 @@ function Home({
                         {product.name || "New product"}
                       </h3>
 
-                      <div
-                        className="ps-dropPrice"
-                        style={{ display: "grid", gap: "2px" }}
-                      >
+                      <div className="ps-dropPrice home-preview-price">
                         <span
                           style={{
                             fontSize: "18px",
@@ -517,12 +476,7 @@ function Home({
                       </div>
                       <button
                         type="button"
-                        className="ps-btn ps-btn-primary"
-                        style={{
-                          width: "100%",
-                          fontSize: "12px",
-                          marginTop: "12px",
-                        }}
+                        className="ps-btn ps-btn-primary home-card-button"
                         onClick={() =>
                           isClothingProduct(product)
                             ? openPreview(product)
@@ -569,33 +523,11 @@ function Home({
       />
 
       {cartSuccessMessage && (
-        <div
-          style={{
-            maxWidth: "1200px",
-            margin: "20px auto",
-            padding: "16px",
-            background: "#d4edda",
-            border: "1px solid #28a745",
-            borderRadius: "8px",
-            color: "#155724",
-            fontSize: "14px",
-            fontWeight: "500",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "flex-start",
-          }}
-        >
-          <span style={{ flex: 1 }}>{cartSuccessMessage}</span>
+        <div className="home-cart-success">
+          <span className="home-cart-success-message">{cartSuccessMessage}</span>
           <button
+            className="home-cart-success-close"
             onClick={onClearCartSuccessMessage}
-            style={{
-              background: "none",
-              border: "none",
-              fontSize: "18px",
-              cursor: "pointer",
-              color: "#155724",
-              padding: 0,
-            }}
           >
             ×
           </button>
@@ -820,14 +752,7 @@ function Home({
               <p className="ps-previewDescription">
                 {previewProduct.description || "No description available yet."}
               </p>
-              <div
-                className="ps-previewPurchaseRow"
-                style={{
-                  gap: "12px",
-                  alignItems: "flex-start",
-                  flexDirection: "column",
-                }}
-              >
+              <div className="ps-previewPurchaseRow" style={{ gap: "12px", alignItems: "flex-start", flexDirection: "column" }}>
                 <div>
                   <div
                     className="ps-previewPrice"
@@ -849,15 +774,7 @@ function Home({
                   <select
                     value={previewSize}
                     onChange={(event) => setPreviewSize(event.target.value)}
-                    style={{
-                      width: "100%",
-                      padding: "10px 12px",
-                      borderRadius: "10px",
-                      border: "1px solid #d9c3ad",
-                      background: "#fffdf8",
-                      fontSize: "14px",
-                      fontWeight: 600,
-                    }}
+                    className="home-preview-select"
                   >
                     <option value="">Select size</option>
                     {sizeOptions.map((size) => (
@@ -868,16 +785,15 @@ function Home({
                   </select>
                 )}
 
-                <div style={{ display: "flex", gap: "10px", width: "100%" }}>
+                <div className="home-preview-actions">
                   <button
                     type="button"
-                    className="ps-btn ps-btn-primary"
+                    className="ps-btn ps-btn-primary home-preview-action-button"
                     onClick={handlePreviewAddToCart}
                     disabled={
                       (previewProduct.stock ?? 0) < 1 ||
                       (isClothingProduct(previewProduct) && !previewSize)
                     }
-                    style={{ flex: 1 }}
                   >
                     {(previewProduct.stock ?? 0) < 1
                       ? "Out of Stock"
@@ -885,9 +801,8 @@ function Home({
                   </button>
                   <button
                     type="button"
-                    className="ps-btn ps-btn-dark"
+                    className="ps-btn ps-btn-dark home-preview-action-button"
                     onClick={handlePreviewBuyNow}
-                    style={{ flex: 1 }}
                   >
                     Buy Now
                   </button>

@@ -1,0 +1,197 @@
+.surfspots-main {
+  padding: 40px 20px;
+}
+
+.surfspots-shell {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 40px;
+  background: rgba(255, 250, 242, 0.84);
+  border: 1px solid rgba(31, 24, 19, 0.08);
+  border-radius: 22px;
+  box-shadow: 0 18px 42px rgba(67, 48, 33, 0.12);
+  font-family: Manrope, 'Segoe UI', sans-serif;
+}
+
+.surfspots-header {
+  margin-bottom: 32px;
+  border-bottom: 1px solid #e0cec0;
+  padding-bottom: 20px;
+}
+
+.surfspots-title {
+  color: #1f1813;
+  font-family: 'Bebas Neue', Impact, sans-serif;
+  font-size: 54px;
+  margin: 0 0 8px 0;
+  letter-spacing: 1px;
+  line-height: 0.9;
+}
+
+.surfspots-subtitle {
+  margin: 0;
+  color: #65574d;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.surfspots-category-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 28px;
+}
+
+.surfspots-category-button {
+  padding: 8px 16px;
+  background: #fff3e5;
+  color: #5f5550;
+  border: 1px solid #d9c3ad;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.surfspots-category-button.is-active {
+  background: linear-gradient(135deg, #245860 0%, #2f747d 100%);
+  color: white;
+  border: none;
+  box-shadow: 0 4px 12px rgba(36, 88, 96, 0.2);
+}
+
+.surfspots-category-button:hover {
+  background: #f4e2cf;
+  border-color: #ccb091;
+}
+
+.surfspots-search {
+  margin-bottom: 20px;
+}
+
+.surfspots-search-input {
+  width: 100%;
+  padding: 11px 14px;
+  border: 1px solid #d9c3ad;
+  border-radius: 10px;
+  font-size: 14px;
+  background: #fffdf8;
+  font-family: inherit;
+}
+
+.surfspots-accessory-row {
+  margin-bottom: 18px;
+  overflow-x: auto;
+  white-space: nowrap;
+  padding-bottom: 4px;
+}
+
+.surfspots-accessory-button {
+  margin-right: 10px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid #d9c3ad;
+  background: #fff3e5;
+  color: #5f5550;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.surfspots-accessory-button.is-active {
+  border: none;
+  background: linear-gradient(135deg, #245860 0%, #2f747d 100%);
+  color: #ffffff;
+}
+
+.surfspots-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.surfspots-product-card {
+  border: 1px solid #e0cec0;
+  background: #fffbf5;
+  box-shadow: 0 12px 30px rgba(76, 56, 38, 0.1);
+}
+
+.surfspots-product-media {
+  position: relative;
+}
+
+.surfspots-product-image-button {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.surfspots-product-image {
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  object-fit: cover;
+  display: block;
+}
+
+.surfspots-product-image-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 0;
+  background: rgba(10, 16, 20, 0.75);
+  color: #fff;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.surfspots-product-image-nav-left {
+  left: 8px;
+}
+
+.surfspots-product-image-nav-right {
+  right: 8px;
+}
+
+.surfspots-product-body {
+  padding: 14px 14px 12px;
+}
+
+.surfspots-price-row {
+  font-weight: 800;
+  color: #1f1813;
+  font-size: 18px;
+}
+
+.surfspots-preview-purchase-row {
+  gap: 12px;
+  align-items: flex-start;
+  flex-direction: column;
+}
+
+.surfspots-preview-size-select {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #d9c3ad;
+  background: #fffdf8;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.surfspots-preview-actions {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+}
+
+.surfspots-preview-action-button {
+  flex: 1;
+}

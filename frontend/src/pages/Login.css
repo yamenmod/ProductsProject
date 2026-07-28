@@ -1,0 +1,61 @@
+.login-form {
+  display: grid;
+  gap: 14px;
+}
+
+.login-field {
+  display: grid;
+  gap: 7px;
+}
+
+.login-label {
+  display: block;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.login-help-card {
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(31, 24, 19, 0.08);
+  background: rgba(247, 239, 229, 0.72);
+}
+
+.login-help-title {
+  margin: 0 0 12px;
+  color: #65574d;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.login-help-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.login-message {
+  margin-top: 16px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #d7a495;
+  background: #fff0ec;
+  color: #8b3529;
+  font-weight: 600;
+  font-size: 13px;
+  text-align: center;
+}
+
+.login-actions {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.login-toggle-button {
+  background-color: #a0522d;
+  color: #ffffff;
+}
+
+.login-toggle-button:hover {
+  background-color: #8a441d;
+}

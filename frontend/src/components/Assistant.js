@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import axios from "axios";
+import "./Assistant.css";
 
 function Assistant({ session, user }) {
   const [open, setOpen] = useState(false);
@@ -50,60 +51,27 @@ function Assistant({ session, user }) {
 
   return (
     <>
-      <div
-        style={{
-          position: "fixed",
-          right: 20,
-          bottom: 20,
-          zIndex: 2000,
-        }}
-      >
+      <div className="ps-assistant-shell">
         {open ? (
-          <div
-            className="ps-assistantCard"
-            style={{
-              width: 340,
-              height: 420,
-              background: "#fff",
-              borderRadius: 10,
-              boxShadow: "0 8px 30px rgba(0,0,0,0.12)",
-              display: "flex",
-              flexDirection: "column",
-              overflow: "hidden",
-            }}
-          >
-            <div
-              style={{
-                padding: "10px 12px",
-                background: "#1f1813",
-                color: "#fff",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-              }}
-            >
+          <div className="ps-assistant-card">
+            <div className="ps-assistant-header">
               <div>
-                <strong>Plage Assistant</strong>
-                <div style={{ fontSize: 11, opacity: 0.9 }}>Customer help</div>
+                <strong className="ps-assistant-title">Plage Assistant</strong>
+                <div className="ps-assistant-subtitle">Customer help</div>
               </div>
-              <div style={{ display: "flex", gap: 8 }}>
+              <div className="ps-assistant-actions">
                 <button
                   onClick={() => {
                     setMessages([]);
                   }}
-                  style={{
-                    background: "transparent",
-                    border: 0,
-                    color: "#fff",
-                    cursor: "pointer",
-                  }}
+                  className="ps-assistant-action"
                   aria-label="Clear chat"
                 >
                   Clear
                 </button>
                 <button
                   onClick={() => setOpen(false)}
-                  style={{ background: "transparent", border: 0, color: "#fff", cursor: "pointer" }}
+                  className="ps-assistant-action"
                   aria-label="Close assistant"
                 >
                   ×
@@ -111,30 +79,20 @@ function Assistant({ session, user }) {
               </div>
             </div>
 
-            <div ref={listRef} style={{ padding: 10, overflowY: "auto", flex: 1, background: "#fbf9f7" }}>
+            <div ref={listRef} className="ps-assistant-messages">
               {messages.length === 0 && (
-                <div style={{ color: "#6b645f", fontSize: 13 }}>Hi {user?.username || "there"}! Ask me about products, shipping, or returns.</div>
+                <div className="ps-assistant-empty">Hi {user?.username || "there"}! Ask me about products, shipping, or returns.</div>
               )}
               {messages.map((m, i) => (
-                <div key={i} style={{ marginTop: 8, display: "flex", justifyContent: m.from === "user" ? "flex-end" : "flex-start" }}>
-                  <div
-                    style={{
-                      background: m.from === "user" ? "#1f1813" : "#fff",
-                      color: m.from === "user" ? "#fff" : "#1f1813",
-                      padding: "8px 10px",
-                      borderRadius: 8,
-                      maxWidth: "78%",
-                      boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
-                      fontSize: 14,
-                    }}
-                  >
+                <div key={i} className={`ps-assistant-message-row ${m.from}`}>
+                  <div className={`ps-assistant-bubble ${m.from}`}>
                     {m.text}
                   </div>
                 </div>
               ))}
             </div>
 
-            <div style={{ padding: 10, borderTop: "1px solid #eee", display: "flex", gap: 8 }}>
+            <div className="ps-assistant-footer">
               <input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
@@ -142,10 +100,10 @@ function Assistant({ session, user }) {
                   if (e.key === "Enter") sendMessage();
                 }}
                 placeholder={loading ? "Thinking..." : "Ask about products, sizes, shipping..."}
-                style={{ flex: 1, padding: "8px 10px", borderRadius: 6, border: "1px solid #ddd" }}
+                className="ps-assistant-input"
                 disabled={loading}
               />
-              <button onClick={sendMessage} disabled={loading || !input.trim()} className="ps-btn ps-btn-primary" style={{ padding: "8px 12px" }}>
+              <button onClick={sendMessage} disabled={loading || !input.trim()} className="ps-btn ps-btn-primary ps-assistant-send">
                 {loading ? "…" : "Send"}
               </button>
             </div>
@@ -154,17 +112,7 @@ function Assistant({ session, user }) {
           <button
             onClick={() => setOpen(true)}
             aria-label="Open assistant"
-            style={{
-              width: 56,
-              height: 56,
-              borderRadius: 999,
-              background: "#1f1813",
-              color: "#fff",
-              border: 0,
-              boxShadow: "0 8px 20px rgba(0,0,0,0.14)",
-              cursor: "pointer",
-              fontSize: 22,
-            }}
+            className="ps-assistant-toggle"
           >
             💬
           </button>

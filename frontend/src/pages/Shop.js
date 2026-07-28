@@ -6,6 +6,7 @@
 import React, { useState } from "react";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
+import "./Shop.css";
 
 function Shop({
   user,
@@ -30,32 +31,18 @@ function Shop({
         cartCount={cartCount}
       />
 
-      <main className="ps-main" style={{ padding: "70px 0" }}>
+      <main className="ps-main shop-page-main">
         <div className="ps-shell">
-          <div style={{ textAlign: "center", marginBottom: "54px" }}>
-            <p className="ps-pill" style={{ marginBottom: "12px" }}>
-              Our collection
-            </p>
-            <h1 className="ps-title" style={{ marginBottom: "10px" }}>
-              Choose your gear
-            </h1>
-            <p
-              className="ps-lead"
-              style={{ maxWidth: "650px", margin: "0 auto" }}
-            >
+          <div className="shop-hero">
+            <p className="ps-pill">Our collection</p>
+            <h1 className="ps-title">Choose your gear</h1>
+            <p className="ps-lead">
               Every category now follows the Plage Surf visual style with warm
               sand surfaces and sea-toned accents.
             </p>
           </div>
 
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-              gap: "22px",
-              marginBottom: "48px",
-            }}
-          >
+          <div className="shop-grid">
             {[
               {
                 name: "Surfboards",
@@ -90,99 +77,30 @@ function Shop({
                 key={item.id}
                 onMouseEnter={() => setHoveredCardId(item.id)}
                 onMouseLeave={() => setHoveredCardId(null)}
-                className="ps-surface"
-                style={{
-                  padding: "30px 24px",
-                  borderRadius: "16px",
-                  textAlign: "center",
-                  cursor: "pointer",
-                  transition: "transform 0.25s ease, box-shadow 0.25s ease",
-                  position: "relative",
-                  overflow: "hidden",
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.transform = "translateY(-8px)";
-                  e.currentTarget.style.boxShadow =
-                    "0 16px 30px rgba(76, 56, 38, 0.2)";
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.transform = "translateY(0)";
-                  e.currentTarget.style.boxShadow =
-                    "0 18px 42px rgba(67, 48, 33, 0.12)";
-                }}
+                className="ps-surface shop-card"
                 onClick={() => onNavigate("products", item.id)}
               >
                 <div
-                  style={{
-                    fontSize: "13px",
-                    marginBottom: "16px",
-                    fontWeight: "800",
-                    letterSpacing: "2px",
-                    textTransform: "uppercase",
-                    color: item.color,
-                  }}
+                  className="shop-card-icon"
+                  style={{ color: item.color }}
                 >
                   {item.icon}
                 </div>
-                <h3
-                  style={{
-                    fontSize: "31px",
-                    fontFamily: "'Bebas Neue', Impact, sans-serif",
-                    letterSpacing: "0.8px",
-                    color: "#1f1813",
-                    margin: "0 0 12px 0",
-                  }}
-                >
+                <h3 className="shop-card-title">
                   {item.name}
                 </h3>
-                <p
-                  style={{
-                    color: "#65574d",
-                    fontSize: "14px",
-                    margin: "0 0 24px 0",
-                    lineHeight: "1.6",
-                  }}
-                >
+                <p className="shop-card-description">
                   {item.desc}
                 </p>
 
                 {item.id === "wetsuits" && hoveredCardId === item.id && (
-                  <div
-                    style={{
-                      display: "grid",
-                      gap: "10px",
-                      marginBottom: "16px",
-                      padding: "14px",
-                      borderRadius: "14px",
-                      background: "rgba(255, 250, 242, 0.92)",
-                      border: "1px solid rgba(31, 24, 19, 0.08)",
-                      boxShadow: "0 14px 28px rgba(67, 48, 33, 0.12)",
-                    }}
-                  >
-                    <p
-                      style={{
-                        margin: 0,
-                        color: "#245860",
-                        fontSize: "11px",
-                        fontWeight: "800",
-                        letterSpacing: "1.2px",
-                        textTransform: "uppercase",
-                      }}
-                    >
+                  <div className="shop-card-extra">
+                    <p className="shop-card-extra-label">
                       Rip Curl Size Charts
                     </p>
                     <button
                       type="button"
-                      style={{
-                        padding: "10px 16px",
-                        background: "#ffffff",
-                        color: "#245860",
-                        border: "1px solid #245860",
-                        borderRadius: "10px",
-                        cursor: "pointer",
-                        fontWeight: "800",
-                        fontSize: "13px",
-                      }}
+                      className="shop-card-extra-button"
                       onClick={(event) => {
                         event.stopPropagation();
                         onNavigate("size-charts", "wetsuits");
@@ -195,17 +113,7 @@ function Shop({
 
                 <button
                   type="button"
-                  className="ps-btn ps-btn-primary"
-                  style={{
-                    width: "100%",
-                    maxWidth: "180px",
-                  }}
-                  onMouseOver={(e) => {
-                    e.target.style.transform = "scale(1.05)";
-                  }}
-                  onMouseOut={(e) => {
-                    e.target.style.transform = "scale(1)";
-                  }}
+                  className="ps-btn ps-btn-primary shop-card-action"
                 >
                   Shop now
                 </button>
@@ -213,44 +121,17 @@ function Shop({
             ))}
           </div>
 
-          <div
-            className="ps-surface"
-            style={{
-              padding: "44px 30px",
-              borderRadius: "16px",
-              textAlign: "center",
-            }}
-          >
-            <h2
-              style={{
-                fontSize: "52px",
-                fontFamily: "'Bebas Neue', Impact, sans-serif",
-                letterSpacing: "1px",
-                margin: "0 0 16px 0",
-              }}
-            >
+          <div className="ps-surface shop-cta-panel">
+            <h2 className="shop-cta-title">
               Build your next setup
             </h2>
-            <p
-              style={{
-                color: "#65574d",
-                fontSize: "15px",
-                margin: "0 0 24px 0",
-                lineHeight: "1.6",
-              }}
-            >
+            <p className="shop-cta-description">
               Open any category or browse all products in the redesigned Plage
               Surf catalog view.
             </p>
             <button
               onClick={() => onNavigate("products", "")}
-              className="ps-btn ps-btn-primary"
-              onMouseOver={(e) => {
-                e.target.style.transform = "scale(1.05)";
-              }}
-              onMouseOut={(e) => {
-                e.target.style.transform = "scale(1)";
-              }}
+              className="ps-btn ps-btn-primary shop-cta-button"
             >
               View All Products
             </button>

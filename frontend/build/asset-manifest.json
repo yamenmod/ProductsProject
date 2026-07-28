@@ -1,0 +1,14 @@
+{
+  "files": {
+    "main.css": "/static/css/main.e86bc624.css",
+    "main.js": "/static/js/main.848d0e13.js",
+    "static/media/SteelplateTextura.ttf": "/static/media/SteelplateTextura.33f522415664625fac72.ttf",
+    "index.html": "/index.html",
+    "main.e86bc624.css.map": "/static/css/main.e86bc624.css.map",
+    "main.848d0e13.js.map": "/static/js/main.848d0e13.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.e86bc624.css",
+    "static/js/main.848d0e13.js"
+  ]
+}

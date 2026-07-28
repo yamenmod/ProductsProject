@@ -8,6 +8,7 @@ import axios from "axios";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { getBasePrice } from "../utils/pricing";
+import "./SurfSpots.css";
 
 function Products({
   session,
@@ -485,93 +486,23 @@ function Products({
         cartCount={cartCount}
       />
 
-      <div className="ps-main" style={{ padding: "40px 20px" }}>
-        <div
-          style={{
-            maxWidth: "1100px",
-            margin: "0 auto",
-            padding: "40px",
-            background: "rgba(255, 250, 242, 0.84)",
-            border: "1px solid rgba(31, 24, 19, 0.08)",
-            borderRadius: "22px",
-            boxShadow: "0 18px 42px rgba(67, 48, 33, 0.12)",
-            fontFamily: "Manrope, 'Segoe UI', sans-serif",
-          }}
-        >
-          <div
-            style={{
-              marginBottom: "32px",
-              borderBottom: "1px solid #e0cec0",
-              paddingBottom: "20px",
-            }}
-          >
-            <h2
-              style={{
-                color: "#1f1813",
-                fontFamily: "'Bebas Neue', Impact, sans-serif",
-                fontSize: "54px",
-                margin: "0 0 8px 0",
-                letterSpacing: "1px",
-                lineHeight: 0.9,
-              }}
-            >
+      <div className="ps-main surfspots-main">
+        <div className="surfspots-shell">
+          <div className="surfspots-header">
+            <h2 className="surfspots-title">
               {resolveShopTitle(activeCategory)}
             </h2>
-            <p
-              style={{
-                margin: "0",
-                color: "#65574d",
-                fontSize: "13px",
-                fontWeight: "600",
-              }}
-            >
+            <p className="surfspots-subtitle">
               Browse our collection of premium products
             </p>
           </div>
 
-          <div
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              gap: "10px",
-              marginBottom: "28px",
-            }}
-          >
+          <div className="surfspots-category-row">
             {categories.map((category) => (
               <button
                 key={category}
                 onClick={() => setActiveCategory(category)}
-                style={{
-                  padding: "8px 16px",
-                  background:
-                    activeCategory === category
-                      ? "linear-gradient(135deg, #245860 0%, #2f747d 100%)"
-                      : "#fff3e5",
-                  color: activeCategory === category ? "white" : "#5f5550",
-                  border:
-                    activeCategory === category ? "none" : "1px solid #d9c3ad",
-                  borderRadius: "8px",
-                  fontWeight: "600",
-                  fontSize: "13px",
-                  cursor: "pointer",
-                  transition: "all 0.2s ease",
-                  boxShadow:
-                    activeCategory === category
-                      ? "0 4px 12px rgba(36, 88, 96, 0.2)"
-                      : "none",
-                }}
-                onMouseOver={(e) => {
-                  if (activeCategory !== category) {
-                    e.target.style.background = "#f4e2cf";
-                    e.target.style.borderColor = "#ccb091";
-                  }
-                }}
-                onMouseOut={(e) => {
-                  if (activeCategory !== category) {
-                    e.target.style.background = "#fff3e5";
-                    e.target.style.borderColor = "#d9c3ad";
-                  }
-                }}
+                className={`surfspots-category-button ${activeCategory === category ? "is-active" : ""}`}
               >
                 {category}
               </button>
@@ -579,21 +510,13 @@ function Products({
           </div>
 
           {activeCategory === "All" && (
-            <div style={{ marginBottom: "20px" }}>
+            <div className="surfspots-search">
               <input
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Search products by name or category"
-                style={{
-                  width: "100%",
-                  padding: "11px 14px",
-                  border: "1px solid #d9c3ad",
-                  borderRadius: "10px",
-                  fontSize: "14px",
-                  background: "#fffdf8",
-                  fontFamily: "inherit",
-                }}
+                className="surfspots-search-input"
               />
             </div>
           )}
@@ -709,33 +632,12 @@ function Products({
           )}
 
           {isAccessoriesCategory && (
-            <div
-              style={{
-                marginBottom: "18px",
-                overflowX: "auto",
-                whiteSpace: "nowrap",
-                paddingBottom: "4px",
-              }}
-            >
+            <div className="surfspots-accessory-row">
               {["All", "Leashes", "Surf Wax", "Fins"].map((item) => (
                 <button
                   key={item}
                   onClick={() => setAccessoryFilter(item)}
-                  style={{
-                    marginRight: "10px",
-                    padding: "8px 16px",
-                    borderRadius: "999px",
-                    border:
-                      accessoryFilter === item ? "none" : "1px solid #d9c3ad",
-                    background:
-                      accessoryFilter === item
-                        ? "linear-gradient(135deg, #245860 0%, #2f747d 100%)"
-                        : "#fff3e5",
-                    color: accessoryFilter === item ? "#ffffff" : "#5f5550",
-                    fontWeight: "700",
-                    fontSize: "13px",
-                    cursor: "pointer",
-                  }}
+                  className={`surfspots-accessory-button ${accessoryFilter === item ? "is-active" : ""}`}
                 >
                   {item}
                 </button>
@@ -743,14 +645,7 @@ function Products({
             </div>
           )}
 
-          <div
-            id="products-grid"
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
-              gap: "16px",
-            }}
-          >
+          <div id="products-grid" className="surfspots-grid">
             {searchedProducts.length === 0 ? (
               <p>
                 {activeCategory === "All" && searchTerm.trim()
@@ -764,38 +659,17 @@ function Products({
                 const activeCardImageIndex = cardImageIndices[productId] || 0;
 
                 return (
-                  <div
-                    key={productId}
-                    className="ps-productCard"
-                    style={{
-                      border: "1px solid #e0cec0",
-                      background: "#fffbf5",
-                      boxShadow: "0 12px 30px rgba(76, 56, 38, 0.1)",
-                    }}
-                  >
-                    <div style={{ position: "relative" }}>
+                  <div key={productId} className="ps-productCard surfspots-product-card">
+                    <div className="surfspots-product-media">
                       <button
                         type="button"
+                        className="surfspots-product-image-button"
                         onClick={() => openPreview(product)}
-                        style={{
-                          display: "block",
-                          width: "100%",
-                          padding: 0,
-                          border: 0,
-                          background: "transparent",
-                          cursor: "pointer",
-                        }}
                       >
                         <img
                           src={productImages[activeCardImageIndex]}
                           alt={product.name}
-                          className="ps-productCardImage"
-                          style={{
-                            width: "100%",
-                            aspectRatio: "4 / 5",
-                            objectFit: "cover",
-                            display: "block",
-                          }}
+                          className="ps-productCardImage surfspots-product-image"
                         />
                       </button>
 
@@ -806,21 +680,7 @@ function Products({
                             onClick={() =>
                               goToCardImage(productId, productImages.length, -1)
                             }
-                            style={{
-                              position: "absolute",
-                              left: "8px",
-                              top: "50%",
-                              transform: "translateY(-50%)",
-                              width: "28px",
-                              height: "28px",
-                              borderRadius: "999px",
-                              border: 0,
-                              background: "rgba(10, 16, 20, 0.75)",
-                              color: "#fff",
-                              cursor: "pointer",
-                              fontSize: "18px",
-                              lineHeight: 1,
-                            }}
+                            className="surfspots-product-image-nav surfspots-product-image-nav-left"
                             aria-label="Previous product image"
                           >
                             ‹
@@ -830,21 +690,7 @@ function Products({
                             onClick={() =>
                               goToCardImage(productId, productImages.length, 1)
                             }
-                            style={{
-                              position: "absolute",
-                              right: "8px",
-                              top: "50%",
-                              transform: "translateY(-50%)",
-                              width: "28px",
-                              height: "28px",
-                              borderRadius: "999px",
-                              border: 0,
-                              background: "rgba(10, 16, 20, 0.75)",
-                              color: "#fff",
-                              cursor: "pointer",
-                              fontSize: "18px",
-                              lineHeight: 1,
-                            }}
+                            className="surfspots-product-image-nav surfspots-product-image-nav-right"
                             aria-label="Next product image"
                           >
                             ›
@@ -852,22 +698,13 @@ function Products({
                         </>
                       )}
                     </div>
-                    <div
-                      className="ps-dropBody"
-                      style={{ padding: "14px 14px 12px" }}
-                    >
+                    <div className="ps-dropBody surfspots-product-body">
                       <h3 className="ps-productCardTitle">{product.name}</h3>
                       <p className="ps-productCardDescription">
                         {product.description}
                       </p>
                       <p className="ps-productCardPrice">
-                        <span
-                          style={{
-                            fontWeight: 800,
-                            color: "#1f1813",
-                            fontSize: "18px",
-                          }}
-                        >
+                        <span className="surfspots-price-row">
                           ${getBasePrice(product).toFixed(2)}
                         </span>
                       </p>
@@ -1008,14 +845,7 @@ function Products({
               <p className="ps-previewDescription">
                 {previewProduct.description || "No description available yet."}
               </p>
-              <div
-                className="ps-previewPurchaseRow"
-                style={{
-                  gap: "12px",
-                  alignItems: "flex-start",
-                  flexDirection: "column",
-                }}
-              >
+              <div className="ps-previewPurchaseRow surfspots-preview-purchase-row">
                 <div>
                   <div
                     className="ps-previewPrice"
@@ -1037,15 +867,7 @@ function Products({
                   <select
                     value={previewSize}
                     onChange={(event) => setPreviewSize(event.target.value)}
-                    style={{
-                      width: "100%",
-                      padding: "10px 12px",
-                      borderRadius: "10px",
-                      border: "1px solid #d9c3ad",
-                      background: "#fffdf8",
-                      fontSize: "14px",
-                      fontWeight: 600,
-                    }}
+                    className="surfspots-preview-size-select"
                   >
                     <option value="">Select size</option>
                     {sizeOptions.map((size) => (
@@ -1056,16 +878,15 @@ function Products({
                   </select>
                 )}
 
-                <div style={{ display: "flex", gap: "10px", width: "100%" }}>
+                <div className="surfspots-preview-actions">
                   <button
                     type="button"
-                    className="ps-btn ps-btn-primary"
+                    className="ps-btn ps-btn-primary surfspots-preview-action-button"
                     onClick={handlePreviewAddToCart}
                     disabled={
                       (previewProduct.stock ?? 0) < 1 ||
                       (isClothingProduct(previewProduct) && !previewSize)
                     }
-                    style={{ flex: 1 }}
                   >
                     {(previewProduct.stock ?? 0) < 1
                       ? "Out of Stock"
@@ -1073,9 +894,8 @@ function Products({
                   </button>
                   <button
                     type="button"
-                    className="ps-btn ps-btn-dark"
+                    className="ps-btn ps-btn-dark surfspots-preview-action-button"
                     onClick={handlePreviewBuyNow}
-                    style={{ flex: 1 }}
                   >
                     Buy Now
                   </button>

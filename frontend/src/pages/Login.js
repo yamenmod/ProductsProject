@@ -5,6 +5,7 @@
  */
 import React, { useState } from "react";
 import axios from "axios";
+import "./Login.css";
 
 // Utility function to sanitize numeric input (weight/height)
 const sanitizeNumericInput = (value) => {
@@ -136,18 +137,9 @@ function Login({ onLoginSuccess, onNavigate }) {
           </p>
         </div>
 
-        <div style={{ display: "grid", gap: "14px" }}>
-          <div>
-            <label
-              style={{
-                display: "block",
-                marginBottom: "7px",
-                fontWeight: 700,
-                fontSize: "13px",
-              }}
-            >
-              Username
-            </label>
+        <div className="login-form">
+          <div className="login-field">
+            <label className="login-label">Username</label>
             <input
               placeholder="Enter your username"
               value={username}
@@ -157,17 +149,8 @@ function Login({ onLoginSuccess, onNavigate }) {
 
           {isRegister && (
             <>
-              <div>
-                <label
-                  style={{
-                    display: "block",
-                    marginBottom: "7px",
-                    fontWeight: 700,
-                    fontSize: "13px",
-                  }}
-                >
-                  Email
-                </label>
+              <div className="login-field">
+                <label className="login-label">Email</label>
                 <input
                   placeholder="Enter your email"
                   type="email"
@@ -176,37 +159,14 @@ function Login({ onLoginSuccess, onNavigate }) {
                 />
               </div>
 
-              <div
-                style={{
-                  padding: "14px",
-                  borderRadius: "16px",
-                  border: "1px solid rgba(31, 24, 19, 0.08)",
-                  background: "rgba(247, 239, 229, 0.72)",
-                }}
-              >
-                <p
-                  style={{
-                    margin: "0 0 12px",
-                    color: "#65574d",
-                    fontSize: "13px",
-                    fontWeight: 700,
-                  }}
-                >
+              <div className="login-help-card">
+                <p className="login-help-title">
                   This might help you for choosing your board
                 </p>
 
-                <div style={{ display: "grid", gap: "12px" }}>
-                  <div>
-                    <label
-                      style={{
-                        display: "block",
-                        marginBottom: "7px",
-                        fontWeight: 700,
-                        fontSize: "13px",
-                      }}
-                    >
-                      Weight
-                    </label>
+                <div className="login-help-grid">
+                  <div className="login-field">
+                    <label className="login-label">Weight</label>
                     <input
                       placeholder="Optional weight"
                       inputMode="decimal"
@@ -218,17 +178,8 @@ function Login({ onLoginSuccess, onNavigate }) {
                     />
                   </div>
 
-                  <div>
-                    <label
-                      style={{
-                        display: "block",
-                        marginBottom: "7px",
-                        fontWeight: 700,
-                        fontSize: "13px",
-                      }}
-                    >
-                      Height
-                    </label>
+                  <div className="login-field">
+                    <label className="login-label">Height</label>
                     <input
                       placeholder="Optional height"
                       inputMode="decimal"
@@ -244,17 +195,8 @@ function Login({ onLoginSuccess, onNavigate }) {
             </>
           )}
 
-          <div>
-            <label
-              style={{
-                display: "block",
-                marginBottom: "7px",
-                fontWeight: 700,
-                fontSize: "13px",
-              }}
-            >
-              Password
-            </label>
+          <div className="login-field">
+            <label className="login-label">Password</label>
             <input
               placeholder="Enter your password"
               type="password"
@@ -265,31 +207,18 @@ function Login({ onLoginSuccess, onNavigate }) {
         </div>
 
         {message && (
-          <div
-            style={{
-              marginTop: "16px",
-              padding: "10px 12px",
-              borderRadius: "10px",
-              border: "1px solid #d7a495",
-              background: "#fff0ec",
-              color: "#8b3529",
-              fontWeight: 600,
-              fontSize: "13px",
-              textAlign: "center",
-            }}
-          >
+          <div className="login-message">
             {message}
           </div>
         )}
 
-        <div style={{ display: "grid", gap: "10px", marginTop: "18px" }}>
+        <div className="login-actions">
           <button className="ps-btn ps-btn-primary" onClick={handleSubmit}>
             {isRegister ? "Create Account" : "Sign In"}
           </button>
           <button
-            className="ps-btn ps-btn-secondary"
+            className="ps-btn ps-btn-secondary login-toggle-button"
             onClick={() => setIsRegister(!isRegister)}
-            style={{ backgroundColor: "#A0522D", color: "#ffffff" }}
           >
             {isRegister ? "Already registered? Sign In" : "Create an Account"}
           </button>

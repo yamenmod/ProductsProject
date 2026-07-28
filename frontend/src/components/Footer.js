@@ -1,4 +1,5 @@
 import React from "react";
+import "./Footer.css";
 
 function Footer() {
   return (
@@ -26,15 +27,7 @@ function Footer() {
         </div>
       </div>
 
-      <div
-        style={{
-          borderTop: "1px solid rgba(31, 24, 19, 0.12)",
-          textAlign: "center",
-          color: "#4e433c",
-          fontSize: "13px",
-          padding: "14px 0 18px",
-        }}
-      >
+      <div className="ps-footer-meta">
         © 2026 Plage Surf. All rights reserved.
       </div>
     </footer>
