@@ -43,6 +43,8 @@ function Login({ onLoginSuccess, onNavigate }) {
   const handleSubmit = async () => {
     setMessage("");
 
+    // for register we start here
+
     if (isRegister) {
       if (!username || !password || !email) {
         setMessage("⚠️ All fields are required! (Username, Email, Password)");
@@ -95,7 +97,7 @@ function Login({ onLoginSuccess, onNavigate }) {
 
       return;
     }
-
+    // if we got here then this is the login
     if (!username || !password) {
       setMessage("⚠️ Username and password are required!");
       return;
