@@ -778,17 +778,47 @@ const updateProduct = async (req, res) => {
 const deleteProduct = async (req, res) => {
   // Delete a product from the catalogue.
   try {
-    const [result] = await db.query("DELETE FROM products WHERE id = ?", [
-      req.params.id,
-    ]);
+    const productId = Number(req.params.id);
 
-    if (!result.affectedRows) {
-      return res.status(404).json({ message: "Product not found" });
+    if (!Number.isFinite(productId)) {
+      return res.status(400).json({ message: "Invalid product id" });
     }
 
-    return res.status(200).json({ message: "Product deleted successfully" });
+    const connection = await db.getConnection();
+
+    try {
+      await connection.beginTransaction();
+
+      await connection.query("DELETE FROM cart_items WHERE product_id = ?", [
+        productId,
+      ]);
+
+      await connection.query("DELETE FROM order_items WHERE product_id = ?", [
+        productId,
+      ]);
+
+      const [result] = await connection.query("DELETE FROM products WHERE id = ?", [
+        productId,
+      ]);
+
+      if (!result.affectedRows) {
+        await connection.rollback();
+        connection.release();
+        return res.status(404).json({ message: "Product not found" });
+      }
+
+      await connection.commit();
+      connection.release();
+
+      return res.status(200).json({ message: "Product deleted successfully" });
+    } catch (error) {
+      await connection.rollback();
+      connection.release();
+      throw error;
+    }
   } catch (error) {
-    return res.status(500).json({ message: "Server error" });
+    console.error("Delete product error:", error);
+    return res.status(500).json({ message: error.message || "Server error" });
   }
 };
 
