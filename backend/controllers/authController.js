@@ -24,7 +24,7 @@ const formatUser = (user) => ({
   id: user.id,
   username: user.username,
   email: user.email,
-  role: user.role,
+
   weight:
     user.weight === null || user.weight === undefined
       ? null

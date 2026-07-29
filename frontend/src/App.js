@@ -30,55 +30,38 @@ import MyOrders from "./pages/MyOrders";
 
 
 
-const normalizeCartItems = (items = []) =>
+const normalizeCartItems = (payload = []) => {
+  const items = Array.isArray(payload)
+    ? payload
+    : Array.isArray(payload?.items)
+      ? payload.items
+      : [];
 
-  (Array.isArray(items) ? items : []).map((item) => {
-
+  return items.map((item) => {
     if (item?.product) {
-
       const product = item.product;
-
       const productId = product.id || product._id;
 
-
-
       return {
-
         ...product,
-
         id: productId,
-
         _id: productId,
-
         size: product.size || item.size || "",
-
         quantity: Number(item.quantity) || 1,
-
       };
-
     }
-
-
 
     const productId = item?.id || item?._id;
 
-
-
     return {
-
       ...item,
-
       id: productId,
-
       _id: productId,
-
       size: item.size || item?.product?.size || "",
-
       quantity: Number(item?.quantity) || 1,
-
     };
-
   });
+};
 
 
 

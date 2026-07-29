@@ -13,6 +13,7 @@ const {
   getVatRateFromDb,
 } = require("../utils/pricing");
 const { getMaxQuantityPerCart } = require("../utils/settings");
+const { validateProductQuantityLimit } = require("../utils/cartQuantity");
 const { syncOrderStatusFields } = require("../utils/orderStatus");
 
 // Cart, checkout, payment, and admin order reporting endpoints.
@@ -520,27 +521,32 @@ const addToCart = async (req, res) => {
       }
 
       const [existingItems] = await connection.query(
-        "SELECT id FROM cart_items WHERE user_id = ? AND product_id = ? AND size = ? LIMIT 1",
+        "SELECT id, quantity FROM cart_items WHERE user_id = ? AND product_id = ? AND size = ? LIMIT 1 FOR UPDATE",
         [req.user.id, productId, isClothing ? normalizedSize : ""],
       );
 
       if (existingItems.length) {
-        // Check max quantity per cart (use global setting)
         const maxQtyPerCart = await getMaxQuantityPerCart();
         const existingQty = Number(existingItems[0].quantity || 0);
-        const newTotalQty = existingQty + qty;
+        const validation = validateProductQuantityLimit({
+          currentQuantity: existingQty,
+          requestedQuantity: qty,
+          maxQuantityPerProduct: maxQtyPerCart,
+        });
 
-        if (newTotalQty > maxQtyPerCart) {
+        if (!validation.allowed) {
           await connection.rollback();
           connection.release();
           return res.status(400).json({
-            message: `You have reached the maximum quantity limit of ${maxQtyPerCart} items per cart.`,
-            maxQuantity: maxQtyPerCart,
-            currentQuantity: existingQty,
+            message: validation.message,
+            maxQuantity: validation.maxQuantity,
+            currentQuantity: validation.currentQuantity,
+            requestedQuantity: validation.requestedQuantity,
           });
         }
 
         // Check if new total quantity exceeds available stock
+        const newTotalQty = existingQty + qty;
         if (newTotalQty > availableStock) {
           await connection.rollback();
           connection.release();
@@ -557,24 +563,21 @@ const addToCart = async (req, res) => {
           [qty, existingItems[0].id],
         );
       } else {
-        // Check max quantity per cart (use global setting)
         const maxQtyPerCart = await getMaxQuantityPerCart();
-        
-        // Check total cart quantity limit
-        const [totalQty] = await connection.query(
-          "SELECT SUM(quantity) as total FROM cart_items WHERE user_id = ?",
-          [req.user.id],
-        );
-        const currentTotalQty = Number(totalQty[0]?.total || 0);
-        const newTotalQty = currentTotalQty + qty;
+        const validation = validateProductQuantityLimit({
+          currentQuantity: 0,
+          requestedQuantity: qty,
+          maxQuantityPerProduct: maxQtyPerCart,
+        });
 
-        if (newTotalQty > maxQtyPerCart) {
+        if (!validation.allowed) {
           await connection.rollback();
           connection.release();
           return res.status(400).json({
-            message: `You have reached the maximum quantity limit of ${maxQtyPerCart} items per cart.`,
-            maxQuantity: maxQtyPerCart,
-            currentQuantity: currentTotalQty,
+            message: validation.message,
+            maxQuantity: validation.maxQuantity,
+            currentQuantity: validation.currentQuantity,
+            requestedQuantity: validation.requestedQuantity,
           });
         }
 
@@ -774,15 +777,21 @@ const updateCartQuantity = async (req, res) => {
           return res.status(404).json({ message: "Cart item not found" });
         }
 
-        // Check max quantity per cart (use global setting)
         const maxQtyPerCart = await getMaxQuantityPerCart();
-        if (nextQuantity > maxQtyPerCart) {
+        const validation = validateProductQuantityLimit({
+          currentQuantity: existingItems[0].quantity || 0,
+          requestedQuantity: nextQuantity - Number(existingItems[0].quantity || 0),
+          maxQuantityPerProduct: maxQtyPerCart,
+        });
+
+        if (!validation.allowed) {
           await connection.rollback();
           connection.release();
           return res.status(400).json({
-            message: `You have reached the maximum quantity limit of ${maxQtyPerCart} items per cart.`,
-            maxQuantity: maxQtyPerCart,
-            currentQuantity: nextQuantity,
+            message: validation.message,
+            maxQuantity: validation.maxQuantity,
+            currentQuantity: validation.currentQuantity,
+            requestedQuantity: validation.requestedQuantity,
           });
         }
 

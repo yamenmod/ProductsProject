@@ -182,7 +182,7 @@ function Cart({
     if (delta > 0 && nextQuantity > maxQuantityLimit) {
       setItemError({
         itemId: item.id,
-        message: `You have reached the maximum quantity limit of ${maxQuantityLimit} items per cart.`,
+        message: `You have reached the maximum quantity limit of ${maxQuantityLimit} items per product.`,
       });
       return;
     }
@@ -791,35 +791,12 @@ function Cart({
                         <span
                           style={{
                             display: "block",
-                            fontSize: "14px",
-                            color: "#65574d",
-                            textDecoration: "line-through",
-                          }}
-                        >
-                          ${getBasePrice(item).toFixed(2)}
-                        </span>
-                        <span
-                          style={{
-                            display: "block",
                             fontSize: "16px",
                             fontWeight: 800,
                             color: "#1f1813",
-                            marginTop: "4px",
                           }}
                         >
-                          ${getDisplayPrice(item).toFixed(2)} x{" "}
-                          {item.quantity || 1}
-                        </span>
-                        <span
-                          style={{
-                            display: "block",
-                            fontSize: "12px",
-                            color: "#999",
-                            marginTop: "6px",
-                            fontWeight: 400,
-                          }}
-                        >
-                          VAT included ({vatPercent}%)
+                          ${getBasePrice(item).toFixed(2)} each
                         </span>
                       </div>
                     </div>
@@ -993,10 +970,25 @@ function Cart({
                         fontSize: "12px",
                       }}
                     >
-                      Tax ({vatPercent}%)
+                      VAT ({vatPercent}%)
                     </p>
                     <p style={{ margin: 0, fontWeight: 700, fontSize: "14px" }}>
                       ${tax.toFixed(2)}
+                    </p>
+                  </div>
+
+                  <div style={{ textAlign: "center", minWidth: "80px" }}>
+                    <p
+                      style={{
+                        margin: "0 0 4px",
+                        color: "#65574d",
+                        fontSize: "12px",
+                      }}
+                    >
+                      Shipping
+                    </p>
+                    <p style={{ margin: 0, fontWeight: 700, fontSize: "14px" }}>
+                      $0.00
                     </p>
                   </div>
 
@@ -1015,7 +1007,7 @@ function Cart({
                         fontSize: "12px",
                       }}
                     >
-                      Total
+                      Final Total
                     </p>
                     <p
                       style={{
