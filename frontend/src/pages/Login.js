@@ -213,8 +213,8 @@ function Login({ onLoginSuccess, onNavigate }) {
             {message}
           </div>
         )}
-
-        <div className="login-actions">
+          
+        <div className="login-actions"> 
           <button className="ps-btn ps-btn-primary" onClick={handleSubmit}>
             {isRegister ? "Create Account" : "Sign In"}
           </button>
