@@ -109,6 +109,8 @@ function Login({ onLoginSuccess, onNavigate }) {
         password,
       });
 
+      console.log("LOGIN RESPONSE:", res.data);
+
       if (res.data.message === "success") {
         onLoginSuccess({ token: res.data.token, user: res.data.user });
       } else {

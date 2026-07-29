@@ -123,7 +123,10 @@ function Header({
     currentPage === "shop" ||
     currentPage === "products" ||
     currentPage === "size-charts";
-  const isAdmin = user.role === "admin";
+  console.log("CURRENT USER:", user);
+  console.log("CURRENT ROLE:", user?.role);
+  const isAdmin = user?.role === "admin";
+  const isCustomer = user?.role === "user";
 
   return (
     <header className="ps-header">
@@ -308,7 +311,7 @@ function Header({
             )}
           </div>
 
-          {user.role === "user" && (
+          {isCustomer && (
             <button
               type="button"
               className="ps-cart-button"
@@ -327,7 +330,7 @@ function Header({
             </button>
           )}
 
-          {user && user.role === "user" && (
+          {user && isCustomer && (
             <button
               type="button"
               className="ps-nav-link"

@@ -190,7 +190,12 @@ function App() {
       const restoredSession = {
 
         ...parsedSession,
-
+        user: parsedSession.user
+          ? {
+              ...parsedSession.user,
+              role: parsedSession.user.role ?? parsedSession.role ?? null,
+            }
+          : parsedSession.user,
         preferredGender: normalizedGender,
 
       };
@@ -1072,12 +1077,18 @@ function App() {
           const nextSession = {
 
             ...authSession,
-
+            user: {
+              ...(authSession?.user || {}),
+              role: authSession?.user?.role ?? authSession?.role ?? null,
+            },
             preferredGender: "male",
 
           };
 
 
+
+          console.log("LOGIN RESPONSE:", authSession);
+          console.log("NEXT SESSION:", nextSession);
 
           localStorage.setItem("session", JSON.stringify(nextSession));
 
@@ -1085,7 +1096,7 @@ function App() {
 
           setCurrentPage(
 
-            authSession.user?.role === "admin" ? "admin-dashboard" : "home",
+            nextSession.user?.role === "admin" ? "admin-dashboard" : "home",
 
           );
 

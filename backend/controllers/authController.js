@@ -24,6 +24,7 @@ const formatUser = (user) => ({
   id: user.id,
   username: user.username,
   email: user.email,
+  role: user.role ?? null,
 
   weight:
     user.weight === null || user.weight === undefined
@@ -292,9 +293,12 @@ const login = async (req, res) => {
       return res.status(401).json({ message: "Invalid login" });
     }
 
+    console.log("LOGIN USER FROM DB:", user);
+
     console.log("✅ LOGIN SUCCESS: User found:", {
       id: user.id,
       username: user.username,
+      role: user.role,
       weight: user.weight,
       height: user.height,
     });
@@ -302,7 +306,7 @@ const login = async (req, res) => {
     const token = getToken(user);
     const formattedUser = formatUser(user);
 
-    console.log("✅ FORMATTED USER FOR LOGIN:", formattedUser);
+    console.log("LOGIN RESPONSE USER:", formattedUser);
 
     return res.status(200).json({
       message: "success",
