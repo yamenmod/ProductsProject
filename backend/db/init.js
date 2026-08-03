@@ -13,11 +13,36 @@ const initDatabase = async () => {
         weight DECIMAL(6, 2) DEFAULT NULL,
         height DECIMAL(6, 2) DEFAULT NULL,
         role ENUM('user', 'admin') NOT NULL DEFAULT 'user',
+        is_active TINYINT(1) NOT NULL DEFAULT 1,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       )
     `);
     console.log("✅ Users table verified/created");
+
+    const [isActiveColumn] = await db.query(
+      `
+        SELECT COUNT(*) AS total
+        FROM information_schema.columns
+        WHERE table_schema = DATABASE()
+          AND table_name = 'users'
+          AND column_name = 'is_active'
+      `,
+    );
+
+    if (isActiveColumn[0]?.total === 0) {
+      console.log("➕ Adding is_active column...");
+      await db.query(
+        `ALTER TABLE users ADD COLUMN is_active TINYINT(1) NOT NULL DEFAULT 1`,
+      );
+      console.log("✅ is_active column added");
+    } else {
+      await db.query(`UPDATE users SET is_active = 1 WHERE is_active IS NULL`);
+      await db.query(
+        `ALTER TABLE users MODIFY COLUMN is_active TINYINT(1) NOT NULL DEFAULT 1`,
+      );
+      console.log("✅ is_active column exists");
+    }
 
     // Add weight column if it doesn't exist
     const [weightColumn] = await db.query(

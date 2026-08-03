@@ -12,6 +12,7 @@ const getCustomers = async (req, res) => {
           username,
           email,
           role,
+          is_active,
           created_at AS createdAt
         FROM users
         WHERE role = 'user'
@@ -25,25 +26,22 @@ const getCustomers = async (req, res) => {
   }
 };
 
-// Deletes a non-admin customer account from the users table.
-// Admin accounts are protected so the current operator cannot remove themselves.
-// Orders related to the customer are preserved by setting user_id to NULL.
-const deleteCustomer = async (req, res) => {
+// Updates a customer activation flag without removing the account.
+// Admin accounts remain protected so their login access is never affected.
+const updateCustomerStatus = async (req, res) => {
   try {
-    // Reject missing or self-targeted deletes before touching the database.
     const { userId } = req.params;
+    const rawIsActive = req.body.is_active ?? req.body.isActive;
 
     if (!userId) {
       return res.status(400).json({ message: "User ID is required" });
     }
 
-    if (Number(userId) === Number(req.user.id)) {
-      return res.status(400).json({ message: "You cannot delete your own account" });
-    }
+    const normalizedUserId = Number(userId);
 
     const [users] = await db.query(
-      "SELECT id, role FROM users WHERE id = ? LIMIT 1",
-      [userId],
+      "SELECT id, role, is_active FROM users WHERE id = ? LIMIT 1",
+      [normalizedUserId],
     );
 
     if (!users.length) {
@@ -51,19 +49,37 @@ const deleteCustomer = async (req, res) => {
     }
 
     if (users[0].role === "admin") {
-      return res.status(400).json({ message: "Admin accounts cannot be deleted" });
+      return res.status(400).json({ message: "Admin accounts cannot be changed" });
     }
 
-    // Set user_id to NULL in all orders for this user to preserve order history
-    await db.query(
-      "UPDATE orders SET user_id = NULL WHERE user_id = ?",
-      [userId],
-    );
+    const nextIsActive =
+      rawIsActive === true || rawIsActive === 1 || rawIsActive === "1"
+        ? 1
+        : rawIsActive === false || rawIsActive === 0 || rawIsActive === "0"
+          ? 0
+          : Number(rawIsActive);
 
-    // Now delete the user
-    await db.query("DELETE FROM users WHERE id = ?", [userId]);
+    if (![0, 1].includes(nextIsActive)) {
+      return res.status(400).json({ message: "Invalid user status" });
+    }
 
-    return res.status(200).json({ message: "Customer deleted successfully" });
+    const [result] = await db.query("UPDATE users SET is_active = ? WHERE id = ?", [
+      nextIsActive,
+      normalizedUserId,
+    ]);
+
+    if (!result.affectedRows) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    return res.status(200).json({
+      message:
+        nextIsActive === 1
+          ? "Customer activated successfully"
+          : "Customer unactivated successfully",
+      userId: normalizedUserId,
+      is_active: nextIsActive,
+    });
   } catch (error) {
     return res.status(500).json({ message: "Server error" });
   }
@@ -71,5 +87,5 @@ const deleteCustomer = async (req, res) => {
 
 module.exports = {
   getCustomers,
-  deleteCustomer,
+  updateCustomerStatus,
 };

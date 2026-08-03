@@ -66,33 +66,20 @@ const normalizeCartItems = (payload = []) => {
 
 
 const extractProductId = (value) => {
-
   const rawId =
-
     value?.id ||
-
     value?._id ||
-
     value?.product?.id ||
-
     value?.product?._id ||
-
     value?.productId;
 
-
-
   if (rawId === undefined || rawId === null || rawId === "") {
-
     return null;
-
   }
-
-
 
   const numericId = Number(rawId);
 
   return Number.isFinite(numericId) ? numericId : rawId;
-
 };
 
 
@@ -159,11 +146,8 @@ function App() {
 
 
   // Restore the saved session so refreshes keep the user logged in.
-
   // If a session exists, admin users are taken to the admin dashboard.
-
   useEffect(() => {
-
     const loadMaxQuantityPerProduct = async () => {
       try {
         const response = await axios.get("/api/admin/settings/max_quantity_per_cart");
@@ -180,15 +164,9 @@ function App() {
     const savedSession = localStorage.getItem("session");
 
     if (savedSession) {
-
       const parsedSession = JSON.parse(savedSession);
-
-      const normalizedGender =
-
-        parsedSession.preferredGender === "female" ? "female" : "male";
-
+      const normalizedGender = parsedSession.preferredGender === "female" ? "female" : "male";
       const restoredSession = {
-
         ...parsedSession,
         user: parsedSession.user
           ? {
@@ -197,289 +175,160 @@ function App() {
             }
           : parsedSession.user,
         preferredGender: normalizedGender,
-
       };
-
-
 
       setSession(restoredSession);
 
-
-
-      // For non-admin users, ensure profile data is fresh before rendering home
-
       if (parsedSession.token && parsedSession.user?.role !== "admin") {
-
         axios
-
           .get("/api/auth/profile", {
-
             headers: {
-
               Authorization: `Bearer ${parsedSession.token}`,
-
             },
-
           })
-
           .then((response) => {
-
             const profileUser = response.data.user || response.data;
-
             handleSessionUpdate(profileUser);
-
           })
-
-          .catch(() => {
-
-            // Keep the restored session if the profile lookup fails.
-
+          .catch((error) => {
+            if (error.response?.status === 401 || error.response?.status === 403) {
+              localStorage.removeItem("session");
+              setSession(null);
+              setCurrentPage("login");
+            }
           });
-
       }
 
-
-
-      setCurrentPage(
-
-        parsedSession.user?.role === "admin" ? "admin-dashboard" : "home",
-
-      );
-
+      setCurrentPage(parsedSession.user?.role === "admin" ? "admin-dashboard" : "home");
     }
 
-    // Handle PayPal redirect token (approval) present in URL
-
     try {
-
       const params = new URLSearchParams(window.location.search);
-
       const token = params.get("token");
-
       const isPaypalCancel = params.has("paypalCancel");
-
       const paypalSuccess = params.has("paypalSuccess");
-
       const paypalUnsuccessful = params.has("paypalUnsuccessful");
-
       const returnedOrderId = params.get("orderId");
 
-
-
       if (paypalSuccess) {
-
         setPaymentSuccess({
-
           title: "Thank you for ordering from Plage Surf",
-
           message:
-
             "Your payment has been captured successfully. Your order is being prepared now.",
-
           orderId: returnedOrderId || "-",
-
         });
-
       }
 
-      // Only show unsuccessful message if there's no token to attempt capture
       if (paypalUnsuccessful && !token) {
-
         setPaymentSuccess({
-
           title: "Payment could not be completed",
-
           message:
-
             "Your PayPal checkout was not completed. The order was marked as cancelled.",
-
           orderId: returnedOrderId || token || "-",
-
         });
-
       }
-
-
 
       if (token) {
-
-        // If user is signed in, attempt capture immediately
-
         const sessionStr = localStorage.getItem("session");
-
         const saved = sessionStr ? JSON.parse(sessionStr) : null;
 
         if (!saved || !saved.token) {
-
           alert("Please sign in to complete PayPal payment.");
-
         } else {
-
           (async () => {
-
             try {
-
               if (isPaypalCancel) {
-
                 await axios.post(
-
                   "/api/cart/paypal/cancel",
-
                   { orderID: token },
-
                   { headers: { Authorization: `Bearer ${saved.token}` } },
-
                 );
 
-
-
                 setPaymentSuccess({
-
                   title: "Checkout cancelled",
-
                   message:
-
                     "You cancelled PayPal checkout before payment was completed.",
-
                   orderId: token,
-
                 });
-
               } else {
-
                 const resp = await axios.post(
-
                   "/api/cart/paypal/capture",
-
                   { orderID: token },
-
                   { headers: { Authorization: `Bearer ${saved.token}` } },
-
                 );
 
-
-
                 setPaymentSuccess({
-
                   title: "Thank you for ordering from Plage Surf",
-
                   message:
-
                     "Your payment has been captured successfully. Your order is being prepared now.",
-
                   orderId: resp.data?.order?.id || token,
-
                 });
-
-                // refresh cart items after capture
 
                 const refreshed = await axios.get("/api/cart", {
-
                   headers: { Authorization: `Bearer ${saved.token}` },
-
                 });
 
                 setCartItems(normalizeCartItems(refreshed.data));
-
               }
-
             } catch (err) {
-
               console.error("PayPal return handling error:", err?.response || err);
-
               setPaymentSuccess({
-
                 title: isPaypalCancel ? "Checkout cancelled" : "Payment could not be completed",
-
                 message:
-
                   err?.response?.data?.message ||
-
                   "Please try again or contact support if the issue continues.",
-
                 orderId: token,
-
               });
-
             }
-
           })();
-
         }
-
       }
-
-
 
       if (token || isPaypalCancel || paypalSuccess || paypalUnsuccessful) {
-
         window.history.replaceState(null, "", window.location.pathname);
-
       }
-
     } catch (e) {
-
       // ignore
-
     }
-
   }, [handleSessionUpdate]);
 
-
-
   useEffect(() => {
+    if (!session?.token || session?.user?.role === "admin") {
+      return undefined;
+    }
 
-    const loadCart = async () => {
+    let isMounted = true;
 
-      if (!session?.token) {
+    axios
+      .get("/api/auth/profile", {
+        headers: {
+          Authorization: `Bearer ${session.token}`,
+        },
+      })
+      .then((response) => {
+        if (!isMounted) {
+          return;
+        }
 
-        setCartItems([]);
+        const profileUser = response.data.user || response.data;
+        handleSessionUpdate(profileUser);
+      })
+      .catch((error) => {
+        if (!isMounted) {
+          return;
+        }
 
-        return;
+        if (error.response?.status === 401 || error.response?.status === 403) {
+          localStorage.removeItem("session");
+          setSession(null);
+          setCurrentPage("login");
+        }
+      });
 
-      }
-
-
-
-      try {
-
-        const response = await axios.get("/api/cart", {
-
-          headers: {
-
-            Authorization: `Bearer ${session.token}`,
-
-          },
-
-        });
-
-
-
-        setCartItems(normalizeCartItems(response.data));
-
-      } catch (error) {
-
-        console.error("Failed to load cart:", error.message);
-
-        setCartItems([]);
-
-      }
-
+    return () => {
+      isMounted = false;
     };
-
-
-
-    loadCart();
-
-  }, [session?.token]);
-
-
-
-
-
-  // Central navigation handler used by the header and page buttons.
-
-  // It also blocks non-admin users from opening the admin orders page.
+  }, [handleSessionUpdate, session?.token, session?.user?.role]);
 
   const handleNavigate = (page, categoryOrData) => {
 
@@ -800,7 +649,7 @@ function App() {
 
 
 
-  const logout = () => {
+  function logout() {
 
     localStorage.removeItem("session");
 
@@ -808,7 +657,7 @@ function App() {
 
     setSession(null);
 
-  };
+  }
 
 
 

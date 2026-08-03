@@ -1,12 +1,13 @@
 /**
  * Manage Customers Page
  * Admin-only page for viewing and managing customer accounts
- * Features search functionality and customer deletion with confirmation
+ * Features search functionality and customer activation status management
  */
 import React, { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
+import { STATUS_COLORS } from "../utils/statusColors";
 
 function ManageCustomers({
   session,
@@ -25,6 +26,7 @@ function ManageCustomers({
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [pendingUserId, setPendingUserId] = useState(null);
   const [pendingUsername, setPendingUsername] = useState("");
+  const [pendingNextIsActive, setPendingNextIsActive] = useState(null);
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
@@ -79,36 +81,56 @@ function ManageCustomers({
         });
   };
 
-  const handleConfirmDelete = async () => {
-    if (pendingUserId === session.user.id) {
-      setActionMessage("You cannot delete your own admin account.");
-      setShowConfirmModal(false);
-      setPendingUserId(null);
-      setPendingUsername("");
-      return;
-    }
+  const clearPendingAction = () => {
+    setShowConfirmModal(false);
+    setPendingUserId(null);
+    setPendingUsername("");
+    setPendingNextIsActive(null);
+  };
 
+  const handleConfirmStatusChange = async () => {
     try {
-      await axios.delete(`/api/admin/users/${pendingUserId}`, {
-        headers: {
-          Authorization: `Bearer ${session.token}`,
+      const response = await axios.put(
+        `/api/users/${pendingUserId}/status`,
+        {
+          is_active: pendingNextIsActive === 1,
         },
-      });
-      setActionMessage("Customer removed successfully.");
-      setShowConfirmModal(false);
-      setPendingUserId(null);
-      setPendingUsername("");
-      loadUsers();
-    } catch (deleteError) {
-      setActionMessage(
-        deleteError.response?.data?.message ||
-          deleteError.message ||
-          "Unable to remove customer",
+        {
+          headers: {
+            Authorization: `Bearer ${session.token}`,
+          },
+        },
       );
-      setShowConfirmModal(false);
-      setPendingUserId(null);
-      setPendingUsername("");
+
+      setActionMessage(
+        response.data.message ||
+          (pendingNextIsActive === 1
+            ? "Customer activated successfully."
+            : "Customer unactivated successfully."),
+      );
+      clearPendingAction();
+      loadUsers();
+    } catch (statusError) {
+      setActionMessage(
+        statusError.response?.data?.message ||
+          statusError.message ||
+          "Unable to update customer status",
+      );
+      clearPendingAction();
     }
+  };
+
+  const openStatusDialog = (user) => {
+    const nextIsActive = Number(user.is_active) === 1 ? 0 : 1;
+
+    setPendingUserId(user.id);
+    setPendingUsername(user.username);
+    setPendingNextIsActive(nextIsActive);
+    setShowConfirmModal(true);
+  };
+
+  const closeStatusDialog = () => {
+    clearPendingAction();
   };
 
   return (
@@ -136,7 +158,8 @@ function ManageCustomers({
               Manage customers
             </h1>
             <p className="ps-lead" style={{ maxWidth: "760px" }}>
-              View every registered customer and remove accounts if needed.
+              View every registered customer and control whether an account is
+              active.
             </p>
           </div>
 
@@ -215,6 +238,15 @@ function ManageCustomers({
                         color: "#5f5550",
                       }}
                     >
+                      Status
+                    </th>
+                    <th
+                      style={{
+                        textAlign: "left",
+                        padding: "12px 10px",
+                        color: "#5f5550",
+                      }}
+                    >
                       Joined
                     </th>
                     <th
@@ -229,45 +261,70 @@ function ManageCustomers({
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredUsers.map((user) => (
-                    <tr
-                      key={user.id}
-                      style={{
-                        borderTop: "1px solid rgba(31, 24, 19, 0.08)",
-                        fontSize: "13px",
-                      }}
-                    >
-                      <td style={{ padding: "14px 10px", color: "#1f1813" }}>
-                        {user.username}
-                      </td>
-                      <td style={{ padding: "14px 10px", color: "#65574d" }}>
-                        {user.email}
-                      </td>
-                      <td style={{ padding: "14px 10px", color: "#1f1813" }}>
-                        {user.role}
-                      </td>
-                      <td style={{ padding: "14px 10px", color: "#65574d" }}>
-                        {formatJoinedDate(user.createdAt || user.created_at)}
-                      </td>
-                      <td style={{ padding: "14px 10px", textAlign: "right" }}>
-                        <button
-                          type="button"
-                          className="ps-btn ps-btn-secondary"
-                          disabled={user.id === session.user.id}
-                          onClick={() => {
-                            setPendingUserId(user.id);
-                            setPendingUsername(user.username);
-                            setShowConfirmModal(true);
-                          }}
-                          style={{ fontSize: "12px" }}
-                        >
-                          {user.id === session.user.id
-                            ? "Current admin"
-                            : "Delete"}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {filteredUsers.map((user) => {
+                    const isActive = Number(user.is_active) === 1;
+
+                    return (
+                      <tr
+                        key={user.id}
+                        style={{
+                          borderTop: "1px solid rgba(31, 24, 19, 0.08)",
+                          fontSize: "13px",
+                        }}
+                      >
+                        <td style={{ padding: "14px 10px", color: "#1f1813" }}>
+                          {user.username}
+                        </td>
+                        <td style={{ padding: "14px 10px", color: "#65574d" }}>
+                          {user.email}
+                        </td>
+                        <td style={{ padding: "14px 10px", color: "#1f1813" }}>
+                          {user.role}
+                        </td>
+                        <td style={{ padding: "14px 10px" }}>
+                          <span
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              padding: "5px 10px",
+                              borderRadius: "999px",
+                              fontSize: "12px",
+                              fontWeight: 700,
+                              letterSpacing: "0.02em",
+                              background: isActive
+                                ? `${STATUS_COLORS.success}1f`
+                                : "rgba(153, 27, 27, 0.12)",
+                              color: isActive ? STATUS_COLORS.success : "#991b1b",
+                            }}
+                          >
+                            {isActive ? "Active" : "Inactive"}
+                          </span>
+                        </td>
+                        <td style={{ padding: "14px 10px", color: "#65574d" }}>
+                          {formatJoinedDate(user.createdAt || user.created_at)}
+                        </td>
+                        <td style={{ padding: "14px 10px", textAlign: "right" }}>
+                          <button
+                            type="button"
+                            className="ps-btn ps-btn-secondary"
+                            onClick={() => openStatusDialog(user)}
+                            style={{
+                              fontSize: "12px",
+                              background: !isActive
+                                ? STATUS_COLORS.success
+                                : undefined,
+                              borderColor: !isActive
+                                ? STATUS_COLORS.success
+                                : undefined,
+                              color: !isActive ? "#fff" : undefined,
+                            }}
+                          >
+                            {isActive ? "Unactivate User" : "Activate User"}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             )}
@@ -282,40 +339,44 @@ function ManageCustomers({
 
       {/* Confirmation Modal */}
       {showConfirmModal && (
-        <div
-          className="ps-cartConfirmBackdrop"
-          onClick={() => setShowConfirmModal(false)}
-        >
+        <div className="ps-cartConfirmBackdrop" onClick={closeStatusDialog}>
           <div
             className="ps-cartConfirmCard"
             role="dialog"
             aria-modal="true"
-            aria-label="Confirm delete user"
+            aria-label="Confirm customer status change"
             onClick={(event) => event.stopPropagation()}
           >
-            <h2 className="ps-cartConfirmTitle">Delete Customer?</h2>
+            <h2 className="ps-cartConfirmTitle">
+              {pendingNextIsActive === 1
+                ? "Activate User?"
+                : "Unactivate User?"}
+            </h2>
             <p className="ps-cartConfirmText">
-              Are you sure you want to delete {pendingUsername}? This action
-              cannot be undone.
+              {pendingNextIsActive === 1
+                ? "Are you sure you want to activate this user?"
+                : "Are you sure you want to unactivate this user?"}
             </p>
             <div className="ps-cartConfirmActions">
               <button
                 type="button"
                 className="ps-btn ps-cartConfirmCancel"
-                onClick={() => {
-                  setShowConfirmModal(false);
-                  setPendingUserId(null);
-                  setPendingUsername("");
-                }}
+                onClick={closeStatusDialog}
               >
                 Cancel
               </button>
               <button
                 type="button"
                 className="ps-btn ps-cartConfirmDelete"
-                onClick={handleConfirmDelete}
+                onClick={handleConfirmStatusChange}
+                style={{
+                  background:
+                    pendingNextIsActive === 0 ? STATUS_COLORS.success : undefined,
+                  borderColor:
+                    pendingNextIsActive === 0 ? STATUS_COLORS.success : undefined,
+                }}
               >
-                Delete
+                Confirm
               </button>
             </div>
           </div>

@@ -9,6 +9,9 @@ const orderRoutes = require("./routes/orderRoutes");
 const categoryRoutes = require("./routes/categoryRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const assistantRoutes = require("./routes/assistant");
+const authMiddleware = require("./middleware/authMiddleware");
+const adminMiddleware = require("./middleware/adminMiddleware");
+const { updateCustomerStatus } = require("./controllers/customerController");
 const initDatabase = require("./db/init");
 
 const app = express();
@@ -40,6 +43,19 @@ app.use("/api/orders", orderRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/assistant", assistantRoutes);
 app.use("/api/categories", categoryRoutes);
+
+app.put(
+  "/api/users/:userId/status",
+  authMiddleware,
+  adminMiddleware,
+  updateCustomerStatus,
+);
+app.patch(
+  "/api/users/:userId/status",
+  authMiddleware,
+  adminMiddleware,
+  updateCustomerStatus,
+);
 
 app.use((error, req, res, next) => {
   if (!error) {

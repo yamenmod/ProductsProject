@@ -3,7 +3,7 @@ const authMiddleware = require("../middleware/authMiddleware");
 const adminMiddleware = require("../middleware/adminMiddleware");
 const {
   getCustomers,
-  deleteCustomer,
+  updateCustomerStatus,
 } = require("../controllers/customerController");
 const {
   getSetting,
@@ -18,18 +18,18 @@ const {
 const router = express.Router();
 
 router.get("/users", authMiddleware, adminMiddleware, getCustomers);
-router.delete(
-  "/users/:userId",
+router.patch(
+  "/users/:userId/status",
   authMiddleware,
   adminMiddleware,
-  deleteCustomer,
+  updateCustomerStatus,
 );
 router.get("/customers", authMiddleware, adminMiddleware, getCustomers);
-router.delete(
-  "/customers/:userId",
+router.patch(
+  "/customers/:userId/status",
   authMiddleware,
   adminMiddleware,
-  deleteCustomer,
+  updateCustomerStatus,
 );
 
 // Public endpoint to get current VAT rate (no auth required)

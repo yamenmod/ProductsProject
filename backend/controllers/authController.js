@@ -25,6 +25,10 @@ const formatUser = (user) => ({
   username: user.username,
   email: user.email,
   role: user.role ?? null,
+  isActive:
+    user.is_active === null || user.is_active === undefined
+      ? null
+      : Number(user.is_active) === 1,
 
   weight:
     user.weight === null || user.weight === undefined
@@ -224,7 +228,7 @@ const register = async (req, res) => {
     }
 
     const [insertResult] = await db.query(
-      "INSERT INTO users (username, email, password, role, weight, height) VALUES (?, ?, ?, ?, ?, ?)",
+      "INSERT INTO users (username, email, password, role, weight, height, is_active) VALUES (?, ?, ?, ?, ?, ?, 1)",
       [
         normalizedUsername,
         normalizedEmail,
@@ -238,7 +242,7 @@ const register = async (req, res) => {
     console.log("✅ INSERT RESULT:", { insertId: insertResult.insertId });
 
     const [users] = await db.query(
-      "SELECT id, username, email, role, weight, height FROM users WHERE id = ? LIMIT 1",
+      "SELECT id, username, email, role, is_active, weight, height FROM users WHERE id = ? LIMIT 1",
       [insertResult.insertId],
     );
 
@@ -282,7 +286,7 @@ const login = async (req, res) => {
     }
 
     const [users] = await db.query(
-      "SELECT id, username, email, password, role, weight, height FROM users WHERE username = ? AND password = ? LIMIT 1",
+      "SELECT id, username, email, password, role, is_active, weight, height FROM users WHERE username = ? AND password = ? LIMIT 1",
       [username.trim(), password],
     );
 
@@ -291,6 +295,13 @@ const login = async (req, res) => {
     if (!user) {
       console.log("❌ LOGIN FAILED: Invalid credentials");
       return res.status(401).json({ message: "Invalid login" });
+    }
+
+    if (user.role !== "admin" && Number(user.is_active) !== 1) {
+      return res.status(403).json({
+        message:
+          "Sorry, your account has been unactivated. You can no longer use our website. Please contact the administrator at Waseemyamen1@gmail.com for assistance.",
+      });
     }
 
     console.log("LOGIN USER FROM DB:", user);
@@ -326,7 +337,7 @@ const getProfile = async (req, res) => {
     console.log("📋 GET PROFILE REQUEST: userId =", userId);
 
     const [users] = await db.query(
-      "SELECT id, username, email, role, weight, height FROM users WHERE id = ? LIMIT 1",
+      "SELECT id, username, email, role, is_active, weight, height FROM users WHERE id = ? LIMIT 1",
       [userId],
     );
 
@@ -395,7 +406,7 @@ const updateProfile = async (req, res) => {
     });
 
     const [users] = await db.query(
-      "SELECT id, username, email, role, weight, height FROM users WHERE id = ? LIMIT 1",
+      "SELECT id, username, email, role, is_active, weight, height FROM users WHERE id = ? LIMIT 1",
       [userId],
     );
 
