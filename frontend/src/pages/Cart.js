@@ -977,21 +977,6 @@ function Cart({
                     </p>
                   </div>
 
-                  <div style={{ textAlign: "center", minWidth: "80px" }}>
-                    <p
-                      style={{
-                        margin: "0 0 4px",
-                        color: "#65574d",
-                        fontSize: "12px",
-                      }}
-                    >
-                      Shipping
-                    </p>
-                    <p style={{ margin: 0, fontWeight: 700, fontSize: "14px" }}>
-                      $0.00
-                    </p>
-                  </div>
-
                   <div
                     style={{
                       textAlign: "center",

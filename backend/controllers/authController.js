@@ -218,13 +218,22 @@ const register = async (req, res) => {
       normalizedHeight,
     });
 
-    const [existingUsers] = await db.query(
-      "SELECT id FROM users WHERE username = ? OR email = ? LIMIT 1",
-      [normalizedUsername, normalizedEmail],
+    const [existingUsername] = await db.query(
+      "SELECT id FROM users WHERE username = ? LIMIT 1",
+      [normalizedUsername],
     );
 
-    if (existingUsers.length) {
-      return res.status(400).json({ message: "User already exists" });
+    if (existingUsername.length) {
+      return res.status(400).json({ message: "Username already exists" });
+    }
+
+    const [existingEmail] = await db.query(
+      "SELECT id FROM users WHERE email = ? LIMIT 1",
+      [normalizedEmail],
+    );
+
+    if (existingEmail.length) {
+      return res.status(400).json({ message: "This email address is already registered. Please use a different email or login to your existing account." });
     }
 
     const [insertResult] = await db.query(

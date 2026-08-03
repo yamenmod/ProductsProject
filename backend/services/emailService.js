@@ -4,6 +4,10 @@ const {
   buildOrderEmailHtml,
   formatMoney,
 } = require("../utils/emailTemplatesClean");
+const {
+  splitVatInclusivePricing,
+  getVatRateFromDb,
+} = require("../utils/pricing");
 
 const createTransporter = () => {
   const user = (process.env.EMAIL_USER || "").trim();
@@ -94,6 +98,8 @@ const sendOrderConfirmation = async ({
     }));
 
     const total = Number(orderRecord.total) || 0;
+    const vatRate = await getVatRateFromDb(db);
+    const pricing = splitVatInclusivePricing(total, vatRate);
 
     const html = buildOrderEmailHtml({
       customerName: orderRecord.username || "Surfer",
@@ -103,9 +109,9 @@ const sendOrderConfirmation = async ({
       transactionId: paypalOrderId || orderRecord.id,
       currency: process.env.PAYPAL_CURRENCY || "USD",
       items,
-      subtotal: total,
+      subtotal: pricing.basePrice,
       shipping: 0,
-      tax: 0,
+      tax: pricing.vatAmount,
       total,
       viewOrderUrl: "#",
     });

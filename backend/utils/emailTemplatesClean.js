@@ -155,10 +155,6 @@ const buildOrderEmailHtml = ({
                 <strong style="color:#06203a;">${formatMoney(subtotal, currency)}</strong>
               </div>
               <div style="display:flex;justify-content:space-between;color:#475569;font-size:14px;">
-                <span>Shipping: </span>
-                <strong style="color:#06203a;">${formatMoney(shipping, currency)}</strong>
-              </div>
-              <div style="display:flex;justify-content:space-between;color:#475569;font-size:14px;">
                 <span>Tax: </span>
                 <strong style="color:#06203a;">${formatMoney(tax, currency)}</strong>
               </div>

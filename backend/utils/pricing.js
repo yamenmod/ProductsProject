@@ -16,6 +16,31 @@ const calculateVatPricing = (basePrice, vatRate = DEFAULT_VAT_RATE) => {
   };
 };
 
+const splitVatInclusivePricing = (totalPrice, vatRate = DEFAULT_VAT_RATE) => {
+  const finalPrice = roundMoney(totalPrice);
+  const safeVatRate = Math.min(Math.max(vatRate ?? DEFAULT_VAT_RATE, 0), 1);
+
+  if (finalPrice <= 0) {
+    return {
+      basePrice: 0,
+      vatAmount: 0,
+      finalPrice: 0,
+      vatRate: safeVatRate,
+    };
+  }
+
+  const divisor = 1 + safeVatRate;
+  const basePrice = roundMoney(divisor > 0 ? finalPrice / divisor : finalPrice);
+  const vatAmount = roundMoney(finalPrice - basePrice);
+
+  return {
+    basePrice,
+    vatAmount,
+    finalPrice,
+    vatRate: safeVatRate,
+  };
+};
+
 const getVatRateFromDb = async (db) => {
   try {
     const [rows] = await db.query(
@@ -35,5 +60,6 @@ module.exports = {
   DEFAULT_VAT_RATE,
   roundMoney,
   calculateVatPricing,
+  splitVatInclusivePricing,
   getVatRateFromDb,
 };

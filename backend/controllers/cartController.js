@@ -10,6 +10,7 @@ const {
 const {
   calculateVatPricing,
   roundMoney,
+  splitVatInclusivePricing,
   getVatRateFromDb,
 } = require("../utils/pricing");
 const { getMaxQuantityPerCart } = require("../utils/settings");
@@ -100,6 +101,7 @@ const getPayPalAccessToken = async () => {
 
 const calculateCartTotal = async (userId) => {
   // Load the current cart and calculate the VAT-inclusive total.
+  const vatRate = await getVatRateFromDb(db);
   const [cartRows] = await db.query(
     `
       SELECT p.id, p.name, p.price, p.stock, p.size_stock, c.name AS category, ci.size, ci.quantity
@@ -120,7 +122,7 @@ const calculateCartTotal = async (userId) => {
 
   let total = 0;
   const items = cartRows.map((item) => {
-    const pricing = calculateVatPricing(item.price);
+    const pricing = calculateVatPricing(item.price, vatRate);
     const itemTotal = roundMoney(pricing.finalPrice * Number(item.quantity));
     total = roundMoney(total + itemTotal);
 
@@ -226,6 +228,7 @@ const quickCheckout = async (req, res) => {
 
     const qty = Number(quantity) > 0 ? Number(quantity) : 1;
     const normalizedSize = (size || "").toString().trim().toUpperCase();
+    const vatRate = await getVatRateFromDb(db);
 
     const connection = await db.getConnection();
     try {
@@ -311,7 +314,7 @@ const quickCheckout = async (req, res) => {
         );
       }
 
-      const pricing = calculateVatPricing(product.price);
+      const pricing = calculateVatPricing(product.price, vatRate);
       const subtotal = roundMoney(pricing.finalPrice * qty);
       const total = roundMoney(subtotal);
 
@@ -853,6 +856,8 @@ const checkout = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
+    const vatRate = await getVatRateFromDb(db);
+
     const [cartRows] = await db.query(
       `
         SELECT
@@ -881,68 +886,111 @@ const checkout = async (req, res) => {
     try {
       await connection.beginTransaction();
 
-      try {
-        await rebuildCartHoldOrder(connection, req.user.id, db);
-      } catch (rebuildError) {
-        await connection.rollback();
-        connection.release();
-        return res.status(400).json({
-          message: rebuildError.message || "Unable to complete checkout",
+      const items = [];
+      let total = 0;
+
+      for (const row of cartRows) {
+        const normalizedSize = (row.size || "").toString().trim().toUpperCase();
+        const qty = Number(row.quantity || 0);
+
+        const [products] = await connection.query(
+          `SELECT p.id, p.name, p.price, p.stock, p.size_stock, c.name AS category
+           FROM products p
+           LEFT JOIN categories c ON c.id = p.category_id
+           WHERE p.id = ? LIMIT 1 FOR UPDATE`,
+          [row.id],
+        );
+
+        if (!products.length) {
+          await connection.rollback();
+          connection.release();
+          return res.status(404).json({ message: `Product ${row.id} not found` });
+        }
+
+        const product = products[0];
+        const sizeStock = normalizeSizeStockMap(product.size_stock);
+
+        let available = 0;
+        if (sizeStock) {
+          available = normalizedSize
+            ? Number(sizeStock[normalizedSize] || 0)
+            : getSizeStockTotal(sizeStock);
+        } else {
+          available = Number(product.stock || 0);
+        }
+
+        if (qty > available) {
+          await connection.rollback();
+          connection.release();
+          return res.status(400).json({
+            message: `Only ${available} items left for ${product.name}`,
+          });
+        }
+
+        if (sizeStock && normalizedSize) {
+          const nextSizeStock = { ...sizeStock };
+          nextSizeStock[normalizedSize] =
+            Number(nextSizeStock[normalizedSize] || 0) - qty;
+          await connection.query(
+            "UPDATE products SET stock = ?, size_stock = ?, updated_at = NOW() WHERE id = ?",
+            [
+              getSizeStockTotal(nextSizeStock),
+              serializeSizeStock(nextSizeStock),
+              product.id,
+            ],
+          );
+        } else {
+          await connection.query(
+            "UPDATE products SET stock = stock - ?, updated_at = NOW() WHERE id = ?",
+            [qty, product.id],
+          );
+        }
+
+        const pricing = calculateVatPricing(row.price, vatRate);
+        const itemTotal = roundMoney(pricing.finalPrice * qty);
+        total = roundMoney(total + itemTotal);
+
+        items.push({
+          product: row.id,
+          name: row.name,
+          displayName: row.size ? `${row.name} (Size ${row.size})` : row.name,
+          finalPrice: pricing.finalPrice,
+          quantity: qty,
+          subtotal: itemTotal,
+          pricing,
         });
       }
 
-      const cartHoldId = await findCartHoldOrderId(connection, req.user.id);
-      if (!cartHoldId) {
-        await connection.rollback();
-        connection.release();
-        return res.status(400).json({ message: "Cart is empty" });
-      }
-
-      const [orderRows] = await connection.query(
-        "SELECT total FROM orders WHERE id = ? LIMIT 1",
-        [cartHoldId],
-      );
-      const total = roundMoney(Number(orderRows[0]?.total || 0));
-
-      const [orderItemRows] = await connection.query(
-        "SELECT product_id, name, price, quantity FROM order_items WHERE order_id = ?",
-        [cartHoldId],
-      );
-
-      const items = orderItemRows.map((row) => ({
-        product: row.product_id,
-        name: row.name,
-        displayName: row.name,
-        finalPrice: Number(row.price),
-        quantity: Number(row.quantity),
-        subtotal: roundMoney(Number(row.price) * Number(row.quantity)),
-      }));
-
       const synced = syncOrderStatusFields(ORDER_STATUS.SUCCESS);
-      await connection.query(
-        `UPDATE orders
-         SET status = ?, payment_status = ?, order_status = ?, paid_at = NOW(),
-             customer_email = COALESCE(?, customer_email)
-         WHERE id = ?`,
+      const [orderResult] = await connection.query(
+        "INSERT INTO orders (user_id, total, customer_email, status, payment_status, order_status, created_at, paid_at) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())",
         [
+          req.user.id,
+          total,
+          users[0]?.email || null,
           synced.status,
           synced.payment_status,
           synced.order_status,
-          users[0]?.email || null,
-          cartHoldId,
         ],
       );
 
-      await connection.query("DELETE FROM cart_items WHERE user_id = ?", [
-        req.user.id,
-      ]);
+      const orderId = orderResult.insertId;
+
+      for (const item of items) {
+        await connection.query(
+          "INSERT INTO order_items (order_id, product_id, name, price, quantity) VALUES (?, ?, ?, ?, ?)",
+          [orderId, item.product, item.displayName || item.name, item.finalPrice, item.quantity],
+        );
+      }
+
+      await connection.query("DELETE FROM cart_items WHERE user_id = ?", [req.user.id]);
       await connection.commit();
       connection.release();
 
       return res.status(200).json({
         message: "Purchase completed successfully",
         order: {
-          id: cartHoldId,
+          id: orderId,
           items,
           total,
           status: ORDER_STATUS.SUCCESS,
@@ -1873,7 +1921,7 @@ const getOrderItems = async (req, res) => {
 
     const order = orders[0];
     const vatRate = await getVatRateFromDb(db);
-    const pricing = calculateVatPricing(order.total, vatRate);
+    const pricing = splitVatInclusivePricing(order.total, vatRate);
 
     return res.status(200).json({
       order: {
