@@ -16,7 +16,6 @@ function Header({
   const [boardInputs, setBoardInputs] = useState({
     weight: "",
     height: "",
-    skillLevel: "beginner",
   });
   const [boardUsingSavedProfile, setBoardUsingSavedProfile] = useState(false);
   const [boardRecommendations, setBoardRecommendations] = useState(null);
@@ -35,7 +34,6 @@ function Header({
   const getInitialBoardInputs = () => ({
     weight: parseMeasurementValue(user?.weight),
     height: parseMeasurementValue(user?.height),
-    skillLevel: "beginner",
   });
 
   const handleLogoutClick = () => {
@@ -60,7 +58,6 @@ function Header({
     const resolvedInputs = {
       weight: (nextInputs.weight || "").toString().trim(),
       height: (nextInputs.height || "").toString().trim(),
-      skillLevel: nextInputs.skillLevel || "beginner",
     };
 
     try {
@@ -74,7 +71,6 @@ function Header({
       const response = await axios.post("/api/products/recommend-boards", {
         weight: Number(resolvedInputs.weight),
         height: Number(resolvedInputs.height),
-        skillLevel: resolvedInputs.skillLevel,
       });
 
       setBoardRecommendations(response.data);
@@ -89,7 +85,7 @@ function Header({
 
   const resetBoardChooser = () => {
     // Close the chooser and clear the previous recommendation results.
-    setBoardInputs({ weight: "", height: "", skillLevel: "beginner" });
+    setBoardInputs({ weight: "", height: "" });
     setBoardRecommendations(null);
     setRecommendationError("");
     setBoardUsingSavedProfile(false);
@@ -446,7 +442,7 @@ function Header({
                       marginBottom: "20px",
                     }}
                   >
-                    {/* Weight, height, and skill level are sent to the recommendation endpoint. */}
+                    {/* Weight and height are sent to the recommendation endpoint. */}
                     <input
                       type="number"
                       placeholder="Weight (kg)"
@@ -507,35 +503,6 @@ function Header({
                       }}
                     />
 
-                    <select
-                      value={boardInputs.skillLevel}
-                      onChange={(e) =>
-                        setBoardInputs({
-                          ...boardInputs,
-                          skillLevel: e.target.value,
-                        })
-                      }
-                      disabled={boardUsingSavedProfile && recommendationLoading}
-                      style={{
-                        padding: "10px 12px",
-                        border: "1px solid #d9c3ad",
-                        borderRadius: "8px",
-                        fontSize: "14px",
-                        fontFamily: "inherit",
-                        cursor:
-                          boardUsingSavedProfile && recommendationLoading
-                            ? "not-allowed"
-                            : "pointer",
-                        opacity:
-                          boardUsingSavedProfile && recommendationLoading
-                            ? 0.6
-                            : 1,
-                      }}
-                    >
-                      <option value="beginner">Beginner</option>
-                      <option value="intermediate">Intermediate</option>
-                      <option value="advanced">Advanced</option>
-                    </select>
                   </div>
 
                   {recommendationError && (
@@ -619,7 +586,7 @@ function Header({
                                   fontWeight: "600",
                                 }}
                               >
-                                #{index + 1} - {board.name}
+                                #{index + 1} {board.name}
                               </p>
                               <p
                                 style={{
@@ -640,7 +607,7 @@ function Header({
                                   color: "#245860",
                                 }}
                               >
-                                {board.recommendationScore}% Match
+                                {board.recommendationScore}% - {board.matchCategory}
                               </p>
                               <p
                                 style={{
@@ -649,8 +616,7 @@ function Header({
                                   color: "#666",
                                 }}
                               >
-                                Volume: {board.volume}L | Length:{" "}
-                                {board.boardLength}ft
+                                Volume: {board.volume}L
                               </p>
                             </div>
                           </div>

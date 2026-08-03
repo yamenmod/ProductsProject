@@ -199,7 +199,23 @@ function App() {
           });
       }
 
-      setCurrentPage(parsedSession.user?.role === "admin" ? "admin-dashboard" : "home");
+      // Restore saved page from localStorage, or use default based on role
+      const savedPage = localStorage.getItem("currentPage");
+      const isAdmin = parsedSession.user?.role === "admin";
+      
+      if (savedPage) {
+        // Check if the saved page is appropriate for the user's role
+        const adminPages = ["manage-orders", "manage-products", "manage-customers", "admin-dashboard"];
+        const isSavedPageAdmin = adminPages.includes(savedPage);
+        
+        if (isAdmin || !isSavedPageAdmin) {
+          setCurrentPage(savedPage);
+        } else {
+          setCurrentPage("home");
+        }
+      } else {
+        setCurrentPage(isAdmin ? "admin-dashboard" : "home");
+      }
     }
 
     try {
@@ -330,7 +346,39 @@ function App() {
     };
   }, [handleSessionUpdate, session?.token, session?.user?.role]);
 
+  // Load cart data when session is restored
+  useEffect(() => {
+    if (!session?.token || session?.user?.role === "admin") {
+      return undefined;
+    }
+
+    let isMounted = true;
+
+    axios
+      .get("/api/cart", {
+        headers: {
+          Authorization: `Bearer ${session.token}`,
+        },
+      })
+      .then((response) => {
+        if (!isMounted) {
+          return;
+        }
+
+        setCartItems(normalizeCartItems(response.data));
+      })
+      .catch((error) => {
+        console.error("Failed to load cart:", error);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [session?.token, session?.user?.role]);
+
   const handleNavigate = (page, categoryOrData) => {
+    // Save current page to localStorage for persistence on refresh
+    localStorage.setItem("currentPage", page);
 
     const isAdmin = session?.user?.role === "admin";
 
