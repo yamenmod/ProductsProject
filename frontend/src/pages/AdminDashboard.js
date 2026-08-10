@@ -176,18 +176,27 @@ function AdminDashboard({
   }, [products, watchlistSearch]);
 
   useEffect(() => {
-    if (products.length > 0) {
-      const uniqueCategories = [
-        ...new Set(
-          products
-            .map((p) => p.category)
-            .filter((cat) => cat && typeof cat === 'string' && cat.trim() !== "")
-        ),
-      ].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
-      console.log("Unique categories found:", uniqueCategories);
-      setCategories(uniqueCategories);
-    }
-  }, [products]);
+    const loadCategories = async () => {
+      if (!session?.token) {
+        return;
+      }
+
+      try {
+        const response = await axios.get("/api/admin/categories", {
+          headers: { Authorization: `Bearer ${session.token}` },
+        });
+        const categoryNames = response.data.map((cat) => cat.name).sort((a, b) => 
+          a.toLowerCase().localeCompare(b.toLowerCase())
+        );
+        console.log("Categories loaded from database:", categoryNames);
+        setCategories(categoryNames);
+      } catch (error) {
+        console.error("Failed to load categories:", error);
+      }
+    };
+
+    loadCategories();
+  }, [session?.token]);
 
   useEffect(() => {
     const loadStats = async () => {

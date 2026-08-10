@@ -81,22 +81,26 @@ const getCategorySales = async (req, res) => {
 
     console.log("[admin:getCategorySales] SQL params:", params);
 
-    // Get sales data for products in a category that have sales
-    // Note: category is stored in categories table, joined via category_id
+    // First, get all products in the category (regardless of sales)
+    // Then LEFT JOIN with order data to get sales within the date range
+    // This separates product existence from sales calculation
     const [rows] = await db.query(
       `
       SELECT 
-        oi.product_id,
-        oi.name,
-        SUM(oi.quantity) as total_sold
-      FROM order_items oi
-      INNER JOIN orders o ON oi.order_id = o.id
-      INNER JOIN products p ON oi.product_id = p.id
+        p.id as product_id,
+        p.name,
+        COALESCE(SUM(oi.quantity), 0) as total_sold
+      FROM products p
       INNER JOIN categories c ON p.category_id = c.id
-      WHERE o.status IN ('paid', 'success', 'successful', 'completed')
-        AND LOWER(c.name) = LOWER(?)${dateFilter}
-      GROUP BY oi.product_id, oi.name
-      ORDER BY total_sold DESC
+      LEFT JOIN order_items oi ON oi.product_id = p.id
+        AND oi.order_id IN (
+          SELECT o.id FROM orders o 
+          WHERE o.status IN ('paid', 'success', 'successful', 'completed')
+          ${dateFilter}
+        )
+      WHERE LOWER(c.name) = LOWER(?)
+      GROUP BY p.id, p.name
+      ORDER BY total_sold DESC, p.name ASC
       `,
       params
     );
@@ -107,6 +111,20 @@ const getCategorySales = async (req, res) => {
     return res.status(200).json(rows);
   } catch (error) {
     console.error("[admin:getCategorySales]", error);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+const getAllCategories = async (req, res) => {
+  try {
+    const [rows] = await db.query(
+      `SELECT id, name FROM categories 
+       WHERE name NOT IN ('Fins', 'Leashes', 'Surfboard Cases')
+       ORDER BY name ASC`
+    );
+    return res.status(200).json(rows);
+  } catch (error) {
+    console.error("[admin:getAllCategories]", error);
     return res.status(500).json({ message: "Server error" });
   }
 };
@@ -159,6 +177,7 @@ const deleteUser = async (req, res) => {
 module.exports = {
   getTopProducts,
   getCategorySales,
+  getAllCategories,
   getAllUsers,
   deleteUser,
 };

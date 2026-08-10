@@ -17,6 +17,7 @@ const {
 const {
   getTopProducts,
   getCategorySales,
+  getAllCategories,
 } = require("../controllers/adminController");
 
 const router = express.Router();
@@ -79,5 +80,8 @@ router.get("/top-products", authMiddleware, adminMiddleware, getTopProducts);
 
 // Category sales endpoint
 router.get("/category-sales", authMiddleware, adminMiddleware, getCategorySales);
+
+// Get all categories endpoint
+router.get("/categories", authMiddleware, adminMiddleware, getAllCategories);
 
 module.exports = router;

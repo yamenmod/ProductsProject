@@ -117,6 +117,25 @@ function CategorySalesChart({ session, category, fromDate, toDate }) {
     );
   }
 
+  // Check if all products have 0 sales
+  const allZeroSales = categoryProducts.every((p) => (p.total_sold || 0) === 0);
+
+  if (allZeroSales) {
+    return (
+      <div className="ps-surface" style={{ padding: "22px" }}>
+        <h2 style={{ margin: "0 0 10px", fontSize: "24px" }}>
+          Sales by Category: {category}
+        </h2>
+        <p style={{ margin: "0 0 18px", color: "#5e5148" }}>
+          Products in this category ranked by units sold from completed orders.
+        </p>
+        <p className="ps-lead">
+          No sales recorded for products in this category during the selected date range.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="ps-surface" style={{ padding: "22px" }}>
       <h2 style={{ margin: "0 0 10px", fontSize: "24px" }}>
@@ -132,9 +151,9 @@ function CategorySalesChart({ session, category, fromDate, toDate }) {
           alignItems: "flex-end",
           justifyContent: "space-around",
           gap: "16px",
-          paddingTop: "30px",
+          paddingTop: "50px",
           paddingBottom: "20px",
-          height: "300px",
+          height: "350px",
           overflowX: "auto",
         }}
       >
