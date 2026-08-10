@@ -246,6 +246,20 @@ const initDatabase = async () => {
       );
     }
 
+    // Add paypal_order_id column to orders table
+    const [paypalOrderIdColumn] = await db.query(
+      `SELECT COUNT(*) AS total FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'orders' AND column_name = 'paypal_order_id'`,
+    );
+
+    if (paypalOrderIdColumn[0]?.total === 0) {
+      await db.query(
+        `ALTER TABLE orders ADD COLUMN paypal_order_id VARCHAR(255) NULL DEFAULT NULL UNIQUE AFTER completed_at`,
+      );
+      console.log("✅ paypal_order_id column added to orders table");
+    } else {
+      console.log("✅ paypal_order_id column exists in orders table");
+    }
+
     // Normalize legacy order status values into the current finite set.
     await db.query(`
       UPDATE orders
@@ -302,19 +316,37 @@ const initDatabase = async () => {
 
     await db.query(`
     CREATE TABLE IF NOT EXISTS payments (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      user_id INT NOT NULL,
-      order_id INT DEFAULT NULL,
-      paypal_order_id VARCHAR(255) NOT NULL,
-      status VARCHAR(50) NOT NULL,
-      amount DECIMAL(10, 2) NOT NULL DEFAULT 0,
-      currency VARCHAR(10) NOT NULL DEFAULT 'USD',
-      raw_response LONGTEXT,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-      FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE SET NULL
+      paypal_order_id VARCHAR(255) NOT NULL PRIMARY KEY,
+      status VARCHAR(50) NOT NULL
     )
   `);
+
+    // Drop old columns from payments table if they exist (migration)
+    // First drop foreign key constraints
+    const [fkConstraints] = await db.query(`
+      SELECT CONSTRAINT_NAME
+      FROM information_schema.KEY_COLUMN_USAGE
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = 'payments'
+        AND CONSTRAINT_NAME != 'PRIMARY'
+    `);
+    for (const fk of fkConstraints) {
+      await db.query(`ALTER TABLE payments DROP FOREIGN KEY ${fk.CONSTRAINT_NAME}`);
+      console.log(`✅ Dropped foreign key '${fk.CONSTRAINT_NAME}' from payments table`);
+    }
+
+    // Then drop old columns
+    const oldColumns = ['id', 'user_id', 'order_id', 'amount', 'currency', 'raw_response', 'created_at'];
+    for (const col of oldColumns) {
+      const [colExists] = await db.query(
+        `SELECT COUNT(*) AS total FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'payments' AND column_name = ?`,
+        [col]
+      );
+      if (colExists[0]?.total > 0) {
+        await db.query(`ALTER TABLE payments DROP COLUMN ${col}`);
+        console.log(`✅ Dropped old column '${col}' from payments table`);
+      }
+    }
 
     await db.query(`
       UPDATE payments

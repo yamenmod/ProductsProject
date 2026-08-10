@@ -1194,25 +1194,27 @@ const capturePaypalOrder = async (req, res) => {
     const connection = await db.getConnection();
     const [existingPayments] = await connection.query(
       `
-        SELECT id, order_id, status
+        SELECT status
         FROM payments
-        WHERE paypal_order_id = ? AND user_id = ?
-        ORDER BY id DESC
+        WHERE paypal_order_id = ?
         LIMIT 1
       `,
-      [orderID, req.user.id],
+      [orderID],
     );
 
     if (
       existingPayments.length &&
       existingPayments[0].status === ORDER_STATUS.SUCCESS
     ) {
-      const orderId = existingPayments[0].order_id;
+      const [order] = await connection.query(
+        "SELECT id FROM orders WHERE paypal_order_id = ? LIMIT 1",
+        [orderID]
+      );
       connection.release();
       return res.status(200).json({
         message: "PayPal order has already been captured",
         order: {
-          id: orderId,
+          id: order[0]?.id,
           status: ORDER_STATUS.SUCCESS,
         },
         payment: {
@@ -1275,16 +1277,22 @@ const capturePaypalOrder = async (req, res) => {
 
       const [existingPayments] = await connection.query(
         `
-          SELECT id, order_id, status
+          SELECT status
           FROM payments
-          WHERE paypal_order_id = ? AND user_id = ?
-          ORDER BY id DESC
+          WHERE paypal_order_id = ?
           LIMIT 1
         `,
-        [orderID, req.user.id],
+        [orderID],
       );
 
-      let orderId = existingPayments[0]?.order_id || null;
+      let orderId = null;
+      if (existingPayments.length) {
+        const [order] = await connection.query(
+          "SELECT id FROM orders WHERE paypal_order_id = ? LIMIT 1",
+          [orderID]
+        );
+        orderId = order[0]?.id || null;
+      }
 
       if (!orderId) {
         const { total, items } = await calculateCartTotal(req.user.id);
@@ -1355,7 +1363,7 @@ const capturePaypalOrder = async (req, res) => {
 
         const synced = syncOrderStatusFields(finalOrderStatus);
         const [orderResult] = await connection.query(
-          "INSERT INTO orders (user_id, total, customer_email, status, payment_status, order_status, created_at, paid_at) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())",
+          "INSERT INTO orders (user_id, total, customer_email, status, payment_status, order_status, paypal_order_id, created_at, paid_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())",
           [
             req.user.id,
             total,
@@ -1363,6 +1371,7 @@ const capturePaypalOrder = async (req, res) => {
             synced.status,
             synced.payment_status,
             synced.order_status,
+            orderID,
           ],
         );
 
@@ -1382,15 +1391,10 @@ const capturePaypalOrder = async (req, res) => {
         }
 
         await connection.query(
-          "INSERT INTO payments (user_id, order_id, paypal_order_id, status, amount, currency, raw_response) VALUES (?, ?, ?, ?, ?, ?, ?)",
+          "INSERT INTO payments (paypal_order_id, status) VALUES (?, ?)",
           [
-            req.user.id,
-            orderId,
             orderID,
             synced.status,
-            Number(amountValue),
-            currencyCode,
-            JSON.stringify(captureData),
           ],
         );
       }
@@ -1412,14 +1416,10 @@ const capturePaypalOrder = async (req, res) => {
       );
 
       await connection.query(
-        "UPDATE payments SET status = ?, amount = ?, currency = ?, raw_response = ? WHERE paypal_order_id = ? AND user_id = ?",
+        "UPDATE payments SET status = ? WHERE paypal_order_id = ?",
         [
           finalSynced.status,
-          Number(amountValue),
-          currencyCode,
-          JSON.stringify(captureData),
           orderID,
-          req.user.id,
         ],
       );
 
@@ -1565,29 +1565,14 @@ const markPaypalOrderAsUnsuccessful = async ({
   // Determine status based on reason: always use CANCELLED for both cancellations and failures
   const finalStatus = status || ORDER_STATUS.CANCELLED;
 
-  let whereClause = "p.paypal_order_id = ?";
-  const whereParams = [orderID];
-  if (userId) {
-    whereClause += " AND p.user_id = ?";
-    whereParams.push(userId);
-  }
-
-  const rawResponse = JSON.stringify({
-    reason,
-    markedAt: new Date().toISOString(),
-  });
-
   const [result] = await db.query(
     `
       UPDATE orders o
-      JOIN payments p ON p.order_id = o.id
       SET
         o.status = CASE WHEN o.status = ? THEN o.status ELSE ? END,
         o.order_status = CASE WHEN o.order_status = ? THEN o.order_status ELSE ? END,
-        o.payment_status = CASE WHEN o.payment_status = 'paid' THEN o.payment_status ELSE ? END,
-        p.status = CASE WHEN p.status = ? THEN p.status ELSE ? END,
-        p.raw_response = ?
-      WHERE ${whereClause}
+        o.payment_status = CASE WHEN o.payment_status = 'paid' THEN o.payment_status ELSE ? END
+      WHERE o.paypal_order_id = ?
     `,
     [
       ORDER_STATUS.SUCCESS,
@@ -1595,28 +1580,27 @@ const markPaypalOrderAsUnsuccessful = async ({
       ORDER_STATUS.SUCCESS,
       finalStatus,
       finalStatus,
-      ORDER_STATUS.SUCCESS,
-      finalStatus,
-      rawResponse,
-      ...whereParams,
+      orderID,
     ],
   );
 
   const [paymentRows] = await db.query(
     `
-      SELECT order_id
-      FROM payments
+      UPDATE payments
+      SET status = ?
       WHERE paypal_order_id = ?
-      ${userId ? "AND user_id = ?" : ""}
-      ORDER BY id DESC
-      LIMIT 1
     `,
-    userId ? [orderID, userId] : [orderID],
+    [finalStatus, orderID],
+  );
+
+  const [orderRows] = await db.query(
+    "SELECT id FROM orders WHERE paypal_order_id = ? LIMIT 1",
+    [orderID]
   );
 
   return {
     updated: Number(result?.affectedRows || 0) > 0,
-    orderId: paymentRows[0]?.order_id || null,
+    orderId: orderRows[0]?.id || null,
   };
 };
 
@@ -1635,11 +1619,10 @@ const handlePaypalSuccessReturn = async (req, res) => {
   try {
     const [paymentRows] = await db.query(
       `
-        SELECT p.user_id, o.status AS order_status, p.status AS payment_status, p.order_id
+        SELECT o.user_id, o.status AS order_status, p.status AS payment_status, o.id AS order_id
         FROM payments p
-        LEFT JOIN orders o ON o.id = p.order_id
+        LEFT JOIN orders o ON o.paypal_order_id = p.paypal_order_id
         WHERE p.paypal_order_id = ?
-        ORDER BY p.id DESC
         LIMIT 1
       `,
       [orderID],
@@ -1910,10 +1893,9 @@ const getOrderItems = async (req, res) => {
 
     const [payments] = await db.query(
       `
-        SELECT paypal_order_id, status AS payment_status, amount, currency, created_at
-        FROM payments
-        WHERE order_id = ?
-        ORDER BY id DESC
+        SELECT p.status AS payment_status
+        FROM payments p
+        WHERE p.paypal_order_id = (SELECT paypal_order_id FROM orders WHERE id = ?)
         LIMIT 1
       `,
       [orderId],
@@ -1935,11 +1917,11 @@ const getOrderItems = async (req, res) => {
         completedAt: order.completed_at_resolved || order.completed_at,
         payment: payments[0]
           ? {
-              paypalOrderId: payments[0].paypal_order_id,
+              paypalOrderId: order.paypal_order_id,
               status: payments[0].payment_status,
-              amount: Number(payments[0].amount),
-              currency: payments[0].currency,
-              createdAt: payments[0].created_at,
+              amount: Number(order.total),
+              currency: PAYPAL_CURRENCY,
+              createdAt: order.paid_at || order.created_at,
             }
           : null,
         pricing: {
