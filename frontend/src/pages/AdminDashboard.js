@@ -7,6 +7,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
+import TopProductsChart from "../components/TopProductsChart";
+import CategorySalesChart from "../components/CategorySalesChart";
 import { STATUS_COLORS } from "../utils/statusColors";
 import { getOrderBucket, ORDER_STATUS_LABELS } from "../utils/orderStatus";
 import { resetVatRateCache } from "../utils/pricing";
@@ -56,6 +58,8 @@ function AdminDashboard({
   const [maxQtyMessage, setMaxQtyMessage] = useState("");
   const [savingMaxQty, setSavingMaxQty] = useState(false);
   const [watchlistSearch, setWatchlistSearch] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const [categories, setCategories] = useState([]);
   const statusColors = STATUS_COLORS;
 
   const filteredOrders = useMemo(() => {
@@ -170,6 +174,20 @@ function AdminDashboard({
       })
       .sort((a, b) => a.stock - b.stock);
   }, [products, watchlistSearch]);
+
+  useEffect(() => {
+    if (products.length > 0) {
+      const uniqueCategories = [
+        ...new Set(
+          products
+            .map((p) => p.category)
+            .filter((cat) => cat && typeof cat === 'string' && cat.trim() !== "")
+        ),
+      ].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+      console.log("Unique categories found:", uniqueCategories);
+      setCategories(uniqueCategories);
+    }
+  }, [products]);
 
   useEffect(() => {
     const loadStats = async () => {
@@ -575,153 +593,161 @@ function AdminDashboard({
           </div>
 
           <div
+            className="ps-surface"
             style={{
-              display: "grid",
-              gridTemplateColumns: "minmax(0, 1.6fr) minmax(320px, 0.9fr)",
-              gap: "16px",
+              padding: "22px",
+              marginBottom: "16px",
             }}
           >
-            <div className="ps-surface" style={{ padding: "22px" }}>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  gap: "12px",
-                  marginBottom: "18px",
-                  flexWrap: "wrap",
-                }}
-              >
-                <div style={{ minWidth: 0, flex: "1 1 320px" }}>
-                  <h2 style={{ margin: "0 0 8px", fontSize: "24px" }}>
-                    Stock watchlist
-                  </h2>
-                  <p style={{ margin: "0 0 12px", color: "#5e5148" }}>
-                    Out of stock products first, then products with 1 to 4 units
-                    remaining.
-                  </p>
-                  <input
-                    type="search"
-                    value={watchlistSearch}
-                    onChange={(event) => setWatchlistSearch(event.target.value)}
-                    placeholder="Search watchlist by product name"
-                    style={{
-                      width: "100%",
-                      padding: "12px 14px",
-                      borderRadius: "12px",
-                      border: "1px solid rgba(31, 24, 19, 0.14)",
-                      background: "rgba(255, 250, 242, 0.95)",
-                      fontSize: "14px",
-                      boxSizing: "border-box",
-                    }}
-                  />
-                </div>
-                <button
-                  type="button"
-                  className="ps-btn ps-btn-primary"
-                  onClick={() => onNavigate("manage-products")}
-                  style={{ height: "44px", whiteSpace: "nowrap" }}
-                >
-                  Open products
-                </button>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                gap: "12px",
+                marginBottom: "18px",
+                flexWrap: "wrap",
+              }}
+            >
+              <div style={{ minWidth: 0, flex: "1 1 320px" }}>
+                <h2 style={{ margin: "0 0 8px", fontSize: "24px" }}>
+                  Stock watchlist
+                </h2>
+                <p style={{ margin: "0 0 12px", color: "#5e5148" }}>
+                  Out of stock products first, then products with 1 to 4 units
+                  remaining.
+                </p>
+                <input
+                  type="search"
+                  value={watchlistSearch}
+                  onChange={(event) => setWatchlistSearch(event.target.value)}
+                  placeholder="Search watchlist by product name"
+                  style={{
+                    width: "100%",
+                    padding: "12px 14px",
+                    borderRadius: "12px",
+                    border: "1px solid rgba(31, 24, 19, 0.14)",
+                    background: "rgba(255, 250, 242, 0.95)",
+                    fontSize: "14px",
+                    boxSizing: "border-box",
+                  }}
+                />
               </div>
+              <button
+                type="button"
+                className="ps-btn ps-btn-primary"
+                onClick={() => onNavigate("manage-products")}
+                style={{ height: "44px", whiteSpace: "nowrap" }}
+              >
+                Open products
+              </button>
+            </div>
 
-              {loading ? (
-                <p className="ps-lead">Loading inventory...</p>
-              ) : lowStockProducts.length ? (
-                <div style={{ display: "grid", gap: "10px" }}>
-                  {lowStockProducts.map((entry) => {
-                    const product = entry.product || {};
-                    const stock = Number(entry.stock ?? 0);
-                    const hasLowSizes =
-                      Array.isArray(entry.lowSizes) && entry.lowSizes.length;
-                    const statusLabel =
-                      stock === 0 && !hasLowSizes
-                        ? "Out of stock"
-                        : "Low stock";
-                    const statusColor =
-                      stock === 0 && !hasLowSizes ? "#a83f34" : "#245860";
+            {loading ? (
+              <p className="ps-lead">Loading inventory...</p>
+            ) : lowStockProducts.length ? (
+              <div style={{ display: "grid", gap: "10px" }}>
+                {lowStockProducts.map((entry) => {
+                  const product = entry.product || {};
+                  const stock = Number(entry.stock ?? 0);
+                  const hasLowSizes =
+                    Array.isArray(entry.lowSizes) && entry.lowSizes.length;
+                  const statusLabel =
+                    stock === 0 && !hasLowSizes
+                      ? "Out of stock"
+                      : "Low stock";
+                  const statusColor =
+                    stock === 0 && !hasLowSizes ? "#a83f34" : "#245860";
 
-                    return (
+                  return (
+                    <div
+                      key={product.id || product._id}
+                      style={{
+                        padding: "12px 14px",
+                        borderRadius: "14px",
+                        background: "rgba(36, 88, 96, 0.06)",
+                        border: "1px solid rgba(36, 88, 96, 0.12)",
+                      }}
+                    >
                       <div
-                        key={product.id || product._id}
                         style={{
-                          padding: "12px 14px",
-                          borderRadius: "14px",
-                          background: "rgba(36, 88, 96, 0.06)",
-                          border: "1px solid rgba(36, 88, 96, 0.12)",
+                          display: "flex",
+                          justifyContent: "space-between",
+                          gap: "10px",
                         }}
                       >
-                        <div
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            gap: "10px",
-                          }}
-                        >
-                          <strong>{product.name}</strong>
-                          <span style={{ color: statusColor, fontWeight: 800 }}>
-                            {statusLabel}
-                          </span>
+                        <strong>{product.name}</strong>
+                        <span style={{ color: statusColor, fontWeight: 800 }}>
+                          {statusLabel}
+                        </span>
+                      </div>
+
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          gap: "10px",
+                          marginTop: "6px",
+                          alignItems: "center",
+                        }}
+                      >
+                        <div style={{ color: "#5e5148", fontSize: "13px" }}>
+                          {product.category || "Uncategorized"}
+                          {hasLowSizes ? (
+                            <div style={{ marginTop: 6 }}>
+                              <strong style={{ fontSize: 13 }}>
+                                Low sizes:
+                              </strong>{" "}
+                              {entry.lowSizes
+                                .map((s) => `${s.size}(${s.qty})`)
+                                .join(", ")}
+                            </div>
+                          ) : null}
                         </div>
 
                         <div
                           style={{
                             display: "flex",
-                            justifyContent: "space-between",
                             gap: "10px",
-                            marginTop: "6px",
                             alignItems: "center",
                           }}
                         >
-                          <div style={{ color: "#5e5148", fontSize: "13px" }}>
-                            {product.category || "Uncategorized"}
-                            {hasLowSizes ? (
-                              <div style={{ marginTop: 6 }}>
-                                <strong style={{ fontSize: 13 }}>
-                                  Low sizes:
-                                </strong>{" "}
-                                {entry.lowSizes
-                                  .map((s) => `${s.size}(${s.qty})`)
-                                  .join(", ")}
-                              </div>
-                            ) : null}
-                          </div>
-
-                          <div
-                            style={{
-                              display: "flex",
-                              gap: "10px",
-                              alignItems: "center",
-                            }}
+                          <button
+                            type="button"
+                            className="ps-btn ps-btn-secondary"
+                            onClick={() => openProductEdit(product)}
+                            style={{ padding: "8px 12px", fontSize: "12px" }}
                           >
-                            <button
-                              type="button"
-                              className="ps-btn ps-btn-secondary"
-                              onClick={() => openProductEdit(product)}
-                              style={{ padding: "8px 12px", fontSize: "12px" }}
+                            Edit
+                          </button>
+                          {!hasLowSizes ? (
+                            <span
+                              style={{ color: "#245860", fontWeight: 700 }}
                             >
-                              Edit
-                            </button>
-                            {!hasLowSizes ? (
-                              <span
-                                style={{ color: "#245860", fontWeight: 700 }}
-                              >
-                                Stock {stock}
-                              </span>
-                            ) : null}
-                          </div>
+                              Stock {stock}
+                            </span>
+                          ) : null}
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <p className="ps-lead">
-                  No products are currently out of stock or low on stock (1-4
-                  units).
-                </p>
-              )}
-            </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="ps-lead">
+                No products are currently out of stock or low on stock (1-4
+                units).
+              </p>
+            )}
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+              gap: "16px",
+            }}
+          >
+            <TopProductsChart session={session} fromDate={dateFrom} toDate={dateTo} />
 
             <div className="ps-surface" style={{ padding: "22px" }}>
               <h2 style={{ margin: "0 0 10px", fontSize: "24px" }}>
@@ -837,6 +863,61 @@ function AdminDashboard({
                 </div>
               ) : null}
             </div>
+          </div>
+
+          <div
+            className="ps-surface"
+            style={{
+              padding: "22px",
+              marginTop: "16px",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                gap: "12px",
+                marginBottom: "18px",
+                flexWrap: "wrap",
+                alignItems: "center",
+              }}
+            >
+              <div style={{ minWidth: 0, flex: "1 1 320px" }}>
+                <h2 style={{ margin: "0 0 8px", fontSize: "24px" }}>
+                  Sales by Category
+                </h2>
+                <p style={{ margin: "0 0 12px", color: "#5e5148" }}>
+                  Select a category to view product sales.
+                </p>
+                <select
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: "12px 14px",
+                    borderRadius: "12px",
+                    border: "1px solid rgba(31, 24, 19, 0.14)",
+                    background: "rgba(255, 250, 242, 0.95)",
+                    fontSize: "14px",
+                    boxSizing: "border-box",
+                  }}
+                >
+                  <option value="">Select a category</option>
+                  {categories.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <CategorySalesChart
+              session={session}
+              category={selectedCategory}
+              fromDate={dateFrom}
+              toDate={dateTo}
+            />
           </div>
 
           <div

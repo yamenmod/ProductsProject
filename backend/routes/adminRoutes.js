@@ -14,6 +14,10 @@ const {
   getAllOrders,
   markAsCompleted,
 } = require("../controllers/orderController");
+const {
+  getTopProducts,
+  getCategorySales,
+} = require("../controllers/adminController");
 
 const router = express.Router();
 
@@ -69,5 +73,11 @@ router.patch(
   adminMiddleware,
   markAsCompleted,
 );
+
+// Top products endpoint
+router.get("/top-products", authMiddleware, adminMiddleware, getTopProducts);
+
+// Category sales endpoint
+router.get("/category-sales", authMiddleware, adminMiddleware, getCategorySales);
 
 module.exports = router;

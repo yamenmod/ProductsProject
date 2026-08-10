@@ -499,11 +499,36 @@ const initDatabase = async () => {
       id INT AUTO_INCREMENT PRIMARY KEY,
       name VARCHAR(100) NOT NULL UNIQUE,
       description TEXT NULL,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
   `);
     console.log("✅ Categories table verified/created");
+
+    // Insert default categories if they don't exist
+    const defaultCategories = [
+      'Surfboards',
+      'Wetsuits',
+      'Leashes',
+      'Fins',
+      'Surfboard Cases',
+      'Surfboard Accessories',
+      'Clothing'
+    ];
+
+    for (const categoryName of defaultCategories) {
+      const [existing] = await db.query(
+        "SELECT id FROM categories WHERE name = ?",
+        [categoryName]
+      );
+      if (existing.length === 0) {
+        await db.query(
+          "INSERT INTO categories (name, description) VALUES (?, ?)",
+          [categoryName, ""]
+        );
+        console.log(`➕ Added category: ${categoryName}`);
+      }
+    }
+    console.log("✅ Default categories verified/inserted");
 
     // Create products table
     await db.query(`
