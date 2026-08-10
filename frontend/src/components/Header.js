@@ -16,6 +16,7 @@ function Header({
   const [boardInputs, setBoardInputs] = useState({
     weight: "",
     height: "",
+    skillLevel: "beginner",
   });
   const [boardUsingSavedProfile, setBoardUsingSavedProfile] = useState(false);
   const [boardRecommendations, setBoardRecommendations] = useState(null);
@@ -34,6 +35,7 @@ function Header({
   const getInitialBoardInputs = () => ({
     weight: parseMeasurementValue(user?.weight),
     height: parseMeasurementValue(user?.height),
+    skillLevel: user?.skillLevel || "beginner",
   });
 
   const handleLogoutClick = () => {
@@ -58,6 +60,7 @@ function Header({
     const resolvedInputs = {
       weight: (nextInputs.weight || "").toString().trim(),
       height: (nextInputs.height || "").toString().trim(),
+      skillLevel: nextInputs.skillLevel || "beginner",
     };
 
     try {
@@ -71,6 +74,7 @@ function Header({
       const response = await axios.post("/api/products/recommend-boards", {
         weight: Number(resolvedInputs.weight),
         height: Number(resolvedInputs.height),
+        skillLevel: resolvedInputs.skillLevel,
       });
 
       setBoardRecommendations(response.data);
@@ -83,9 +87,52 @@ function Header({
     }
   };
 
+  const handleSaveProfile = async () => {
+    setRecommendationError("");
+    setRecommendationLoading(true);
+
+    const resolvedInputs = {
+      weight: (boardInputs.weight || "").toString().trim(),
+      height: (boardInputs.height || "").toString().trim(),
+      skillLevel: boardInputs.skillLevel || "beginner",
+    };
+
+    try {
+      if (!resolvedInputs.weight || !resolvedInputs.height) {
+        setRecommendationError("Please enter weight and height to save");
+        setRecommendationLoading(false);
+        return;
+      }
+
+      const response = await axios.patch(
+        "/api/auth/profile",
+        {
+          weight: Number(resolvedInputs.weight),
+          height: Number(resolvedInputs.height),
+          skillLevel: resolvedInputs.skillLevel,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${user?.token}`,
+          },
+        },
+      );
+
+   
+      setRecommendationError("Profile saved successfully!");
+      setTimeout(() => setRecommendationError(""), 2000);
+    } catch (error) {
+      setRecommendationError(
+        error.response?.data?.message || "Failed to save profile",
+      );
+    } finally {
+      setRecommendationLoading(false);
+    }
+  };
+
   const resetBoardChooser = () => {
     // Close the chooser and clear the previous recommendation results.
-    setBoardInputs({ weight: "", height: "" });
+    setBoardInputs({ weight: "", height: "", skillLevel: "beginner" });
     setBoardRecommendations(null);
     setRecommendationError("");
     setBoardUsingSavedProfile(false);
@@ -442,7 +489,7 @@ function Header({
                       marginBottom: "20px",
                     }}
                   >
-                    {/* Weight and height are sent to the recommendation endpoint. */}
+                    {/* Weight, height, and skill level are sent to the recommendation endpoint. */}
                     <input
                       type="number"
                       placeholder="Weight (kg)"
@@ -503,6 +550,36 @@ function Header({
                       }}
                     />
 
+                    <select
+                      value={boardInputs.skillLevel}
+                      onChange={(e) =>
+                        setBoardInputs({
+                          ...boardInputs,
+                          skillLevel: e.target.value,
+                        })
+                      }
+                      disabled={boardUsingSavedProfile && recommendationLoading}
+                      style={{
+                        padding: "10px 12px",
+                        border: "1px solid #d9c3ad",
+                        borderRadius: "8px",
+                        fontSize: "14px",
+                        fontFamily: "inherit",
+                        cursor:
+                          boardUsingSavedProfile && recommendationLoading
+                            ? "not-allowed"
+                            : "pointer",
+                        opacity:
+                          boardUsingSavedProfile && recommendationLoading
+                            ? 0.6
+                            : 1,
+                      }}
+                    >
+                      <option value="beginner">Beginner</option>
+                      <option value="intermediate">Intermediate</option>
+                      <option value="advanced">Advanced</option>
+                    </select>
+
                   </div>
 
                   {recommendationError && (
@@ -522,6 +599,7 @@ function Header({
                       display: "flex",
                       gap: "12px",
                       justifyContent: "flex-end",
+                      flexWrap: "wrap",
                     }}
                   >
                     <button
@@ -530,6 +608,16 @@ function Header({
                       onClick={resetBoardChooser}
                     >
                       Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="ps-btn ps-btn-secondary"
+                      onClick={handleSaveProfile}
+                      disabled={recommendationLoading}
+                    >
+                      {recommendationLoading
+                        ? "Saving..."
+                        : "Save Profile"}
                     </button>
                     <button
                       type="button"

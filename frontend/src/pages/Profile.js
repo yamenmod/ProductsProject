@@ -43,6 +43,7 @@ function Profile({
   const [email, setEmail] = useState(user?.email || "");
   const [weight, setWeight] = useState(formatOptionalMeasurement(user?.weight));
   const [height, setHeight] = useState(formatOptionalMeasurement(user?.height));
+  const [skillLevel, setSkillLevel] = useState(user?.skillLevel || "beginner");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -67,6 +68,7 @@ function Profile({
         setEmail(profile.email || "");
         setWeight(formatOptionalMeasurement(profile.weight));
         setHeight(formatOptionalMeasurement(profile.height));
+        setSkillLevel(profile.skillLevel || "beginner");
 
         if (typeof onSessionUpdate === "function") {
           onSessionUpdate(profile);
@@ -126,6 +128,7 @@ function Profile({
           username: trimmedUsername,
           weight: parsedWeight,
           height: parsedHeight,
+          skillLevel: skillLevel,
         },
         {
           headers: {
@@ -139,6 +142,7 @@ function Profile({
       setEmail(updatedUser.email || "");
       setWeight(formatOptionalMeasurement(updatedUser.weight));
       setHeight(formatOptionalMeasurement(updatedUser.height));
+      setSkillLevel(updatedUser.skillLevel || "beginner");
       setMessage("Profile updated successfully.");
 
       if (typeof onSessionUpdate === "function") {
@@ -293,6 +297,35 @@ function Profile({
                           placeholder="Add or update your height"
                         />
                       </div>
+
+                      <div>
+                        <label
+                          style={{
+                            display: "block",
+                            marginBottom: "7px",
+                            fontWeight: 700,
+                            fontSize: "13px",
+                          }}
+                        >
+                          Surf Level
+                        </label>
+                        <select
+                          value={skillLevel}
+                          onChange={(event) => setSkillLevel(event.target.value)}
+                          style={{
+                            padding: "10px 12px",
+                            border: "1px solid #d9c3ad",
+                            borderRadius: "8px",
+                            fontSize: "14px",
+                            fontFamily: "inherit",
+                            width: "100%",
+                          }}
+                        >
+                          <option value="beginner">Beginner</option>
+                          <option value="intermediate">Intermediate</option>
+                          <option value="advanced">Advanced</option>
+                        </select>
+                      </div>
                     </div>
                   </div>
 
@@ -426,6 +459,20 @@ function Profile({
                     </div>
                     <div style={{ fontSize: "16px", fontWeight: 700 }}>
                       {height || "Not set yet"}
+                    </div>
+                  </div>
+                  <div>
+                    <div
+                      style={{
+                        color: "#65574d",
+                        fontSize: "12px",
+                        fontWeight: 700,
+                      }}
+                    >
+                      Surf Level
+                    </div>
+                    <div style={{ fontSize: "16px", fontWeight: 700 }}>
+                      {skillLevel || "Not set yet"}
                     </div>
                   </div>
                 </div>

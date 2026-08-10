@@ -23,6 +23,7 @@ function ManageCustomers({
   const [error, setError] = useState("");
   const [actionMessage, setActionMessage] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [pendingUserId, setPendingUserId] = useState(null);
   const [pendingUsername, setPendingUsername] = useState("");
@@ -55,7 +56,17 @@ function ManageCustomers({
 
   const filteredUsers = users.filter((user) => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
+    const isActive = Number(user.is_active) === 1;
 
+    // Filter by status
+    if (statusFilter === "active" && !isActive) {
+      return false;
+    }
+    if (statusFilter === "inactive" && isActive) {
+      return false;
+    }
+
+    // Filter by search term
     if (!normalizedSearch) {
       return true;
     }
@@ -179,6 +190,57 @@ function ManageCustomers({
                 fontSize: "13px",
               }}
             />
+          </div>
+
+          <div style={{ marginBottom: "18px", display: "flex", gap: "10px", flexWrap: "wrap" }}>
+            <button
+              type="button"
+              onClick={() => setStatusFilter("all")}
+              style={{
+                fontSize: "12px",
+                padding: "8px 16px",
+                background: statusFilter === "all" ? "#245860" : "rgba(36, 88, 96, 0.1)",
+                color: statusFilter === "all" ? "#fff" : "#245860",
+                border: statusFilter === "all" ? "none" : "1px solid #245860",
+                borderRadius: "8px",
+                cursor: "pointer",
+                fontWeight: statusFilter === "all" ? 600 : 400,
+              }}
+            >
+              All
+            </button>
+            <button
+              type="button"
+              onClick={() => setStatusFilter("active")}
+              style={{
+                fontSize: "12px",
+                padding: "8px 16px",
+                background: statusFilter === "active" ? "#16a34a" : "rgba(22, 163, 74, 0.1)",
+                color: statusFilter === "active" ? "#fff" : "#16a34a",
+                border: statusFilter === "active" ? "none" : "1px solid #16a34a",
+                borderRadius: "8px",
+                cursor: "pointer",
+                fontWeight: statusFilter === "active" ? 600 : 400,
+              }}
+            >
+              Active
+            </button>
+            <button
+              type="button"
+              onClick={() => setStatusFilter("inactive")}
+              style={{
+                fontSize: "12px",
+                padding: "8px 16px",
+                background: statusFilter === "inactive" ? "#dc2626" : "rgba(220, 38, 38, 0.1)",
+                color: statusFilter === "inactive" ? "#fff" : "#dc2626",
+                border: statusFilter === "inactive" ? "none" : "1px solid #dc2626",
+                borderRadius: "8px",
+                cursor: "pointer",
+                fontWeight: statusFilter === "inactive" ? 600 : 400,
+              }}
+            >
+              Inactive
+            </button>
           </div>
 
           {actionMessage && (

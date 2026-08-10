@@ -12,6 +12,7 @@ const initDatabase = async () => {
         password VARCHAR(255) NOT NULL,
         weight DECIMAL(6, 2) DEFAULT NULL,
         height DECIMAL(6, 2) DEFAULT NULL,
+        skill_level VARCHAR(20) DEFAULT 'beginner',
         role ENUM('user', 'admin') NOT NULL DEFAULT 'user',
         is_active TINYINT(1) NOT NULL DEFAULT 1,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -84,6 +85,27 @@ const initDatabase = async () => {
       console.log("✅ Height column added");
     } else {
       console.log("✅ Height column exists");
+    }
+
+    // Add skill_level column if it doesn't exist
+    const [skillLevelColumn] = await db.query(
+      `
+        SELECT COUNT(*) AS total
+        FROM information_schema.columns
+        WHERE table_schema = DATABASE()
+          AND table_name = 'users'
+          AND column_name = 'skill_level'
+      `,
+    );
+
+    if (skillLevelColumn[0]?.total === 0) {
+      console.log("➕ Adding skill_level column...");
+      await db.query(
+        `ALTER TABLE users ADD COLUMN skill_level VARCHAR(20) DEFAULT 'beginner'`,
+      );
+      console.log("✅ Skill_level column added");
+    } else {
+      console.log("✅ Skill_level column exists");
     }
 
     // Drop reset_code column if it exists (no longer needed)

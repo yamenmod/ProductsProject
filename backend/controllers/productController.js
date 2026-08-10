@@ -898,9 +898,10 @@ const syncImages = async (req, res) => {
 const recommendBoards = async (req, res) => {
   // Recommend surfboards based on the user's measurements and preferences.
   try {
-    const { weight, height } = req.body;
+    const { weight, height, skillLevel } = req.body;
     let resolvedWeight = weight;
     let resolvedHeight = height;
+    let resolvedSkillLevel = skillLevel || "beginner";
 
     const hasMissingMeasurements =
       resolvedWeight === undefined ||
@@ -959,6 +960,8 @@ const recommendBoards = async (req, res) => {
       });
     }
 
+    // skillLevel is optional, defaults to "beginner"
+
     // Validate weight and height
     const weightNum = Number(resolvedWeight);
     const heightNum = Number(resolvedHeight);
@@ -1004,66 +1007,85 @@ const recommendBoards = async (req, res) => {
       });
     }
 
-    // Calculate recommendation score based on weight and volume only
-    // Weight-based volume rules:
-    // - 0-70 kg: Boards <= 30L are best, higher volumes reduce score
-    // - 71-85 kg: Boards 30L-40L are best, lower or higher reduce score
-    // - 86kg+: Boards <= 30L are bad, higher volumes get better scores
+    // Calculate recommended volume based on weight and skill level
+    // Beginner: weight (kg) * 0.8 to 1.0
+    // Intermediate: weight (kg) * 0.6 to 0.8
+    // Advanced: weight (kg) * 0.35 to 0.5
+    let volumeMultiplierMin, volumeMultiplierMax;
 
-    const calculateVolumeScore = (weight, volume) => {
-      if (volume === null || volume === undefined || Number.isNaN(volume)) {
+    if (resolvedSkillLevel === "beginner" || resolvedSkillLevel === "Beginner") {
+      volumeMultiplierMin = 0.8;
+      volumeMultiplierMax = 1.0;
+    } else if (resolvedSkillLevel === "intermediate" || resolvedSkillLevel === "Intermediate") {
+      volumeMultiplierMin = 0.6;
+      volumeMultiplierMax = 0.8;
+    } else if (resolvedSkillLevel === "advanced" || resolvedSkillLevel === "Advanced") {
+      volumeMultiplierMin = 0.35;
+      volumeMultiplierMax = 0.5;
+    } else {
+      volumeMultiplierMin = 0.6;
+      volumeMultiplierMax = 0.8;
+    }
+
+    const targetVolumeMin = weightNum * volumeMultiplierMin;
+    const targetVolumeMax = weightNum * volumeMultiplierMax;
+
+    const boardHeightRatio =
+      resolvedSkillLevel === "beginner" || resolvedSkillLevel === "Beginner"
+        ? 0.1
+        : resolvedSkillLevel === "advanced" || resolvedSkillLevel === "Advanced"
+          ? 0.09
+          : 0.095;
+    const boardHeightTolerance =
+      resolvedSkillLevel === "beginner" || resolvedSkillLevel === "Beginner"
+        ? 3.5
+        : resolvedSkillLevel === "advanced" || resolvedSkillLevel === "Advanced"
+          ? 2.0
+          : 2.7;
+
+    const targetBoardHeight = Math.max(0, heightNum * boardHeightRatio);
+    const targetBoardHeightMin = Math.max(
+      0,
+      targetBoardHeight - boardHeightTolerance,
+    );
+    const targetBoardHeightMax = targetBoardHeight + boardHeightTolerance;
+
+    // Height also influences board length preferences
+    const surferHeightFt = heightNum / 30.48;
+    const baseLengthFt = surferHeightFt + 0.5;
+    let lengthOffsetMin = 0.2;
+    let lengthOffsetMax = 0.7;
+
+    if (resolvedSkillLevel === "beginner" || resolvedSkillLevel === "Beginner") {
+      lengthOffsetMin = 0.4;
+      lengthOffsetMax = 1.0;
+    } else if (resolvedSkillLevel === "intermediate" || resolvedSkillLevel === "Intermediate") {
+      lengthOffsetMin = 0.3;
+      lengthOffsetMax = 0.8;
+    } else if (resolvedSkillLevel === "advanced" || resolvedSkillLevel === "Advanced") {
+      lengthOffsetMin = 0.1;
+      lengthOffsetMax = 0.5;
+    }
+
+    const targetLengthMin = Math.max(5.0, baseLengthFt + lengthOffsetMin);
+    const targetLengthMax = Math.min(12.0, baseLengthFt + lengthOffsetMax);
+    const targetLengthCenter = (targetLengthMin + targetLengthMax) / 2;
+    const targetVolumeCenter = (targetVolumeMin + targetVolumeMax) / 2;
+    const targetHeightCenter =
+      (targetBoardHeightMin + targetBoardHeightMax) / 2;
+
+    const scoreMetric = (value, target) => {
+      if (value === null || value === undefined || Number.isNaN(value)) {
         return 0;
       }
 
-      const vol = Number(volume);
-
-      if (weight <= 70) {
-        // Lighter surfers need fewer liters
-        // Boards <= 30L are very good match
-        if (vol <= 30) {
-          return 100;
-        }
-        // Boards much higher than 30L reduce score
-        const excess = vol - 30;
-        const penalty = Math.min(excess * 3, 100);
-        return Math.max(0, 100 - penalty);
-      } else if (weight <= 85) {
-        // Medium weight surfers
-        // Boards around 30L-40L are best match
-        if (vol >= 30 && vol <= 40) {
-          return 100;
-        }
-        if (vol < 30) {
-          // Lower volume boards reduce score
-          const deficit = 30 - vol;
-          const penalty = Math.min(deficit * 4, 100);
-          return Math.max(0, 100 - penalty);
-        }
-        // Higher volume boards reduce score
-        const excess = vol - 40;
-        const penalty = Math.min(excess * 2, 100);
-        return Math.max(0, 100 - penalty);
-      } else {
-        // Heavy surfers (86kg+)
-        // Boards <= 30L are bad match
-        if (vol <= 30) {
-          return Math.max(0, vol * 2);
-        }
-        // Higher volume boards get better scores
-        // Optimal range for heavy surfers is 35L-50L
-        if (vol >= 35 && vol <= 50) {
-          return 100;
-        }
-        if (vol < 35) {
-          const deficit = 35 - vol;
-          const penalty = Math.min(deficit * 3, 100);
-          return Math.max(0, 100 - penalty);
-        }
-        // Above 50L, gradually reduce score
-        const excess = vol - 50;
-        const penalty = Math.min(excess * 1.5, 100);
-        return Math.max(0, 100 - penalty);
+      const diff = Math.abs(value - target);
+      if (diff === 0) {
+        return 100;
       }
+
+      const normalized = Math.max(0, 100 - (diff / Math.max(target, 1)) * 100);
+      return Math.round(Math.min(100, normalized));
     };
 
     const getMatchCategory = (score) => {
@@ -1075,23 +1097,41 @@ const recommendBoards = async (req, res) => {
     // Get VAT rate once
     const vatRate = await getVatRateFromDb(db);
 
-    // Score each surfboard based on volume match with weight
+    // Score each surfboard based on volume, board feet, and board length matches
     const scoredBoards = surfboards
       .map((board) => {
+        const normalizedHeight =
+          board.board_height !== undefined && board.board_height !== null
+            ? Number(board.board_height)
+            : board.height !== undefined && board.height !== null
+              ? Number(board.height)
+              : null;
         const normalizedVolume =
           board.board_volume !== undefined && board.board_volume !== null
             ? Number(board.board_volume)
             : board.volume !== undefined && board.volume !== null
               ? Number(board.volume)
               : null;
-        
-        const volumeScore = calculateVolumeScore(weightNum, normalizedVolume);
-        const matchCategory = getMatchCategory(volumeScore);
+        const volume = normalizedVolume;
+        const boardHeight = normalizedHeight;
+        const boardLength = Number(board.board_length);
+
+        const volumeScore = scoreMetric(volume, targetVolumeCenter);
+        const heightScore = scoreMetric(boardHeight, targetHeightCenter);
+        const lengthScore = scoreMetric(boardLength, targetLengthCenter);
+
+        const recommendationScore = Math.round(
+          volumeScore * 0.5 + heightScore * 0.4 + lengthScore * 0.1,
+        );
+        const matchCategory = getMatchCategory(recommendationScore);
 
         return {
           ...normalizeProduct(board, vatRate),
-          recommendationScore: volumeScore,
+          recommendationScore,
           matchCategory,
+          volumeScore,
+          boardHeightScore: heightScore,
+          boardLengthScore: lengthScore,
         };
       })
       .sort((a, b) => b.recommendationScore - a.recommendationScore);
@@ -1103,6 +1143,15 @@ const recommendBoards = async (req, res) => {
       userProfile: {
         weight: weightNum,
         height: heightNum,
+        skillLevel: resolvedSkillLevel,
+        targetVolumeRange: {
+          min: Math.round(targetVolumeMin * 10) / 10,
+          max: Math.round(targetVolumeMax * 10) / 10,
+        },
+        targetLengthRange: {
+          min: targetLengthMin,
+          max: targetLengthMax,
+        },
       },
     });
   } catch (error) {

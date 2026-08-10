@@ -38,6 +38,7 @@ const formatUser = (user) => ({
     user.height === null || user.height === undefined
       ? null
       : Number(user.height),
+  skillLevel: user.skill_level || "beginner",
 });
 
 // Creates the JWT payload that the frontend stores after login or register.
@@ -346,7 +347,7 @@ const getProfile = async (req, res) => {
     console.log("📋 GET PROFILE REQUEST: userId =", userId);
 
     const [users] = await db.query(
-      "SELECT id, username, email, role, is_active, weight, height FROM users WHERE id = ? LIMIT 1",
+      "SELECT id, username, email, role, is_active, weight, height, skill_level FROM users WHERE id = ? LIMIT 1",
       [userId],
     );
 
@@ -372,7 +373,7 @@ const getProfile = async (req, res) => {
 // Updates editable profile fields for the current user.
 const updateProfile = async (req, res) => {
   try {
-    const { username, weight, height } = req.body;
+    const { username, weight, height, skillLevel } = req.body;
     const userId = req.user.id;
 
     console.log("🔧 UPDATE PROFILE REQUEST:", {
@@ -380,6 +381,7 @@ const updateProfile = async (req, res) => {
       username,
       weight,
       height,
+      skillLevel,
     });
 
     if (!username || !username.trim()) {
@@ -389,11 +391,13 @@ const updateProfile = async (req, res) => {
     const normalizedUsername = username.trim();
     const normalizedWeight = normalizeOptionalMeasurement(weight, "Weight");
     const normalizedHeight = normalizeOptionalMeasurement(height, "Height");
+    const normalizedSkillLevel = skillLevel || "beginner";
 
     console.log("✅ NORMALIZED UPDATE DATA:", {
       normalizedUsername,
       normalizedWeight,
       normalizedHeight,
+      normalizedSkillLevel,
     });
 
     const [existingUsers] = await db.query(
@@ -406,8 +410,8 @@ const updateProfile = async (req, res) => {
     }
 
     const [updateResult] = await db.query(
-      "UPDATE users SET username = ?, weight = ?, height = ? WHERE id = ?",
-      [normalizedUsername, normalizedWeight, normalizedHeight, userId],
+      "UPDATE users SET username = ?, weight = ?, height = ?, skill_level = ? WHERE id = ?",
+      [normalizedUsername, normalizedWeight, normalizedHeight, normalizedSkillLevel, userId],
     );
 
     console.log("✅ UPDATE RESULT:", {
@@ -415,7 +419,7 @@ const updateProfile = async (req, res) => {
     });
 
     const [users] = await db.query(
-      "SELECT id, username, email, role, is_active, weight, height FROM users WHERE id = ? LIMIT 1",
+      "SELECT id, username, email, role, is_active, weight, height, skill_level FROM users WHERE id = ? LIMIT 1",
       [userId],
     );
 
