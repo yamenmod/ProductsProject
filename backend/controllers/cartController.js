@@ -230,6 +230,21 @@ const quickCheckout = async (req, res) => {
     const normalizedSize = (size || "").toString().trim().toUpperCase();
     const vatRate = await getVatRateFromDb(db);
 
+    // Fetch max_quantity_per_cart setting
+    const [settingRows] = await db.query(
+      "SELECT value FROM settings WHERE key_name = 'max_quantity_per_cart' LIMIT 1"
+    );
+    const maxQuantityPerProduct = settingRows.length > 0 
+      ? parseInt(settingRows[0].value, 10) 
+      : 12; // Default to 12 if not set
+
+    // Validate quantity against max_quantity_per_product setting
+    if (qty > maxQuantityPerProduct) {
+      return res.status(400).json({
+        message: `Quantity exceeds the maximum limit of ${maxQuantityPerProduct} per product.`
+      });
+    }
+
     const connection = await db.getConnection();
     try {
       await connection.beginTransaction();
@@ -858,6 +873,14 @@ const checkout = async (req, res) => {
 
     const vatRate = await getVatRateFromDb(db);
 
+    // Fetch max_quantity_per_cart setting
+    const [settingRows] = await db.query(
+      "SELECT value FROM settings WHERE key_name = 'max_quantity_per_cart' LIMIT 1"
+    );
+    const maxQuantityPerProduct = settingRows.length > 0 
+      ? parseInt(settingRows[0].value, 10) 
+      : 12; // Default to 12 if not set
+
     const [cartRows] = await db.query(
       `
         SELECT
@@ -879,6 +902,16 @@ const checkout = async (req, res) => {
 
     if (!cartRows.length) {
       return res.status(400).json({ message: "Cart is empty" });
+    }
+
+    // Validate cart items against max_quantity_per_product setting
+    for (const row of cartRows) {
+      const qty = Number(row.quantity || 0);
+      if (qty > maxQuantityPerProduct) {
+        return res.status(400).json({
+          message: `Quantity for '${row.name}' exceeds the maximum limit of ${maxQuantityPerProduct}. Please update your cart.`
+        });
+      }
     }
 
     const connection = await db.getConnection();

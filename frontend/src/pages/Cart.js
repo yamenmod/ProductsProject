@@ -501,16 +501,34 @@ function Cart({
           },
         });
 
-        setDisplayItems(
-          normalizeCartItems(response.data.items || response.data),
-        );
+        const normalizedItems = normalizeCartItems(response.data.items || response.data);
+        
+        // Auto-adjust quantities that exceed maxQuantityLimit
+        const adjustedItems = normalizedItems.map((item) => {
+          const currentQuantity = Number(item.quantity || 1);
+          const cappedQuantity = Math.min(currentQuantity, maxQuantityLimit);
+          
+          if (cappedQuantity < currentQuantity) {
+            // Update the cart on the server if quantity was capped
+            onUpdateCartQuantity(item.id, cappedQuantity, item.size || "").catch((err) => {
+              console.error("Failed to auto-adjust quantity:", err);
+            });
+          }
+          
+          return {
+            ...item,
+            quantity: cappedQuantity,
+          };
+        });
+        
+        setDisplayItems(adjustedItems);
       } catch (error) {
         console.error("Failed to load cart page items:", error.message);
       }
     };
 
     loadCart();
-  }, [session?.token]);
+  }, [session?.token, maxQuantityLimit]);
 
   const subtotal = displayItems.reduce(
     (runningTotal, item) =>
@@ -542,6 +560,14 @@ function Cart({
   });
 
   const hasOutOfStockItems = outOfStockItems.length > 0;
+
+  // Check for items exceeding max quantity limit
+  const itemsExceedingLimit = displayItems.filter((item) => {
+    const quantity = Number(item.quantity || 1);
+    return quantity > maxQuantityLimit;
+  });
+
+  const hasItemsExceedingLimit = itemsExceedingLimit.length > 0;
 
   useEffect(() => {
     if (!displayItems.length && vatRate === null) {
@@ -1012,7 +1038,7 @@ function Cart({
                   className="ps-btn ps-btn-primary"
                   onClick={openPayPalModal}
                   style={{ padding: "10px 24px", whiteSpace: "nowrap" }}
-                  disabled={displayItems.length === 0}
+                  disabled={displayItems.length === 0 || hasOutOfStockItems || hasItemsExceedingLimit}
                 >
                   Buy Now
                 </button>
