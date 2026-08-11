@@ -27,16 +27,18 @@ const getTopProducts = async (req, res) => {
     }
 
     // Get top 3 products by total quantity sold from completed/successful orders
+    // Group by actual product (ignoring size variants)
     const [rows] = await db.query(
       `
       SELECT 
-        oi.product_id,
-        oi.name,
+        p.id as product_id,
+        p.name,
         SUM(oi.quantity) as total_sold
       FROM order_items oi
       INNER JOIN orders o ON oi.order_id = o.id
+      INNER JOIN products p ON oi.product_id = p.id
       WHERE o.status IN ('paid', 'success', 'successful', 'completed')${dateFilter}
-      GROUP BY oi.product_id, oi.name
+      GROUP BY p.id, p.name
       ORDER BY total_sold DESC
       LIMIT 3
       `,

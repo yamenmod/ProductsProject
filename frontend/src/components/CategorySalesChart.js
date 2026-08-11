@@ -1,7 +1,7 @@
 /**
  * CategorySalesChart Component
  * Displays a vertical bar chart of sales by product within a category
- * Uses actual sales data from completed/successful orders
+ * Uses actual sales data from successful orders
  */
 import React, { useEffect, useState } from "react";
 import axios from "axios";
@@ -78,7 +78,7 @@ function CategorySalesChart({ session, category, fromDate, toDate }) {
           Sales by Category: {category}
         </h2>
         <p style={{ margin: "0 0 18px", color: "#5e5148" }}>
-          Products in this category ranked by units sold from completed orders.
+          Products in this category ranked by units sold from successful orders.
         </p>
         <p className="ps-lead">Loading category sales...</p>
       </div>
@@ -92,7 +92,7 @@ function CategorySalesChart({ session, category, fromDate, toDate }) {
           Sales by Category: {category}
         </h2>
         <p style={{ margin: "0 0 18px", color: "#5e5148" }}>
-          Products in this category ranked by units sold from completed orders.
+          Products in this category ranked by units sold from successful orders.
         </p>
         <p className="ps-lead" style={{ color: "#991b1b" }}>
           {error}
@@ -108,7 +108,7 @@ function CategorySalesChart({ session, category, fromDate, toDate }) {
           Sales by Category: {category}
         </h2>
         <p style={{ margin: "0 0 18px", color: "#5e5148" }}>
-          Products in this category ranked by units sold from completed orders.
+          Products in this category ranked by units sold from successful orders.
         </p>
         <p className="ps-lead">
           No products found in this category.
@@ -127,7 +127,7 @@ function CategorySalesChart({ session, category, fromDate, toDate }) {
           Sales by Category: {category}
         </h2>
         <p style={{ margin: "0 0 18px", color: "#5e5148" }}>
-          Products in this category ranked by units sold from completed orders.
+          Products in this category ranked by units sold from successful orders.
         </p>
         <p className="ps-lead">
           No sales recorded for products in this category during the selected date range.
@@ -142,7 +142,7 @@ function CategorySalesChart({ session, category, fromDate, toDate }) {
         Sales by Category: {category}
       </h2>
       <p style={{ margin: "0 0 18px", color: "#5e5148" }}>
-        Products in this category ranked by units sold from completed orders.
+        Products in this category ranked by units sold from successful orders.
       </p>
 
       <div

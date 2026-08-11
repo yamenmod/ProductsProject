@@ -57,7 +57,7 @@ function TopProductsChart({ session, fromDate, toDate }) {
           Top 3 Most Bought Products
         </h2>
         <p style={{ margin: "0 0 18px", color: "#5e5148" }}>
-          Products ranked by total units sold from completed orders.
+          Products ranked by total units sold from successful orders.
         </p>
         <p className="ps-lead">Loading top products...</p>
       </div>
@@ -71,7 +71,7 @@ function TopProductsChart({ session, fromDate, toDate }) {
           Top 3 Most Bought Products
         </h2>
         <p style={{ margin: "0 0 18px", color: "#5e5148" }}>
-          Products ranked by total units sold from completed orders.
+          Products ranked by total units sold from successful orders.
         </p>
         <p className="ps-lead" style={{ color: "#991b1b" }}>
           {error}
@@ -87,7 +87,7 @@ function TopProductsChart({ session, fromDate, toDate }) {
           Top 3 Most Bought Products
         </h2>
         <p style={{ margin: "0 0 18px", color: "#5e5148" }}>
-          Products ranked by total units sold from completed orders.
+          Products ranked by total units sold from successful orders.
         </p>
         <p className="ps-lead">
           No products have been purchased yet.
@@ -102,7 +102,7 @@ function TopProductsChart({ session, fromDate, toDate }) {
         Top 3 Most Bought Products
       </h2>
       <p style={{ margin: "0 0 18px", color: "#5e5148" }}>
-        Products ranked by total units sold from completed orders.
+        Products ranked by total units sold from successful orders.
       </p>
 
       <div

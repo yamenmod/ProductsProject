@@ -3,7 +3,8 @@
  * Contact information page for bulk orders and customer support
  * Displays contact details for users who need to place large orders
  */
-import React from "react";
+import React, { useState } from "react";
+import axios from "axios";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import "./Contact.css";
@@ -17,6 +18,46 @@ function Contact({
   onLogout,
   cartCount = 0,
 }) {
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    subject: "",
+    message: "",
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitStatus, setSubmitStatus] = useState(null); // 'success' | 'error' | null
+  const [errorMessage, setErrorMessage] = useState("");
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    setSubmitStatus(null);
+    setErrorMessage("");
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    setSubmitStatus(null);
+    setErrorMessage("");
+
+    try {
+      const response = await axios.post("/api/contact/submit", formData);
+      
+      if (response.status === 200) {
+        setSubmitStatus("success");
+        setFormData({ name: "", email: "", subject: "", message: "" });
+      }
+    } catch (error) {
+      setSubmitStatus("error");
+      setErrorMessage(
+        error.response?.data?.message || 
+        "Failed to send message. Please try again later."
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
   return (
     <div className="ps-page">
       <Header
@@ -83,43 +124,67 @@ function Contact({
 
             <form
               className="contact-form"
-              onSubmit={(e) => {
-                e.preventDefault();
-                alert("Thank you for your message! We'll be in touch soon.");
-                e.target.reset();
-              }}
+              onSubmit={handleSubmit}
             >
               <input
                 type="text"
+                name="name"
                 placeholder="Your Name"
+                value={formData.name}
+                onChange={handleChange}
                 required
                 className="contact-input"
               />
 
               <input
                 type="email"
+                name="email"
                 placeholder="Your Email"
+                value={formData.email}
+                onChange={handleChange}
                 required
                 className="contact-input"
               />
 
               <input
                 type="text"
+                name="subject"
                 placeholder="Subject"
+                value={formData.subject}
+                onChange={handleChange}
                 required
                 className="contact-input"
               />
 
               <textarea
+                name="message"
                 placeholder="Your Message"
+                value={formData.message}
+                onChange={handleChange}
                 rows="6"
                 required
                 className="contact-textarea"
               />
 
-              <button type="submit" className="ps-btn ps-btn-primary">
-                Send Message
+              <button 
+                type="submit" 
+                className="ps-btn ps-btn-primary"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? "Sending..." : "Send Message"}
               </button>
+
+              {submitStatus === "success" && (
+                <p className="ps-lead" style={{ color: "#166534", marginTop: "16px" }}>
+                  Thank you for your message! We'll be in touch soon.
+                </p>
+              )}
+
+              {submitStatus === "error" && (
+                <p className="ps-lead" style={{ color: "#991b1b", marginTop: "16px" }}>
+                  {errorMessage}
+                </p>
+              )}
             </form>
           </div>
         </div>

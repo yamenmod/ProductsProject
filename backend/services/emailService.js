@@ -150,6 +150,107 @@ const sendOrderConfirmation = async ({
   }
 };
 
+const sendContactEmail = async ({ name, email, subject, message }) => {
+  if (!name || !email || !subject || !message) {
+    console.error("[emailService] name, email, subject, and message are required");
+    return { success: false, reason: "missing-parameters" };
+  }
+
+  const transporter = createTransporter();
+  if (!transporter) {
+    return { success: false, reason: "transporter-missing" };
+  }
+
+  try {
+    const adminEmail = (process.env.CONTACT_EMAIL || "waseemyamen1@gmail.com").trim();
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>New Contact Form Submission</title>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
+          .container { background: #f9f9f9; padding: 30px; border-radius: 8px; }
+          h1 { color: #1f1813; margin-top: 0; }
+          .field { margin-bottom: 20px; }
+          .label { font-weight: bold; color: #5e5148; margin-bottom: 5px; }
+          .value { background: #fff; padding: 10px; border-left: 4px solid #1f1813; }
+          .message { white-space: pre-wrap; }
+          .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #999; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <h1>New Contact Form Submission</h1>
+          
+          <div class="field">
+            <div class="label">Name:</div>
+            <div class="value">${name}</div>
+          </div>
+          
+          <div class="field">
+            <div class="label">Email:</div>
+            <div class="value">${email}</div>
+          </div>
+          
+          <div class="field">
+            <div class="label">Subject:</div>
+            <div class="value">${subject}</div>
+          </div>
+          
+          <div class="field">
+            <div class="label">Message:</div>
+            <div class="value message">${message}</div>
+          </div>
+          
+          <div class="footer">
+            This message was sent from the Plage Surf website contact form.
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    try {
+      await transporter.verify();
+    } catch (verifyErr) {
+      console.error(
+        "[emailService] SMTP verify failed",
+        verifyErr.message || verifyErr,
+      );
+    }
+
+    const mailOptions = {
+      from: getFromAddress(),
+      to: adminEmail,
+      replyTo: email,
+      subject: `Contact Form: ${subject}`,
+      html,
+      text: `Name: ${name}\nEmail: ${email}\nSubject: ${subject}\n\nMessage:\n${message}`,
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log("[emailService] contact email sent", {
+      to: adminEmail,
+      from: email,
+      subject,
+      messageId: info.messageId,
+    });
+
+    return { success: true, messageId: info.messageId };
+  } catch (err) {
+    console.error(
+      "[emailService] failed to send contact email",
+      err.message || err,
+    );
+    return { success: false, error: err.message || String(err) };
+  }
+};
+
 module.exports = {
   sendOrderConfirmation,
+  sendContactEmail,
 };
