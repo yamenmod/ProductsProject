@@ -707,7 +707,7 @@ function AdminDashboard({
                                 Low sizes:
                               </strong>{" "}
                               {entry.lowSizes
-                                .map((s) => `${s.size}(${s.qty})`)
+                                .map((s) => `${s.size}(${s.qty === 0 ? 'Out of stock' : s.qty})`)
                                 .join(", ")}
                             </div>
                           ) : null}
