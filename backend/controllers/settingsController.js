@@ -98,10 +98,10 @@ const updateSetting = async (req, res) => {
           .json({ error: "Max quantity per cart must be a positive integer" });
       }
 
-      if (numValue > 1000) {
+      if (numValue > 12) {
         return res
           .status(400)
-          .json({ error: "Max quantity per cart cannot exceed 1000" });
+          .json({ error: "Max quantity per cart cannot exceed 12" });
       }
 
       const storedValue = String(numValue);

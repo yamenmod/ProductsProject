@@ -503,25 +503,7 @@ function Cart({
 
         const normalizedItems = normalizeCartItems(response.data.items || response.data);
         
-        // Auto-adjust quantities that exceed maxQuantityLimit
-        const adjustedItems = normalizedItems.map((item) => {
-          const currentQuantity = Number(item.quantity || 1);
-          const cappedQuantity = Math.min(currentQuantity, maxQuantityLimit);
-          
-          if (cappedQuantity < currentQuantity) {
-            // Update the cart on the server if quantity was capped
-            onUpdateCartQuantity(item.id, cappedQuantity, item.size || "").catch((err) => {
-              console.error("Failed to auto-adjust quantity:", err);
-            });
-          }
-          
-          return {
-            ...item,
-            quantity: cappedQuantity,
-          };
-        });
-        
-        setDisplayItems(adjustedItems);
+        setDisplayItems(normalizedItems);
       } catch (error) {
         console.error("Failed to load cart page items:", error.message);
       }

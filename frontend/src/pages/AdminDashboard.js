@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Admin Dashboard Page
  * Main admin interface showing order statistics, stock watchlist, and settings
  * Features date filtering, order status cards, and VAT/max quantity configuration
@@ -324,8 +324,8 @@ function AdminDashboard({
   const saveMaxQtyPerProduct = async () => {
     const parsed = Number(maxQtyInput);
 
-    if (!Number.isFinite(parsed) || parsed < 1 || parsed > 1000) {
-      setMaxQtyMessage("Max quantity per cart must be between 1 and 1000.");
+    if (!Number.isFinite(parsed) || parsed < 1 || parsed > 12) {
+      setMaxQtyMessage("Max quantity per cart must be between 1 and 12.");
       return;
     }
 

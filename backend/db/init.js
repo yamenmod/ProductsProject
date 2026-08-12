@@ -678,7 +678,7 @@ const initDatabase = async () => {
 
     if (!existingMaxQtyCart || existingMaxQtyCart.length === 0) {
       await db.query(
-        "INSERT INTO settings (key_name, value) VALUES ('max_quantity_per_cart', '10')",
+        "INSERT INTO settings (key_name, value) VALUES ('max_quantity_per_cart', '12')",
       );
     }
 

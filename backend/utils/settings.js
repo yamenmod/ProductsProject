@@ -8,13 +8,13 @@ const getMaxQuantityPerCart = async () => {
 
     if (result.length > 0) {
       const val = Number(result[0].value);
-      return Number.isFinite(val) && val > 0 ? val : 10;
+      return Number.isFinite(val) && val > 0 ? val : 12;
     }
 
-    return 10;
+    return 12;
   } catch (error) {
     console.error("[settings:getMaxQuantityPerCart]", error.message);
-    return 10;
+    return 12;
   }
 };
 
