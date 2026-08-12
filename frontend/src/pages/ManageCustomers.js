@@ -156,19 +156,20 @@ function ManageCustomers({
         cartCount={cartCount}
       />
 
-      <main className="ps-main" style={{ padding: "70px 0" }}>
-        <div className="ps-shell">
-          <div style={{ marginBottom: "20px" }}>
+      <main className="ps-main" style={{ padding: "10px 0" }}>
+        <div className="ps-shell" style={{ paddingTop: "10px" }}>
+          <div style={{ marginBottom: "12px" }}>
             <h1
               className="ps-title"
               style={{
-                marginBottom: "10px",
+                marginBottom: "4px",
+                marginTop: "0",
                 fontSize: "clamp(22px, 3vw, 32px)",
               }}
             >
               Manage customers
             </h1>
-            <p className="ps-lead" style={{ maxWidth: "760px" }}>
+            <p className="ps-lead" style={{ maxWidth: "760px", marginBottom: "0" }}>
               View every registered customer and control whether an account is
               active.
             </p>

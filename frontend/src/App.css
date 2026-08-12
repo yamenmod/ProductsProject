@@ -1086,12 +1086,14 @@ textarea {
   border-bottom: 1px solid rgba(31, 24, 19, 0.1);
   background: rgba(255, 247, 237, 0.9);
   backdrop-filter: blur(10px);
+  padding: 8px 0;
+  margin-bottom: 0;
 }
 
 .ps-header-inner {
   width: min(1240px, calc(100% - 30px));
   margin: 0 auto;
-  min-height: 84px;
+  min-height: 48px;
   display: flex;
   align-items: center;
   justify-content: space-between;

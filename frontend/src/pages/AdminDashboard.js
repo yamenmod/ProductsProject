@@ -411,10 +411,10 @@ function AdminDashboard({
           onLogout={onLogout}
           cartCount={cartCount}
         />
-        <main className="ps-main" style={{ padding: "70px 0" }}>
+        <main className="ps-main" style={{ padding: "40px 0" }}>
           <div className="ps-shell">
-            <div className="ps-surface" style={{ padding: "30px" }}>
-              <h1 className="ps-title" style={{ marginBottom: "10px" }}>
+            <div className="ps-surface" style={{ padding: "24px" }}>
+              <h1 className="ps-title" style={{ marginBottom: "6px" }}>
                 Access restricted
               </h1>
               <p className="ps-lead">
@@ -440,104 +440,111 @@ function AdminDashboard({
         cartCount={cartCount}
       />
 
-      <main className="ps-main" style={{ padding: "70px 0" }}>
-        <div className="ps-shell">
-          <div style={{ marginBottom: "24px" }}>
-            <h1
-              className="ps-title"
-              style={{
-                marginBottom: "8px",
-                fontSize: "clamp(24px, 3vw, 34px)",
-              }}
-            >
-              Welcome, admin
-            </h1>
-            <p className="ps-lead" style={{ maxWidth: "760px" }}>
-              Track order health at a glance and watch products that are close
-              to running out of stock.
-            </p>
-          </div>
-
+      <main className="ps-main" style={{ padding: "10px 0" }}>
+        <div className="ps-shell" style={{ paddingTop: "10px" }}>
           <div
-            className="ps-surface"
             style={{
-              padding: "18px 20px",
-              marginBottom: "22px",
               display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: "24px",
+              marginBottom: "20px",
               flexWrap: "wrap",
-              gap: "16px",
-              alignItems: "flex-end",
             }}
           >
-            <div style={{ minWidth: "180px", flex: "1 1 180px" }}>
-              <div
+            <div style={{ flex: "1 1 auto", minWidth: "0" }}>
+              <h1
+                className="ps-title"
                 style={{
-                  color: "#65574d",
-                  fontSize: "12px",
-                  fontWeight: 800,
-                  letterSpacing: "1px",
-                  textTransform: "uppercase",
-                  marginBottom: "6px",
+                  marginBottom: "4px",
+                  marginTop: "0",
+                  fontSize: "clamp(24px, 3vw, 34px)",
                 }}
               >
-                From
-              </div>
-              <input
-                type="date"
-                value={dateFrom}
-                onChange={(event) => setDateFrom(event.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "11px 12px",
-                  borderRadius: "12px",
-                  border: "1px solid rgba(31, 24, 19, 0.14)",
-                  background: "rgba(255, 250, 242, 0.95)",
-                  fontSize: "13px",
-                  height: "44px",
-                  boxSizing: "border-box",
-                }}
-              />
+                Welcome, admin
+              </h1>
+              <p className="ps-lead" style={{ maxWidth: "760px", marginBottom: "0" }}>
+                Track order health at a glance and watch products that are close
+                to running out of stock.
+              </p>
             </div>
-            <div style={{ minWidth: "180px", flex: "1 1 180px" }}>
-              <div
-                style={{
-                  color: "#65574d",
-                  fontSize: "12px",
-                  fontWeight: 800,
-                  letterSpacing: "1px",
-                  textTransform: "uppercase",
-                  marginBottom: "6px",
-                }}
-              >
-                To
-              </div>
-              <input
-                type="date"
-                value={dateTo}
-                onChange={(event) => setDateTo(event.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "11px 12px",
-                  borderRadius: "12px",
-                  border: "1px solid rgba(31, 24, 19, 0.14)",
-                  background: "rgba(255, 250, 242, 0.95)",
-                  fontSize: "13px",
-                  height: "44px",
-                  boxSizing: "border-box",
-                }}
-              />
-            </div>
-            <button
-              type="button"
-              className="ps-btn ps-btn-secondary"
-              onClick={() => {
-                setDateFrom("");
-                setDateTo("");
+
+            <div
+              style={{
+                display: "flex",
+                gap: "12px",
+                alignItems: "flex-end",
+                flex: "0 0 auto",
               }}
-              style={{ height: "44px", flex: "0 0 auto" }}
             >
-              Clear range
-            </button>
+              <div>
+                <div
+                  style={{
+                    color: "#65574d",
+                    fontSize: "12px",
+                    fontWeight: 800,
+                    letterSpacing: "1px",
+                    textTransform: "uppercase",
+                    marginBottom: "6px",
+                  }}
+                >
+                  From
+                </div>
+                <input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(event) => setDateFrom(event.target.value)}
+                  style={{
+                    padding: "11px 12px",
+                    borderRadius: "12px",
+                    border: "1px solid rgba(31, 24, 19, 0.14)",
+                    background: "rgba(255, 250, 242, 0.95)",
+                    fontSize: "13px",
+                    height: "44px",
+                    boxSizing: "border-box",
+                  }}
+                />
+              </div>
+              <div>
+                <div
+                  style={{
+                    color: "#65574d",
+                    fontSize: "12px",
+                    fontWeight: 800,
+                    letterSpacing: "1px",
+                    textTransform: "uppercase",
+                    marginBottom: "6px",
+                  }}
+                >
+                  To
+                </div>
+                <input
+                  type="date"
+                  value={dateTo}
+                  onChange={(event) => setDateTo(event.target.value)}
+                  style={{
+                    padding: "11px 12px",
+                    borderRadius: "12px",
+                    border: "1px solid rgba(31, 24, 19, 0.14)",
+                    background: "rgba(255, 250, 242, 0.95)",
+                    fontSize: "13px",
+                    height: "44px",
+                    boxSizing: "border-box",
+                  }}
+                />
+              </div>
+              <button
+                type="button"
+                className="ps-btn ps-btn-secondary"
+                onClick={() => {
+                  setDateFrom("");
+                  setDateTo("");
+                }}
+                style={{ height: "44px", flex: "0 0 auto" }}
+              >
+                Clear range
+              </button>
+            </div>
           </div>
 
           <div
@@ -545,7 +552,7 @@ function AdminDashboard({
               display: "grid",
               gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
               gap: "16px",
-              marginBottom: "24px",
+              marginBottom: "16px",
             }}
           >
             {cards.map((item) => (
@@ -555,7 +562,7 @@ function AdminDashboard({
                 className="ps-surface"
                 onClick={() => openOrders(item.filter)}
                 style={{
-                  padding: "18px 20px",
+                  padding: "14px 18px",
                   border: `1px solid ${item.color}33`,
                   textAlign: "left",
                   cursor: "pointer",
@@ -604,7 +611,7 @@ function AdminDashboard({
           <div
             className="ps-surface"
             style={{
-              padding: "22px",
+              padding: "14px 18px",
               marginBottom: "16px",
             }}
           >
