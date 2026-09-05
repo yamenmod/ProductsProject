@@ -637,11 +637,14 @@ const updateProduct = async (req, res) => {
             ? parseSizeStockInput(sizeStock)
             : normalizeSizeStockMap(existingProduct.size_stock)
           : null;
-    const nextStock = stock !== undefined
-      ? Number(stock)
-      : isClothingCategory(category !== undefined ? category : existingProduct.category)
-        ? getSizeStockTotal(nextSizeStock)
-        : Number(existingProduct.stock);
+    const nextStock =
+      stock !== undefined
+        ? Number(stock)
+        : isClothingCategory(
+              category !== undefined ? category : existingProduct.category,
+            )
+          ? getSizeStockTotal(nextSizeStock)
+          : Number(existingProduct.stock);
     const uploadedImagePaths = Array.isArray(req.files)
       ? req.files
           .filter(
@@ -711,7 +714,9 @@ const updateProduct = async (req, res) => {
         description !== undefined ? description : existingProduct.description,
         nextPrice,
         nextStock,
-        maxQuantityPerUser !== undefined ? Number(maxQuantityPerUser) : (existingProduct.max_quantity_per_user || 10),
+        maxQuantityPerUser !== undefined
+          ? Number(maxQuantityPerUser)
+          : existingProduct.max_quantity_per_user || 10,
         nextCategoryId,
         nextGender,
         storedImageValue,
@@ -797,9 +802,10 @@ const deleteProduct = async (req, res) => {
         productId,
       ]);
 
-      const [result] = await connection.query("DELETE FROM products WHERE id = ?", [
-        productId,
-      ]);
+      const [result] = await connection.query(
+        "DELETE FROM products WHERE id = ?",
+        [productId],
+      );
 
       if (!result.affectedRows) {
         await connection.rollback();
@@ -896,22 +902,16 @@ const syncImages = async (req, res) => {
 };
 
 const recommendBoards = async (req, res) => {
-  // Recommend surfboards based on the user's measurements and preferences.
+  // Recommend surfboards based on user weight and board volume only.
   try {
-    const { weight, height, skillLevel } = req.body;
+    const { weight } = req.body;
     let resolvedWeight = weight;
-    let resolvedHeight = height;
-    let resolvedSkillLevel = skillLevel || "beginner";
 
-    const hasMissingMeasurements =
+    if (
       resolvedWeight === undefined ||
       resolvedWeight === null ||
-      resolvedWeight === "" ||
-      resolvedHeight === undefined ||
-      resolvedHeight === null ||
-      resolvedHeight === "";
-
-    if (hasMissingMeasurements) {
+      resolvedWeight === ""
+    ) {
       const authorizationHeader = req.headers.authorization || "";
 
       if (authorizationHeader.startsWith("Bearer ")) {
@@ -923,7 +923,7 @@ const recommendBoards = async (req, res) => {
           );
 
           const [users] = await db.query(
-            "SELECT weight, height FROM users WHERE id = ? LIMIT 1",
+            "SELECT weight FROM users WHERE id = ? LIMIT 1",
             [decoded.id],
           );
 
@@ -938,37 +938,23 @@ const recommendBoards = async (req, res) => {
           ) {
             resolvedWeight = profile.weight;
           }
-
-          if (
-            (resolvedHeight === undefined ||
-              resolvedHeight === null ||
-              resolvedHeight === "") &&
-            profile?.height !== undefined &&
-            profile?.height !== null
-          ) {
-            resolvedHeight = profile.height;
-          }
         } catch (tokenError) {
           // Continue with the request body if the token is missing or invalid.
         }
       }
     }
 
-    if (!resolvedWeight || !resolvedHeight) {
+    if (!resolvedWeight) {
       return res.status(400).json({
-        message: "weight and height are required",
+        message: "weight is required",
       });
     }
 
-    // skillLevel is optional, defaults to "beginner"
-
-    // Validate weight and height
     const weightNum = Number(resolvedWeight);
-    const heightNum = Number(resolvedHeight);
 
-    if (Number.isNaN(weightNum) || Number.isNaN(heightNum)) {
+    if (Number.isNaN(weightNum)) {
       return res.status(400).json({
-        message: "weight and height must be valid numbers",
+        message: "weight must be a valid number",
       });
     }
 
@@ -986,8 +972,6 @@ const recommendBoards = async (req, res) => {
           p.image_url,
           p.size,
           p.board_length,
-          p.board_height,
-          p.height,
           p.board_volume,
           p.volume,
           p.created_at,
@@ -1007,134 +991,67 @@ const recommendBoards = async (req, res) => {
       });
     }
 
-    // Calculate recommended volume based on weight and skill level
-    // Beginner: weight (kg) * 0.8 to 1.0
-    // Intermediate: weight (kg) * 0.6 to 0.8
-    // Advanced: weight (kg) * 0.35 to 0.5
-    let volumeMultiplierMin, volumeMultiplierMax;
+    const targetVolume = weightNum / 2;
 
-    if (resolvedSkillLevel === "beginner" || resolvedSkillLevel === "Beginner") {
-      volumeMultiplierMin = 0.8;
-      volumeMultiplierMax = 1.0;
-    } else if (resolvedSkillLevel === "intermediate" || resolvedSkillLevel === "Intermediate") {
-      volumeMultiplierMin = 0.6;
-      volumeMultiplierMax = 0.8;
-    } else if (resolvedSkillLevel === "advanced" || resolvedSkillLevel === "Advanced") {
-      volumeMultiplierMin = 0.35;
-      volumeMultiplierMax = 0.5;
-    } else {
-      volumeMultiplierMin = 0.6;
-      volumeMultiplierMax = 0.8;
-    }
-
-    const targetVolumeMin = weightNum * volumeMultiplierMin;
-    const targetVolumeMax = weightNum * volumeMultiplierMax;
-
-    const boardHeightRatio =
-      resolvedSkillLevel === "beginner" || resolvedSkillLevel === "Beginner"
-        ? 0.1
-        : resolvedSkillLevel === "advanced" || resolvedSkillLevel === "Advanced"
-          ? 0.09
-          : 0.095;
-    const boardHeightTolerance =
-      resolvedSkillLevel === "beginner" || resolvedSkillLevel === "Beginner"
-        ? 3.5
-        : resolvedSkillLevel === "advanced" || resolvedSkillLevel === "Advanced"
-          ? 2.0
-          : 2.7;
-
-    const targetBoardHeight = Math.max(0, heightNum * boardHeightRatio);
-    const targetBoardHeightMin = Math.max(
-      0,
-      targetBoardHeight - boardHeightTolerance,
-    );
-    const targetBoardHeightMax = targetBoardHeight + boardHeightTolerance;
-
-    // Height also influences board length preferences
-    const surferHeightFt = heightNum / 30.48;
-    const baseLengthFt = surferHeightFt + 0.5;
-    let lengthOffsetMin = 0.2;
-    let lengthOffsetMax = 0.7;
-
-    if (resolvedSkillLevel === "beginner" || resolvedSkillLevel === "Beginner") {
-      lengthOffsetMin = 0.4;
-      lengthOffsetMax = 1.0;
-    } else if (resolvedSkillLevel === "intermediate" || resolvedSkillLevel === "Intermediate") {
-      lengthOffsetMin = 0.3;
-      lengthOffsetMax = 0.8;
-    } else if (resolvedSkillLevel === "advanced" || resolvedSkillLevel === "Advanced") {
-      lengthOffsetMin = 0.1;
-      lengthOffsetMax = 0.5;
-    }
-
-    const targetLengthMin = Math.max(5.0, baseLengthFt + lengthOffsetMin);
-    const targetLengthMax = Math.min(12.0, baseLengthFt + lengthOffsetMax);
-    const targetLengthCenter = (targetLengthMin + targetLengthMax) / 2;
-    const targetVolumeCenter = (targetVolumeMin + targetVolumeMax) / 2;
-    const targetHeightCenter =
-      (targetBoardHeightMin + targetBoardHeightMax) / 2;
-
-    const scoreMetric = (value, target) => {
-      if (value === null || value === undefined || Number.isNaN(value)) {
-        return 0;
+    const getBoardMatch = (boardVolume) => {
+      if (!Number.isFinite(boardVolume) || boardVolume <= 0) {
+        return "BAD";
       }
 
-      const diff = Math.abs(value - target);
-      if (diff === 0) {
-        return 100;
+      const difference = Math.abs(boardVolume - targetVolume);
+
+      if (difference <= 3) {
+        return "PERFECT";
       }
 
-      const normalized = Math.max(0, 100 - (diff / Math.max(target, 1)) * 100);
-      return Math.round(Math.min(100, normalized));
-    };
+      if (difference <= 6) {
+        return "GOOD";
+      }
 
-    const getMatchCategory = (score) => {
-      if (score >= 68) return "Perfect Match";
-      if (score >= 34) return "Good Match";
-      return "Bad Match";
+      return "BAD";
     };
 
     // Get VAT rate once
     const vatRate = await getVatRateFromDb(db);
 
-    // Score each surfboard based on volume, board feet, and board length matches
+    // Score each surfboard only by the relationship between weight and volume.
     const scoredBoards = surfboards
       .map((board) => {
-        const normalizedHeight =
-          board.board_height !== undefined && board.board_height !== null
-            ? Number(board.board_height)
-            : board.height !== undefined && board.height !== null
-              ? Number(board.height)
-              : null;
         const normalizedVolume =
           board.board_volume !== undefined && board.board_volume !== null
             ? Number(board.board_volume)
             : board.volume !== undefined && board.volume !== null
               ? Number(board.volume)
               : null;
-        const volume = normalizedVolume;
-        const boardHeight = normalizedHeight;
-        const boardLength = Number(board.board_length);
+        const volume =
+          Number.isFinite(normalizedVolume) && normalizedVolume > 0
+            ? normalizedVolume
+            : null;
 
-        const volumeScore = scoreMetric(volume, targetVolumeCenter);
-        const heightScore = scoreMetric(boardHeight, targetHeightCenter);
-        const lengthScore = scoreMetric(boardLength, targetLengthCenter);
+        if (volume === null) {
+          return null;
+        }
 
-        const recommendationScore = Math.round(
-          volumeScore * 0.5 + heightScore * 0.4 + lengthScore * 0.1,
-        );
-        const matchCategory = getMatchCategory(recommendationScore);
+        const difference = Math.abs(volume - targetVolume);
+        const matchLabel = getBoardMatch(volume);
+        const matchPriority =
+          matchLabel === "PERFECT" ? 0 : matchLabel === "GOOD" ? 1 : 2;
 
         return {
           ...normalizeProduct(board, vatRate),
-          recommendationScore,
-          matchCategory,
-          volumeScore,
-          boardHeightScore: heightScore,
-          boardLengthScore: lengthScore,
+          matchLabel,
+          matchPriority,
+          difference,
         };
       })
-      .sort((a, b) => b.recommendationScore - a.recommendationScore);
+      .filter(Boolean)
+      .sort((a, b) => {
+        if (a.matchPriority !== b.matchPriority) {
+          return a.matchPriority - b.matchPriority;
+        }
+
+        return a.difference - b.difference;
+      });
 
     const topRecommendations = scoredBoards.slice(0, 5);
 
@@ -1142,16 +1059,7 @@ const recommendBoards = async (req, res) => {
       recommendations: topRecommendations,
       userProfile: {
         weight: weightNum,
-        height: heightNum,
-        skillLevel: resolvedSkillLevel,
-        targetVolumeRange: {
-          min: Math.round(targetVolumeMin * 10) / 10,
-          max: Math.round(targetVolumeMax * 10) / 10,
-        },
-        targetLengthRange: {
-          min: targetLengthMin,
-          max: targetLengthMax,
-        },
+        targetVolume: Math.round(targetVolume * 10) / 10,
       },
     });
   } catch (error) {

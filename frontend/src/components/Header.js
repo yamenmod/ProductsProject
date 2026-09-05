@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import axios from "axios";
 
 function Header({
@@ -16,12 +16,22 @@ function Header({
   const [boardInputs, setBoardInputs] = useState({
     weight: "",
     height: "",
-    skillLevel: "beginner",
+  });
+  const [tempBoardInputs, setTempBoardInputs] = useState({
+    weight: "",
+    height: "",
   });
   const [boardUsingSavedProfile, setBoardUsingSavedProfile] = useState(false);
+  const [useCustomMeasurements, setUseCustomMeasurements] = useState(false);
   const [boardRecommendations, setBoardRecommendations] = useState(null);
   const [recommendationLoading, setRecommendationLoading] = useState(false);
   const [recommendationError, setRecommendationError] = useState("");
+  const recommendationRequestIdRef = useRef(0);
+
+  const isValidMeasurement = (value) => {
+    const numericValue = Number(value);
+    return Number.isFinite(numericValue) && numericValue > 0;
+  };
 
   const parseMeasurementValue = (value) => {
     if (value === undefined || value === null || value === "") {
@@ -35,7 +45,6 @@ function Header({
   const getInitialBoardInputs = () => ({
     weight: parseMeasurementValue(user?.weight),
     height: parseMeasurementValue(user?.height),
-    skillLevel: user?.skillLevel || "beginner",
   });
 
   const handleLogoutClick = () => {
@@ -53,77 +62,59 @@ function Header({
     setLogoutPromptOpen(false);
   };
 
-  const handleGetRecommendations = async (nextInputs = boardInputs) => {
+  const handleGetRecommendations = async (overrideInputs) => {
     setRecommendationError("");
     setRecommendationLoading(true);
 
+    const activeInputs =
+      overrideInputs || (useCustomMeasurements ? tempBoardInputs : boardInputs);
     const resolvedInputs = {
-      weight: (nextInputs.weight || "").toString().trim(),
-      height: (nextInputs.height || "").toString().trim(),
-      skillLevel: nextInputs.skillLevel || "beginner",
+      weight: activeInputs.weight,
+      height: activeInputs.height,
     };
 
+    console.log("CUSTOM MODE:", useCustomMeasurements);
+    console.log("PROFILE WEIGHT:", user?.weight);
+    console.log("BOARD INPUTS:", boardInputs);
+    console.log("TEMP INPUTS:", tempBoardInputs);
+    console.log("WEIGHT ACTUALLY SENT:", Number(resolvedInputs.weight));
+
     try {
-      // The board chooser uses the shopper's body data to ask the backend for matches.
-      if (!resolvedInputs.weight || !resolvedInputs.height) {
-        setRecommendationError("Please enter weight and height");
+      const hasWeight = isValidMeasurement(resolvedInputs.weight);
+      const hasHeight = isValidMeasurement(resolvedInputs.height);
+
+      if (!hasWeight || !hasHeight) {
+        setRecommendationError("weight and height are required");
         setRecommendationLoading(false);
         return;
       }
+
+      const requestId = ++recommendationRequestIdRef.current;
 
       const response = await axios.post("/api/products/recommend-boards", {
         weight: Number(resolvedInputs.weight),
-        height: Number(resolvedInputs.height),
-        skillLevel: resolvedInputs.skillLevel,
       });
 
-      setBoardRecommendations(response.data);
-    } catch (error) {
-      setRecommendationError(
-        error.response?.data?.message || "Failed to get recommendations",
-      );
-    } finally {
-      setRecommendationLoading(false);
-    }
-  };
-
-  const handleSaveProfile = async () => {
-    setRecommendationError("");
-    setRecommendationLoading(true);
-
-    const resolvedInputs = {
-      weight: (boardInputs.weight || "").toString().trim(),
-      height: (boardInputs.height || "").toString().trim(),
-      skillLevel: boardInputs.skillLevel || "beginner",
-    };
-
-    try {
-      if (!resolvedInputs.weight || !resolvedInputs.height) {
-        setRecommendationError("Please enter weight and height to save");
-        setRecommendationLoading(false);
+      if (requestId !== recommendationRequestIdRef.current) {
         return;
       }
 
-      const response = await axios.patch(
-        "/api/auth/profile",
-        {
-          weight: Number(resolvedInputs.weight),
-          height: Number(resolvedInputs.height),
-          skillLevel: resolvedInputs.skillLevel,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${user?.token}`,
-          },
-        },
-      );
+      const recommendations =
+        response.data?.recommendations ||
+        response.data?.boards ||
+        response.data?.products ||
+        [];
 
-   
-      setRecommendationError("Profile saved successfully!");
-      setTimeout(() => setRecommendationError(""), 2000);
+      setBoardRecommendations({
+        ...response.data,
+        recommendations,
+      });
     } catch (error) {
+      console.error("Recommendation error:", error);
       setRecommendationError(
-        error.response?.data?.message || "Failed to save profile",
+        error.response?.data?.message ||
+          error.message ||
+          "Failed to get recommendations",
       );
     } finally {
       setRecommendationLoading(false);
@@ -132,30 +123,76 @@ function Header({
 
   const resetBoardChooser = () => {
     // Close the chooser and clear the previous recommendation results.
-    setBoardInputs({ weight: "", height: "", skillLevel: "beginner" });
+    setBoardInputs({ weight: "", height: "" });
+    setTempBoardInputs({ weight: "", height: "" });
     setBoardRecommendations(null);
     setRecommendationError("");
     setBoardUsingSavedProfile(false);
+    setUseCustomMeasurements(false);
+    recommendationRequestIdRef.current += 1;
     setChooseBoardOpen(false);
+  };
+
+  const startCustomMeasurements = () => {
+    setTempBoardInputs((prev) => ({
+      weight: prev.weight || parseMeasurementValue(user?.weight),
+      height: prev.height || parseMeasurementValue(user?.height),
+    }));
+    setUseCustomMeasurements(true);
+    setBoardRecommendations(null);
+    setRecommendationError("");
+    recommendationRequestIdRef.current += 1;
+  };
+
+  const handleTryDifferentSettings = () => {
+    console.log("TEMP BEFORE REOPEN:", tempBoardInputs);
+    setUseCustomMeasurements(true);
+    setBoardRecommendations(null);
+    setRecommendationError("");
+    recommendationRequestIdRef.current += 1;
+  };
+
+  const handleUseSavedMeasurements = () => {
+    const savedWeight = parseMeasurementValue(user?.weight);
+    const savedHeight = parseMeasurementValue(user?.height);
+
+    setBoardInputs({
+      weight: savedWeight,
+      height: savedHeight,
+    });
+
+    setTempBoardInputs({
+      weight: savedWeight,
+      height: savedHeight,
+    });
+    setUseCustomMeasurements(false);
+    setBoardUsingSavedProfile(true);
+    setBoardRecommendations(null);
+    setRecommendationError("");
+    recommendationRequestIdRef.current += 1;
+
+    void handleGetRecommendations({
+      weight: savedWeight,
+      height: savedHeight,
+    });
   };
 
   const handleOpenBoardChooser = () => {
     const initialInputs = getInitialBoardInputs();
+    const hasWeight = isValidMeasurement(initialInputs.weight);
+    const hasHeight = isValidMeasurement(initialInputs.height);
+    const hasSavedMeasurements = hasWeight && hasHeight;
 
     setBoardInputs(initialInputs);
     setBoardRecommendations(null);
     setRecommendationError("");
 
-    // Check if we have any measurements to work with
-    const hasAnyMeasurements =
-      (initialInputs.weight && initialInputs.weight !== "") ||
-      (initialInputs.height && initialInputs.height !== "");
-
-    setBoardUsingSavedProfile(hasAnyMeasurements);
+    setBoardUsingSavedProfile(hasSavedMeasurements);
+    setUseCustomMeasurements(false);
+    recommendationRequestIdRef.current += 1;
     setChooseBoardOpen(true);
 
-    // If we have measurements, auto-fetch recommendations
-    if (hasAnyMeasurements && initialInputs.weight && initialInputs.height) {
+    if (hasSavedMeasurements) {
       void handleGetRecommendations(initialInputs);
     }
   };
@@ -166,8 +203,6 @@ function Header({
     currentPage === "shop" ||
     currentPage === "products" ||
     currentPage === "size-charts";
-  console.log("CURRENT USER:", user);
-  console.log("CURRENT ROLE:", user?.role);
   const isAdmin = user?.role === "admin";
   const isCustomer = user?.role === "user";
 
@@ -437,20 +472,64 @@ function Header({
             style={{ maxHeight: "90vh", overflowY: "auto" }}
           >
             {!boardRecommendations ? (
-              recommendationLoading && boardUsingSavedProfile ? (
+              boardUsingSavedProfile && !useCustomMeasurements ? (
                 <>
                   <h2 style={{ marginTop: 0, marginBottom: "12px" }}>
-                    Finding your recommendations
+                    Choose My Board
                   </h2>
                   <p style={{ margin: 0, color: "#65574d", lineHeight: 1.6 }}>
-                    We found saved measurements on your profile, so the board
-                    chooser is using them automatically.
+                    Using your saved measurements:
+                    <br />
+                    Weight: {Number(boardInputs.weight)} kg
+                    <br />
+                    Height: {Number(boardInputs.height)} cm
                   </p>
+
+                  {recommendationLoading && (
+                    <p style={{ marginTop: "14px", color: "#65574d" }}>
+                      Finding your recommendations...
+                    </p>
+                  )}
+
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: "12px",
+                      justifyContent: "flex-end",
+                      flexWrap: "wrap",
+                      marginTop: "20px",
+                    }}
+                  >
+                    <button
+                      type="button"
+                      className="ps-btn ps-btn-secondary"
+                      onClick={startCustomMeasurements}
+                    >
+                      Try Different Measurements
+                    </button>
+                    <button
+                      type="button"
+                      className="ps-btn ps-btn-primary"
+                      onClick={() => handleGetRecommendations()}
+                      disabled={recommendationLoading}
+                    >
+                      {recommendationLoading
+                        ? "Loading..."
+                        : "Get Recommendations"}
+                    </button>
+                    <button
+                      type="button"
+                      className="ps-btn ps-btn-secondary"
+                      onClick={resetBoardChooser}
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 </>
               ) : (
                 <>
                   <h2 style={{ marginTop: 0, marginBottom: "20px" }}>
-                    Find Your Perfect Board
+                    Choose My Board
                   </h2>
 
                   {boardUsingSavedProfile && (
@@ -463,7 +542,11 @@ function Header({
                         fontWeight: 500,
                       }}
                     >
-                      Using your saved measurements.
+                      Using your saved measurements:
+                      <br />
+                      Weight: {Number(boardInputs.weight)} kg
+                      <br />
+                      Height: {Number(boardInputs.height)} cm
                     </p>
                   )}
 
@@ -476,8 +559,8 @@ function Header({
                         lineHeight: 1.5,
                       }}
                     >
-                      Enter your measurements to find boards that match your
-                      needs.
+                      Enter your weight and height to find boards that match
+                      your needs.
                     </p>
                   )}
 
@@ -489,18 +572,31 @@ function Header({
                       marginBottom: "20px",
                     }}
                   >
-                    {/* Weight, height, and skill level are sent to the recommendation endpoint. */}
+                    {/* Weight and height are collected here, but only weight is sent to the recommendation endpoint. */}
                     <input
                       type="number"
                       placeholder="Weight (kg)"
-                      value={boardInputs.weight}
-                      onChange={(e) =>
-                        setBoardInputs({
-                          ...boardInputs,
-                          weight: e.target.value,
-                        })
+                      value={
+                        useCustomMeasurements
+                          ? tempBoardInputs.weight
+                          : boardInputs.weight
                       }
-                      disabled={boardUsingSavedProfile && recommendationLoading}
+                      onChange={(e) =>
+                        useCustomMeasurements
+                          ? (console.log(
+                              "CUSTOM INPUT CHANGED:",
+                              e.target.value,
+                            ),
+                            setTempBoardInputs({
+                              ...tempBoardInputs,
+                              weight: e.target.value,
+                            }))
+                          : setBoardInputs({
+                              ...boardInputs,
+                              weight: e.target.value,
+                            })
+                      }
+                      disabled={recommendationLoading}
                       min="30"
                       max="150"
                       style={{
@@ -523,14 +619,27 @@ function Header({
                     <input
                       type="number"
                       placeholder="Height (cm)"
-                      value={boardInputs.height}
-                      onChange={(e) =>
-                        setBoardInputs({
-                          ...boardInputs,
-                          height: e.target.value,
-                        })
+                      value={
+                        useCustomMeasurements
+                          ? tempBoardInputs.height
+                          : boardInputs.height
                       }
-                      disabled={boardUsingSavedProfile && recommendationLoading}
+                      onChange={(e) =>
+                        useCustomMeasurements
+                          ? (console.log(
+                              "CUSTOM INPUT CHANGED:",
+                              e.target.value,
+                            ),
+                            setTempBoardInputs({
+                              ...tempBoardInputs,
+                              height: e.target.value,
+                            }))
+                          : setBoardInputs({
+                              ...boardInputs,
+                              height: e.target.value,
+                            })
+                      }
+                      disabled={recommendationLoading}
                       min="120"
                       max="220"
                       style={{
@@ -549,37 +658,6 @@ function Header({
                             : "auto",
                       }}
                     />
-
-                    <select
-                      value={boardInputs.skillLevel}
-                      onChange={(e) =>
-                        setBoardInputs({
-                          ...boardInputs,
-                          skillLevel: e.target.value,
-                        })
-                      }
-                      disabled={boardUsingSavedProfile && recommendationLoading}
-                      style={{
-                        padding: "10px 12px",
-                        border: "1px solid #d9c3ad",
-                        borderRadius: "8px",
-                        fontSize: "14px",
-                        fontFamily: "inherit",
-                        cursor:
-                          boardUsingSavedProfile && recommendationLoading
-                            ? "not-allowed"
-                            : "pointer",
-                        opacity:
-                          boardUsingSavedProfile && recommendationLoading
-                            ? 0.6
-                            : 1,
-                      }}
-                    >
-                      <option value="beginner">Beginner</option>
-                      <option value="intermediate">Intermediate</option>
-                      <option value="advanced">Advanced</option>
-                    </select>
-
                   </div>
 
                   {recommendationError && (
@@ -609,20 +687,21 @@ function Header({
                     >
                       Cancel
                     </button>
-                    <button
-                      type="button"
-                      className="ps-btn ps-btn-secondary"
-                      onClick={handleSaveProfile}
-                      disabled={recommendationLoading}
-                    >
-                      {recommendationLoading
-                        ? "Saving..."
-                        : "Save Profile"}
-                    </button>
+
+                    {boardUsingSavedProfile && (
+                      <button
+                        type="button"
+                        className="ps-btn ps-btn-secondary"
+                        onClick={handleUseSavedMeasurements}
+                      >
+                        Use Saved Measurements
+                      </button>
+                    )}
+
                     <button
                       type="button"
                       className="ps-btn ps-btn-primary"
-                      onClick={handleGetRecommendations}
+                      onClick={() => handleGetRecommendations()}
                       disabled={recommendationLoading}
                     >
                       {recommendationLoading
@@ -686,28 +765,41 @@ function Header({
                                 ${board.price}
                               </p>
                             </div>
-                            <div style={{ textAlign: "right" }}>
-                              <p
-                                style={{
-                                  margin: 0,
-                                  fontSize: "14px",
-                                  fontWeight: "600",
-                                  color: "#245860",
-                                }}
-                              >
-                                {board.recommendationScore}% - {board.matchCategory}
-                              </p>
-                              <p
-                                style={{
-                                  margin: "4px 0 0 0",
-                                  fontSize: "11px",
-                                  color: "#666",
-                                }}
-                              >
-                                Volume: {board.volume}L
-                              </p>
-                            </div>
+                            <span
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                padding: "6px 10px",
+                                borderRadius: "999px",
+                                background:
+                                  board.matchLabel === "PERFECT"
+                                    ? "rgba(36, 88, 96, 0.14)"
+                                    : board.matchLabel === "GOOD"
+                                      ? "rgba(199, 122, 74, 0.16)"
+                                      : "rgba(217, 83, 79, 0.14)",
+                                color:
+                                  board.matchLabel === "PERFECT"
+                                    ? "#245860"
+                                    : board.matchLabel === "GOOD"
+                                      ? "#a65b2d"
+                                      : "#b03b37",
+                                fontSize: "12px",
+                                fontWeight: 800,
+                                letterSpacing: "0.06em",
+                              }}
+                            >
+                              {board.matchLabel}
+                            </span>
                           </div>
+                          <p
+                            style={{
+                              margin: "4px 0 0 0",
+                              fontSize: "11px",
+                              color: "#666",
+                            }}
+                          >
+                            Volume: {board.volume}L
+                          </p>
                           <p
                             style={{
                               margin: "8px 0 0 0",
@@ -725,15 +817,15 @@ function Header({
                   </div>
                 ) : (
                   <p style={{ marginBottom: "20px", color: "#666" }}>
-                    No suitable surfboards found. Try adjusting your
-                    preferences.
+                    No suitable surfboards found. Try a different weight or
+                    check board volumes.
                   </p>
                 )}
 
                 <button
                   type="button"
                   className="ps-btn ps-btn-primary"
-                  onClick={() => setBoardRecommendations(null)}
+                  onClick={handleTryDifferentSettings}
                   style={{ width: "100%" }}
                 >
                   Try Different Settings
