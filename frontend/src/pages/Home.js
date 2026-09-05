@@ -7,7 +7,6 @@ import React, { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
-import Assistant from "../components/Assistant";
 import "./Home.css";
 
 function Home({
@@ -411,7 +410,10 @@ function Home({
 
                 return (
                   <article className="ps-dropCard" key={productId}>
-                    <div className="ps-dropImageWrap" style={{ position: "relative" }}>
+                    <div
+                      className="ps-dropImageWrap"
+                      style={{ position: "relative" }}
+                    >
                       <button
                         type="button"
                         className="home-card-image-button"
@@ -524,7 +526,9 @@ function Home({
 
       {cartSuccessMessage && (
         <div className="home-cart-success">
-          <span className="home-cart-success-message">{cartSuccessMessage}</span>
+          <span className="home-cart-success-message">
+            {cartSuccessMessage}
+          </span>
           <button
             className="home-cart-success-close"
             onClick={onClearCartSuccessMessage}
@@ -752,7 +756,14 @@ function Home({
               <p className="ps-previewDescription">
                 {previewProduct.description || "No description available yet."}
               </p>
-              <div className="ps-previewPurchaseRow" style={{ gap: "12px", alignItems: "flex-start", flexDirection: "column" }}>
+              <div
+                className="ps-previewPurchaseRow"
+                style={{
+                  gap: "12px",
+                  alignItems: "flex-start",
+                  flexDirection: "column",
+                }}
+              >
                 <div>
                   <div
                     className="ps-previewPrice"
@@ -814,7 +825,6 @@ function Home({
       )}
 
       <Footer />
-      <Assistant session={session} user={user} />
     </div>
   );
 }

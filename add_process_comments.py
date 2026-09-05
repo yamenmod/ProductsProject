@@ -11,7 +11,7 @@ def describe(name: str) -> str:
     if name[0].isupper():
         if name == 'App':
             return 'renders the main application shell.'
-        if name in {'Header', 'Footer', 'Assistant'}:
+        if name in {'Header', 'Footer'}:
             return f'renders the {name.lower()} UI.'
         return f'implements the {name} workflow.'
 
