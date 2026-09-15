@@ -206,6 +206,10 @@ function Header({
   const isAdmin = user?.role === "admin";
   const isCustomer = user?.role === "user";
 
+  // if its man or woman women/men
+
+
+  // shop scrolldown
   return (
     <header className="ps-header">
       <div className="ps-header-inner">
@@ -330,7 +334,7 @@ function Header({
             <>
               <button
                 type="button"
-                className={`ps-nav-link ${currentPage === "admin-dashboard" ? "active" : ""}`}
+                className={`ps-nav-link ${currentPage === "admin-dashboard" ? "active" : ""}`} // admin header
                 onClick={() => onNavigate("admin-dashboard")}
               >
                 Dashboard

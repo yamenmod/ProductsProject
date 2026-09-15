@@ -53,139 +53,6 @@ const getToken = (user) =>
     { expiresIn: "7d" },
   );
 
-const generateResetCode = () =>
-  String(Math.floor(100000 + Math.random() * 900000)).padStart(6, "0");
-
-// Sends a password reset code to the user's email address.
-const forgotPassword = async (req, res) => {
-  try {
-    const { email } = req.body;
-
-    if (!email) {
-      return res.status(400).json({ message: "Email is required" });
-    }
-
-    const normalizedEmail = email.toLowerCase().trim();
-
-    const [users] = await db.query(
-      "SELECT id FROM users WHERE email = ? LIMIT 1",
-      [normalizedEmail],
-    );
-
-    const user = users[0];
-
-    if (!user) {
-      return res.status(404).json({ message: "Email not found" });
-    }
-
-    const code = generateResetCode();
-
-    await db.query(
-      "UPDATE users SET reset_code = ?, reset_code_expires = DATE_ADD(NOW(), INTERVAL 10 MINUTE) WHERE id = ?",
-      [code, user.id],
-    );
-
-    const transporter = createMailTransporter();
-
-    if (!transporter) {
-      console.error(
-        "Forgot password email not sent: missing EMAIL_USER or EMAIL_PASS",
-      );
-      return res.status(500).json({
-        message:
-          "Unable to send reset email because email configuration is missing.",
-      });
-    }
-
-    try {
-      await transporter.sendMail({
-        from: process.env.EMAIL_USER,
-        to: normalizedEmail,
-        subject: "Surf Shop - Password Reset Code",
-        text: `Your reset code is: ${code}. It expires in 10 minutes.`,
-      });
-    } catch (emailError) {
-      console.error("Password reset email failed:", emailError);
-      return res.status(500).json({
-        message: "Unable to send reset email. Please try again later.",
-      });
-    }
-
-    console.log(`Password reset code for ${normalizedEmail}: ${code}`);
-
-    return res.status(200).json({
-      message: "Reset code sent to your email.",
-    });
-  } catch (error) {
-    console.error("FORGOT PASSWORD ERROR:", error);
-    return res.status(500).json({ message: "Server error" });
-  }
-};
-
-// Confirms that a reset code is valid and not expired.
-const verifyResetCode = async (req, res) => {
-  try {
-    const { email, code } = req.body;
-
-    if (!email || !code) {
-      return res
-        .status(400)
-        .json({ message: "Email and reset code are required" });
-    }
-
-    const normalizedEmail = email.toLowerCase().trim();
-
-    const [users] = await db.query(
-      "SELECT id FROM users WHERE email = ? AND reset_code = ? AND reset_code_expires > NOW() LIMIT 1",
-      [normalizedEmail, code],
-    );
-
-    if (!users.length) {
-      return res.status(400).json({ message: "Invalid or expired code" });
-    }
-
-    return res.status(200).json({ message: "Code verified" });
-  } catch (error) {
-    console.error("VERIFY RESET CODE ERROR:", error);
-    return res.status(500).json({ message: "Server error" });
-  }
-};
-
-// Updates the password after the reset code has been validated.
-const resetPassword = async (req, res) => {
-  try {
-    const { email, code, newPassword } = req.body;
-
-    if (!email || !code || !newPassword) {
-      return res
-        .status(400)
-        .json({ message: "Email, code and new password are required" });
-    }
-
-    if (newPassword.trim().length < 4) {
-      return res
-        .status(400)
-        .json({ message: "New password must be at least 4 characters" });
-    }
-
-    const normalizedEmail = email.toLowerCase().trim();
-
-    const [result] = await db.query(
-      "UPDATE users SET password = ?, reset_code = NULL, reset_code_expires = NULL WHERE email = ? AND reset_code = ? AND reset_code_expires > NOW()",
-      [newPassword, normalizedEmail, code],
-    );
-
-    if (!result.affectedRows) {
-      return res.status(400).json({ message: "Invalid or expired code" });
-    }
-
-    return res.status(200).json({ message: "Password updated" });
-  } catch (error) {
-    console.error("RESET PASSWORD ERROR:", error);
-    return res.status(500).json({ message: "Server error" });
-  }
-};
-
 // Creates a normal user account and returns the session token for the app.
 // The response includes the user role so the frontend can show admin-only UI.
 // Creates a new user account and returns a token for the frontend session.
@@ -233,12 +100,10 @@ const register = async (req, res) => {
     );
 
     if (existingEmail.length) {
-      return res
-        .status(400)
-        .json({
-          message:
-            "This email address is already registered. Please use a different email or login to your existing account.",
-        });
+      return res.status(400).json({
+        message:
+          "This email address is already registered. Please use a different email or login to your existing account.",
+      });
     }
 
     const [insertResult] = await db.query(

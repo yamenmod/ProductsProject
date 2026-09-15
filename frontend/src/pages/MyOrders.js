@@ -46,7 +46,7 @@ function MyOrders({ session, user, onNavigate }) {
         if (order.paid_at && isSuccessfulOrder(order)) {
           const paidAt = new Date(order.paid_at);
           const elapsed = now - paidAt;
-          const ms2Minutes = 2 * 60 * 1000;
+          const ms2Minutes = 2 * 60 * 1000; // 120k - is 2 minutes
           const remaining = ms2Minutes - elapsed;
           if (remaining > 0) {
             newTimeLeft[order.id] = Math.floor(remaining / 1000);
@@ -63,6 +63,7 @@ function MyOrders({ session, user, onNavigate }) {
 
   const isSuccessfulOrder = (order) => getOrderBucket(order) === "success";
 
+  // cancelling order/cancelled
   const canCancel = (order) => {
     if (!order.paid_at) return false;
     if (!isSuccessfulOrder(order)) return false;
@@ -244,7 +245,7 @@ function MyOrders({ session, user, onNavigate }) {
                     </ul>
                   ) : null}
                 </div>
-
+ 
                 <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
                   {canCancel(o) && (
                     <button
@@ -254,6 +255,7 @@ function MyOrders({ session, user, onNavigate }) {
                     >
                       Cancel Order
                     </button>
+                    //cancel order button/ cancel order btn
                   )}
                   {isSuccessfulOrder(o) && !canCancel(o) && (
                     <div
