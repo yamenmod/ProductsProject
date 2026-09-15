@@ -132,6 +132,8 @@ function AdminDashboard({
     ],
   );
 
+// stock watch
+
   const lowStockProducts = useMemo(() => {
     const THRESHOLD = 4;
     const normalizedSearch = (watchlistSearch || "")
@@ -355,6 +357,7 @@ function AdminDashboard({
     }
   };
 
+   // open cards
   const openOrders = (filter) => {
     if (typeof onOpenOrders === "function") {
       onOpenOrders(filter);
