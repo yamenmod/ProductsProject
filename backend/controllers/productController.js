@@ -990,7 +990,7 @@ const recommendBoards = async (req, res) => {
         message: "No surfboards available",
       });
     }
-
+    // target weight
     const targetVolume = weightNum / 2;
 
     const getBoardMatch = (boardVolume) => {

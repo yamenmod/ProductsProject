@@ -376,6 +376,8 @@ function App() {
     };
   }, [session?.token, session?.user?.role]);
 
+ // save refresh/savef5
+ 
   const handleNavigate = (page, categoryOrData) => {
     // Save current page to localStorage for persistence on refresh
     localStorage.setItem("currentPage", page);

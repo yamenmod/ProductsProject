@@ -29,6 +29,7 @@ function ManageCustomers({
   const [pendingUsername, setPendingUsername] = useState("");
   const [pendingNextIsActive, setPendingNextIsActive] = useState(null);
 
+  // getting users
   const loadUsers = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -56,6 +57,7 @@ function ManageCustomers({
 
   const filteredUsers = users.filter((user) => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
+    // active is 1
     const isActive = Number(user.is_active) === 1;
 
     // Filter by status
@@ -326,7 +328,7 @@ function ManageCustomers({
                 <tbody>
                   {filteredUsers.map((user) => {
                     const isActive = Number(user.is_active) === 1;
-
+                    
                     return (
                       <tr
                         key={user.id}
@@ -360,7 +362,7 @@ function ManageCustomers({
                               color: isActive ? STATUS_COLORS.success : "#991b1b",
                             }}
                           >
-                            {isActive ? "Active" : "Inactive"}
+                            {isActive ? "Active" : "Inactive"} 
                           </span>
                         </td>
                         <td style={{ padding: "14px 10px", color: "#65574d" }}>
