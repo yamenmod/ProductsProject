@@ -28,6 +28,7 @@ const authMiddleware = async (req, res, next) => {
           return res.status(401).json({ message: "Invalid token" });
         }
 
+        // blocking account
         if (user.role !== "admin" && Number(user.is_active) !== 1) {
           return res.status(403).json({
             message:

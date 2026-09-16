@@ -132,7 +132,7 @@ function AdminDashboard({
     ],
   );
 
-// stock watch
+// stock watch/4
 
   const lowStockProducts = useMemo(() => {
     const THRESHOLD = 4;
@@ -150,7 +150,7 @@ function AdminDashboard({
 
         if (sizeStock && typeof sizeStock === "object") {
           lowSizes = Object.entries(sizeStock)
-            .filter(([, qty]) => Number(qty) >= 0 && Number(qty) <= THRESHOLD)
+            .filter(([, qty]) => Number(qty) >= 0 && Number(qty) <= THRESHOLD) // if lower than 4
             .map(([size, qty]) => ({ size, qty: Number(qty) }));
         }
 
