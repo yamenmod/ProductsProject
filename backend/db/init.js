@@ -21,6 +21,11 @@ const initDatabase = async () => {
     `);
     console.log("✅ Users table verified/created");
 
+    await db.query(
+      `ALTER TABLE users MODIFY COLUMN password VARCHAR(255) NOT NULL`,
+    );
+    console.log("✅ Password column supports bcrypt hashes");
+
     const [isActiveColumn] = await db.query(
       `
         SELECT COUNT(*) AS total

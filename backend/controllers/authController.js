@@ -1,4 +1,5 @@
 const jwt = require("jsonwebtoken");
+const bcrypt = require("bcryptjs");
 const db = require("../db/connection");
 const { createMailTransporter } = require("../utils/mailer");
 
@@ -77,6 +78,7 @@ const register = async (req, res) => {
     const normalizedEmail = email.toLowerCase().trim();
     const normalizedWeight = normalizeOptionalMeasurement(weight, "Weight");
     const normalizedHeight = normalizeOptionalMeasurement(height, "Height");
+    const hashedPassword = await bcrypt.hash(password, 10);
 
     console.log("✅ NORMALIZED DATA:", {
       normalizedUsername,
@@ -111,7 +113,7 @@ const register = async (req, res) => {
       [
         normalizedUsername,
         normalizedEmail,
-        password,
+        hashedPassword,
         "user",
         normalizedWeight,
         normalizedHeight,
@@ -165,13 +167,17 @@ const login = async (req, res) => {
     }
 
     const [users] = await db.query(
-      "SELECT id, username, email, password, role, is_active, weight, height FROM users WHERE username = ? AND password = ? LIMIT 1",
-      [username.trim(), password],
+      "SELECT id, username, email, password, role, is_active, weight, height FROM users WHERE username = ? LIMIT 1",
+      [username.trim()],
     );
 
     const user = users[0];
 
-    if (!user) {
+    const isPasswordValid = user
+      ? await bcrypt.compare(password, user.password)
+      : false;
+
+    if (!user || !isPasswordValid) {
       console.log("❌ LOGIN FAILED: Invalid credentials");
       return res.status(401).json({ message: "Invalid login" });
     }
@@ -182,8 +188,6 @@ const login = async (req, res) => {
           "Sorry, your account has been unactivated. You can no longer use our website. Please contact the administrator at Waseemyamen1@gmail.com for assistance.",
       });
     }
-
-    console.log("LOGIN USER FROM DB:", user);
 
     console.log("✅ LOGIN SUCCESS: User found:", {
       id: user.id,
