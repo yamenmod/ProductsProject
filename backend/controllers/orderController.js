@@ -119,7 +119,7 @@ const cancel = async (req, res) => {
 
       // Restore stock for items
       const [items] = await connection.query(
-        "SELECT product_id, quantity FROM order_items WHERE order_id = ?",
+        "SELECT product_id, name, quantity FROM order_items WHERE order_id = ?",
         [orderId],
       );
 
@@ -133,18 +133,10 @@ const cancel = async (req, res) => {
         const sizeStock = normalizeSizeStockMap(product.size_stock);
 
         if (sizeStock) {
-          // We don't know sizes in order_items currently; assume single-size orders stored in name
-          // Try to detect size from name
-          const [oItemRows] = await connection.query(
-            "SELECT name FROM order_items WHERE order_id = ? AND product_id = ? LIMIT 1",
-            [orderId, it.product_id],
-          );
           let size = "";
-          if (oItemRows.length) {
-            const nm = oItemRows[0].name || "";
-            const m = nm.match(/\(\s*Size\s*([^\)]+)\s*\)/i);
-            if (m && m[1]) size = m[1].toUpperCase();
-          }
+          const nm = it.name || "";
+          const m = nm.match(/\(\s*Size\s*([^\)]+)\s*\)/i);
+          if (m && m[1]) size = m[1].trim().toUpperCase();
 
           if (size) {
             const next = { ...sizeStock };

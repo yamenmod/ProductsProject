@@ -358,6 +358,8 @@ function AdminDashboard({
   };
 
    // open cards
+
+   //הפילטר אומר איזה סוג הזמנות אנחנו רוצים לפתוח
   const openOrders = (filter) => {
     if (typeof onOpenOrders === "function") {
       onOpenOrders(filter);
