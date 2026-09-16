@@ -617,6 +617,7 @@ const addToCart = async (req, res) => {
           p.name,
           p.price,
           p.stock,
+          p.size_stock,
           p.image_url,
           c.name AS category,
           ci.size,
@@ -784,6 +785,20 @@ const updateCartQuantity = async (req, res) => {
             .json({ message: "Size is required for clothing products" });
         }
 
+        const availableStock = isClothing
+          ? getAvailableStock(product, normalizedSize)
+          : Number(product.stock) || 0;
+
+        if (nextQuantity > availableStock) {
+          await connection.rollback();
+          connection.release();
+          return res.status(400).json({
+            message: `Only ${availableStock} item(s) available in stock.`,
+            availableStock,
+            requestedQuantity: nextQuantity,
+          });
+        }
+
         const [existingItems] = await connection.query(
           "SELECT id, quantity FROM cart_items WHERE user_id = ? AND product_id = ? AND size = ? LIMIT 1 FOR UPDATE",
           [req.user.id, productId, normalizedSize],
@@ -831,6 +846,7 @@ const updateCartQuantity = async (req, res) => {
           p.name,
           p.price,
           p.stock,
+          p.size_stock,
           p.image_url,
           c.name AS category,
           ci.size,

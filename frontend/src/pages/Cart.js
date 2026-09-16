@@ -114,6 +114,25 @@ function Cart({
       };
     });
 
+  const getItemAvailableStock = (item) => {
+    const sizeStock = item?.size_stock;
+    const size = (item?.size || "").toString().trim().toUpperCase();
+
+    if (sizeStock && size) {
+      try {
+        const parsedSizeStock =
+          typeof sizeStock === "string" ? JSON.parse(sizeStock) : sizeStock;
+        if (parsedSizeStock && typeof parsedSizeStock === "object") {
+          return Number(parsedSizeStock[size] || 0);
+        }
+      } catch (error) {
+        console.error("Failed to parse size_stock:", sizeStock, error);
+      }
+    }
+
+    return Number(item?.stock || 0);
+  };
+
   const handleRemoveClick = (item) => {
     if (!item?.id || typeof onRemoveFromCart !== "function") {
       return;
@@ -188,7 +207,7 @@ function Cart({
     }
 
     // Check if trying to increase quantity on out-of-stock item
-    if (delta > 0 && (item.stock ?? 0) < nextQuantity) {
+    if (delta > 0 && getItemAvailableStock(item) < nextQuantity) {
       setItemError({
         itemId: item.id,
         message:
