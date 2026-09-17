@@ -1,14 +1,14 @@
 {
   "files": {
     "main.css": "/static/css/main.87fa3ace.css",
-    "main.js": "/static/js/main.f11a282b.js",
+    "main.js": "/static/js/main.1c553812.js",
     "static/media/SteelplateTextura.ttf": "/static/media/SteelplateTextura.33f522415664625fac72.ttf",
     "index.html": "/index.html",
     "main.87fa3ace.css.map": "/static/css/main.87fa3ace.css.map",
-    "main.f11a282b.js.map": "/static/js/main.f11a282b.js.map"
+    "main.1c553812.js.map": "/static/js/main.1c553812.js.map"
   },
   "entrypoints": [
     "static/css/main.87fa3ace.css",
-    "static/js/main.f11a282b.js"
+    "static/js/main.1c553812.js"
   ]
 }

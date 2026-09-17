@@ -54,6 +54,7 @@ function ManageProducts({
   const [selectedImagePreviewUrls, setSelectedImagePreviewUrls] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
   const fileInputRef = React.useRef(null);
 
   // Generate height options from 4.0 to 10.0 in 0.1 increments, plus specific inch values
@@ -646,8 +647,15 @@ function ManageProducts({
       .toLowerCase();
     const matchesCategory =
       categoryFilter === "all" ? true : normalizedCategory === categoryFilter;
+    const isActive = Number(product.is_active) === 1;
+    const matchesStatus =
+      statusFilter === "all"
+        ? true
+        : statusFilter === "active"
+          ? isActive
+          : !isActive;
 
-    return matchesSearch && matchesCategory;
+    return matchesSearch && matchesCategory && matchesStatus;
   });
 
   return (
@@ -784,6 +792,25 @@ function ManageProducts({
                   {category}
                 </option>
               ))}
+            </select>
+
+            <select
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value)}
+              aria-label="Filter products by status"
+              style={{
+                minWidth: "180px",
+                padding: "12px 14px",
+                border: "1px solid #d9c3ad",
+                borderRadius: "12px",
+                background: "#fffdf8",
+                fontSize: "13px",
+                cursor: "pointer",
+              }}
+            >
+              <option value="all">All products</option>
+              <option value="active">Active</option>
+              <option value="inactive">Unactive</option>
             </select>
           </div>
 
@@ -1482,7 +1509,13 @@ function ManageProducts({
                     )}
                   </div>
                   <div style={{ padding: "12px" }}>
-                    <h4 style={{ margin: "0 0 8px 0", fontSize: "14px" }}>
+                    <h4
+                      style={{
+                        margin: "0 0 8px 0",
+                        fontSize: "14px",
+                        color: Number(product.is_active) === 0 ? "#c62828" : "#1f1813",
+                      }}
+                    >
                       {product.name}
                     </h4>
                     <p
@@ -1598,7 +1631,7 @@ function ManageProducts({
 
           {visibleProducts.length === 0 && (
             <p style={{ marginTop: "18px", color: "#65574d" }}>
-              No products match your search or category filter.
+              No products match your search or selected filters.
             </p>
           )}
 
