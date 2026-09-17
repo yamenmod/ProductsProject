@@ -1,6 +1,6 @@
 /**
  * Manage Products Page
- * Admin-only page for creating, editing, and deleting products
+ * Admin-only page for creating, editing, and managing product availability
  * Features form validation, size stock management, and image handling
  */
 import React, { useEffect, useState } from "react";
@@ -47,7 +47,6 @@ function ManageProducts({
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [showForm, setShowForm] = useState(false);
-  const [productToDelete, setProductToDelete] = useState(null);
   const [previewProduct, setPreviewProduct] = useState(null);
   const [previewImageIndex, setPreviewImageIndex] = useState(0);
   const [swipeStartX, setSwipeStartX] = useState(null);
@@ -265,7 +264,9 @@ function ManageProducts({
 
   const loadProducts = async () => {
     try {
-      const res = await axios.get("/api/products");
+      const res = await axios.get("/api/products/admin", {
+        headers: { Authorization: `Bearer ${session.token}` },
+      });
       setProducts(res.data);
     } catch (err) {
       setError("Failed to load products");
@@ -274,7 +275,9 @@ function ManageProducts({
 
   useEffect(() => {
     loadProducts();
-  }, []);
+    // loadProducts reads the current authenticated session token.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session.token]);
 
   useEffect(() => {
     const nextUrls = imageFiles.map((file) => URL.createObjectURL(file));
@@ -475,20 +478,24 @@ function ManageProducts({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialProductToEdit]);
 
-  const handleDelete = async (id) => {
+  const handleStatusChange = async (product, isActive) => {
     setSuccess("");
+    setError("");
     try {
-      await axios.delete(`/api/products/${id}`, {
+      await axios.patch(`/api/products/${product._id || product.id}/status`, {
+        is_active: isActive,
+      }, {
         headers: {
           Authorization: `Bearer ${session.token}`,
         },
       });
       loadProducts();
-      setSuccess("Product deleted");
+      setSuccess(`Product ${isActive ? "activated" : "deactivated"}`);
     } catch (requestError) {
-      setError(requestError.response?.data?.message || "Delete failed");
-    } finally {
-      setProductToDelete(null);
+      setError(
+        requestError.response?.data?.message ||
+          `Unable to ${isActive ? "activate" : "deactivate"} product`,
+      );
     }
   };
 
@@ -696,7 +703,7 @@ function ManageProducts({
                 fontWeight: "600",
               }}
             >
-              Create, edit, and delete products from your inventory
+              Create, edit, and manage product availability in your inventory
             </p>
           </div>
 
@@ -1512,7 +1519,7 @@ function ManageProducts({
                         L
                       </p>
                     )}
-                    <div style={{ display: "flex", gap: "8px" }}>
+                    <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                       <button
                         onClick={() => handleEdit(product)}
                         style={{
@@ -1537,12 +1544,34 @@ function ManageProducts({
                         Edit
                       </button>
                       <button
-                        className="danger"
-                        onClick={() => setProductToDelete(product)}
+                        onClick={() => handleStatusChange(product, true)}
                         style={{
                           flex: 1,
                           padding: "8px 12px",
-                          background: "#A0522D",
+                          background: "#3d7a4b",
+                          color: "#fff",
+                          border: "0",
+                          borderRadius: "6px",
+                          cursor: "pointer",
+                          fontSize: "12px",
+                          fontWeight: "600",
+                          transition: "background 150ms ease",
+                        }}
+                        onMouseEnter={(e) => {
+                            e.target.style.background = "#2f633b";
+                        }}
+                        onMouseLeave={(e) => {
+                            e.target.style.background = "#3d7a4b";
+                        }}
+                      >
+                        Active
+                      </button>
+                      <button
+                        onClick={() => handleStatusChange(product, false)}
+                        style={{
+                          flex: 1,
+                          padding: "8px 12px",
+                          background: "#a0522d",
                           color: "#fff",
                           border: "0",
                           borderRadius: "6px",
@@ -1555,10 +1584,10 @@ function ManageProducts({
                           e.target.style.background = "#8a5633";
                         }}
                         onMouseLeave={(e) => {
-                          e.target.style.background = "#A0522D";
+                          e.target.style.background = "#a0522d";
                         }}
                       >
-                        Delete
+                        Unactive
                       </button>
                     </div>
                   </div>
@@ -1573,114 +1602,6 @@ function ManageProducts({
             </p>
           )}
 
-          {productToDelete && (
-            <div
-              style={{
-                position: "fixed",
-                inset: "0",
-                backgroundColor: "rgba(10, 16, 20, 0.72)",
-                backdropFilter: "blur(8px)",
-                display: "grid",
-                placeItems: "center",
-                zIndex: 2000,
-              }}
-              onClick={() => setProductToDelete(null)}
-            >
-              <div
-                style={{
-                  maxWidth: "480px",
-                  width: "90%",
-                  background: "#fff",
-                  borderRadius: "16px",
-                  padding: "32px",
-                  boxShadow: "0 20px 60px rgba(0, 0, 0, 0.3)",
-                  position: "relative",
-                }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <button
-                  onClick={() => setProductToDelete(null)}
-                  style={{
-                    position: "absolute",
-                    top: "12px",
-                    right: "12px",
-                    background: "transparent",
-                    border: "0",
-                    fontSize: "20px",
-                    cursor: "pointer",
-                    color: "#65574d",
-                  }}
-                >
-                  ×
-                </button>
-
-                <h3
-                  style={{
-                    margin: "0 0 12px 0",
-                    fontSize: "20px",
-                    color: "#1f1813",
-                  }}
-                >
-                  Confirm Deletion
-                </h3>
-
-                <p style={{ margin: "0 0 24px 0", color: "#5f5550" }}>
-                  You are about to delete the product{" "}
-                  <strong>{productToDelete.name}</strong>. This action cannot be
-                  undone.
-                </p>
-
-                <div style={{ display: "flex", gap: "12px" }}>
-                  <button
-                    onClick={() => setProductToDelete(null)}
-                    style={{
-                      flex: 1,
-                      padding: "10px 16px",
-                      background: "#e8e0d6",
-                      color: "#1f1813",
-                      border: "0",
-                      borderRadius: "8px",
-                      cursor: "pointer",
-                      fontWeight: "600",
-                      fontSize: "14px",
-                      transition: "background 150ms ease",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.target.style.background = "#d9cec2";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.background = "#e8e0d6";
-                    }}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={() => handleDelete(productToDelete._id)}
-                    style={{
-                      flex: 1,
-                      padding: "10px 16px",
-                      background: "#A0522D",
-                      color: "#fff",
-                      border: "0",
-                      borderRadius: "8px",
-                      cursor: "pointer",
-                      fontWeight: "600",
-                      fontSize: "14px",
-                      transition: "background 150ms ease",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.target.style.background = "#8a5633";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.background = "#A0522D";
-                    }}
-                  >
-                    Delete product
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
 
           {previewProduct && (
             <div className="ps-previewBackdrop" onClick={closePreview}>

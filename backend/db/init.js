@@ -578,6 +578,7 @@ const initDatabase = async () => {
       category_id INT NULL,
       gender ENUM('male', 'female', 'unisex') NOT NULL DEFAULT 'unisex',
       image_url MEDIUMTEXT NULL,
+      is_active TINYINT(1) NOT NULL DEFAULT 1,
       size VARCHAR(10) NULL DEFAULT NULL,
       size_stock LONGTEXT NULL DEFAULT NULL,
       board_length DECIMAL(5, 2) NULL DEFAULT NULL,
@@ -591,6 +592,27 @@ const initDatabase = async () => {
     )
   `);
     console.log("✅ Products table verified/created");
+
+    const [productActiveColumn] = await db.query(
+      `
+        SELECT COUNT(*) AS total
+        FROM information_schema.columns
+        WHERE table_schema = DATABASE()
+          AND table_name = 'products'
+          AND column_name = 'is_active'
+      `,
+    );
+
+    if (productActiveColumn[0]?.total === 0) {
+      await db.query(
+        `ALTER TABLE products ADD COLUMN is_active TINYINT(1) NOT NULL DEFAULT 1 AFTER image_url`,
+      );
+    } else {
+      await db.query(
+        `ALTER TABLE products MODIFY COLUMN is_active TINYINT(1) NOT NULL DEFAULT 1`,
+      );
+    }
+    console.log("✅ Product active status verified");
 
     // Create cart_items table after products table exists
     await db.query(`

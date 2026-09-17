@@ -288,6 +288,12 @@ const normalizeProduct = (row, vatRate = 0) => {
     price: roundMoney(row.price),
     ...calculateVatPricing(row.price, vatRate),
     stock: normalizedStock,
+    is_active:
+      row.is_active === undefined || row.is_active === null
+        ? 1
+        : Number(row.is_active) === 1
+          ? 1
+          : 0,
     max_quantity_per_user: Number(row.max_quantity_per_user || 10),
     category_id: row.category_id,
     category: row.category || "",
@@ -348,6 +354,7 @@ const getProducts = async (req, res) => {
           p.category_id,
           p.gender,
           p.image_url,
+          p.is_active,
           p.size,
           p.board_length,
           p.board_height,
@@ -359,6 +366,7 @@ const getProducts = async (req, res) => {
           c.name AS category
         FROM products p
         LEFT JOIN categories c ON c.id = p.category_id
+        WHERE p.is_active = 1
         ORDER BY p.created_at DESC
       `,
     );
@@ -369,6 +377,31 @@ const getProducts = async (req, res) => {
     return res.status(200).json(response);
   } catch (error) {
     console.error("getProducts error:", error);
+    return res.status(500).json({ message: error.message || "Server error" });
+  }
+};
+
+const getAdminProducts = async (req, res) => {
+  // Admin inventory needs to include inactive products so they can be restored.
+  try {
+    const vatRate = await getVatRateFromDb(db);
+    const [products] = await db.query(`
+      SELECT
+        p.id, p.name, p.description, p.price, p.stock,
+        p.max_quantity_per_user, p.size_stock, p.category_id, p.gender,
+        p.image_url, p.is_active, p.size, p.board_length, p.board_height,
+        p.height, p.board_volume, p.volume, p.created_at, p.updated_at,
+        c.name AS category
+      FROM products p
+      LEFT JOIN categories c ON c.id = p.category_id
+      ORDER BY p.created_at DESC
+    `);
+
+    return res
+      .status(200)
+      .json(products.map((product) => normalizeProduct(product, vatRate)));
+  } catch (error) {
+    console.error("getAdminProducts error:", error);
     return res.status(500).json({ message: error.message || "Server error" });
   }
 };
@@ -391,6 +424,7 @@ const getProductById = async (req, res) => {
           p.category_id,
           p.gender,
           p.image_url,
+          p.is_active,
           p.size,
           p.board_length,
           p.board_height,
@@ -576,7 +610,7 @@ const updateProduct = async (req, res) => {
   // Update an existing product and refresh its stored images.
   try {
     const [existingRows] = await db.query(
-      "SELECT p.id, p.name, p.price, p.stock, p.max_quantity_per_user, p.category_id, p.description, p.gender, p.image_url, p.size, p.board_length, p.board_height, p.height, p.board_volume, p.volume, c.name AS category FROM products p LEFT JOIN categories c ON c.id = p.category_id WHERE p.id = ? LIMIT 1",
+      "SELECT p.id, p.name, p.price, p.stock, p.max_quantity_per_user, p.category_id, p.description, p.gender, p.image_url, p.is_active, p.size, p.board_length, p.board_height, p.height, p.board_volume, p.volume, c.name AS category FROM products p LEFT JOIN categories c ON c.id = p.category_id WHERE p.id = ? LIMIT 1",
       [req.params.id],
     );
 
@@ -760,6 +794,7 @@ const updateProduct = async (req, res) => {
           p.height,
           p.board_volume,
           p.volume,
+          p.is_active,
           p.created_at,
           p.updated_at,
           c.name AS category
@@ -781,7 +816,7 @@ const updateProduct = async (req, res) => {
 };
 
 const deleteProduct = async (req, res) => {
-  // Delete a product from the catalogue.
+  // Keep this legacy endpoint non-destructive so order history remains intact.
   try {
     const productId = Number(req.params.id);
 
@@ -789,41 +824,40 @@ const deleteProduct = async (req, res) => {
       return res.status(400).json({ message: "Invalid product id" });
     }
 
-    const connection = await db.getConnection();
+    const [result] = await db.query(
+      "UPDATE products SET is_active = 0, updated_at = NOW() WHERE id = ?",
+      [productId],
+    );
 
-    try {
-      await connection.beginTransaction();
-
-      await connection.query("DELETE FROM cart_items WHERE product_id = ?", [
-        productId,
-      ]);
-
-      await connection.query("DELETE FROM order_items WHERE product_id = ?", [
-        productId,
-      ]);
-
-      const [result] = await connection.query(
-        "DELETE FROM products WHERE id = ?",
-        [productId],
-      );
-
-      if (!result.affectedRows) {
-        await connection.rollback();
-        connection.release();
-        return res.status(404).json({ message: "Product not found" });
-      }
-
-      await connection.commit();
-      connection.release();
-
-      return res.status(200).json({ message: "Product deleted successfully" });
-    } catch (error) {
-      await connection.rollback();
-      connection.release();
-      throw error;
+    if (!result.affectedRows) {
+      return res.status(404).json({ message: "Product not found" });
     }
+
+    return res.status(200).json({ message: "Product deactivated successfully" });
   } catch (error) {
     console.error("Delete product error:", error);
+    return res.status(500).json({ message: error.message || "Server error" });
+  }
+};
+
+const updateProductStatus = async (req, res) => {
+  try {
+    const isActive = req.body.is_active === true || Number(req.body.is_active) === 1;
+    const [result] = await db.query(
+      "UPDATE products SET is_active = ?, updated_at = NOW() WHERE id = ?",
+      [isActive ? 1 : 0, req.params.id],
+    );
+
+    if (!result.affectedRows) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    return res.status(200).json({
+      message: `Product ${isActive ? "activated" : "deactivated"} successfully`,
+      is_active: isActive ? 1 : 0,
+    });
+  } catch (error) {
+    console.error("Update product status error:", error);
     return res.status(500).json({ message: error.message || "Server error" });
   }
 };
@@ -1074,6 +1108,8 @@ module.exports = {
   createProduct,
   updateProduct,
   deleteProduct,
+  getAdminProducts,
+  updateProductStatus,
   syncImages,
   recommendBoards,
 };
