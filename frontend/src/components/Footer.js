@@ -22,7 +22,7 @@ function Footer() {
         <div>
           <h4>Contact</h4>
           <p>Email: support@plagesurf.com</p>
-          <p>Phone: +1 (555) 123-4567</p>
+          <p>Phone: 054-448-3724</p>
           <p>Mon-Sat: 9:00 AM - 6:00 PM</p>
         </div>
       </div>

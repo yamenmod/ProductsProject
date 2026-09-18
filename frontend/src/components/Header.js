@@ -208,7 +208,6 @@ function Header({
 
   // if its man or woman women/men
 
-
   // shop scrolldown
   return (
     <header className="ps-header">
@@ -398,7 +397,7 @@ function Header({
               type="button"
               className="ps-cart-button"
               onClick={() => onNavigate("cart")}
-              aria-label={`Cart with ${cartCount} item${cartCount === 1 ? "" : "s"}`}
+              aria-label={`Cart with ${cartCount} product${cartCount === 1 ? "" : "s"}`}
             >
               <img
                 src="/CartLogo/cartlogo.png"

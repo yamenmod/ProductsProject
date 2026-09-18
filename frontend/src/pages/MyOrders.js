@@ -204,7 +204,7 @@ function MyOrders({ session, user, onNavigate }) {
                       color: "#1f1813",
                     }}
                   >
-                    Items:
+                    Products:
                   </h4>
                   {canCancel(o) && (
                     <div
@@ -245,7 +245,7 @@ function MyOrders({ session, user, onNavigate }) {
                     </ul>
                   ) : null}
                 </div>
- 
+
                 <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
                   {canCancel(o) && (
                     <button

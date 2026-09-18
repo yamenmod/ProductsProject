@@ -201,7 +201,7 @@ function Cart({
     if (delta > 0 && nextQuantity > maxQuantityLimit) {
       setItemError({
         itemId: item.id,
-        message: `You have reached the maximum quantity limit of ${maxQuantityLimit} items per product.`,
+        message: `You have reached the maximum quantity limit of ${maxQuantityLimit} products.`,
       });
       return;
     }
@@ -250,7 +250,7 @@ function Cart({
     // Check if there are out-of-stock items
     if (hasOutOfStockItems) {
       setErrorMessage(
-        "Some items in your cart are out of stock. You've reached the stock limit. We apologize for the inconvenience. Please remove out-of-stock items or check back later for availability updates.",
+        "Some products in your cart are out of stock. You've reached the stock limit. We apologize for the inconvenience. Please remove out-of-stock products or check back later for availability updates.",
       );
       return;
     }
@@ -520,8 +520,10 @@ function Cart({
           },
         });
 
-        const normalizedItems = normalizeCartItems(response.data.items || response.data);
-        
+        const normalizedItems = normalizeCartItems(
+          response.data.items || response.data,
+        );
+
         setDisplayItems(normalizedItems);
       } catch (error) {
         console.error("Failed to load cart page items:", error.message);
@@ -888,7 +890,7 @@ function Cart({
                               boxShadow: "none",
                             }}
                             onClick={() => handleChangeQuantity(item, -1)}
-                            aria-label={`Decrease quantity of ${item.name || "item"}`}
+                            aria-label={`Decrease quantity of ${item.name || "product"}`}
                           >
                             -
                           </button>
@@ -920,7 +922,7 @@ function Cart({
                               boxShadow: "none",
                             }}
                             onClick={() => handleChangeQuantity(item, 1)}
-                            aria-label={`Increase quantity of ${item.name || "item"}`}
+                            aria-label={`Increase quantity of ${item.name || "product"}`}
                           >
                             +
                           </button>
@@ -957,11 +959,11 @@ function Cart({
                       fontSize: "13px",
                     }}
                   >
-                    Items
+                    Products
                   </p>
                   <h2 style={{ margin: 0, fontSize: "20px" }}>
                     {displayItems.length}{" "}
-                    {displayItems.length === 1 ? "item" : "items"}
+                    {displayItems.length === 1 ? "product" : "products"}
                   </h2>
                 </div>
 
@@ -1039,7 +1041,11 @@ function Cart({
                   className="ps-btn ps-btn-primary"
                   onClick={openPayPalModal}
                   style={{ padding: "10px 24px", whiteSpace: "nowrap" }}
-                  disabled={displayItems.length === 0 || hasOutOfStockItems || hasItemsExceedingLimit}
+                  disabled={
+                    displayItems.length === 0 ||
+                    hasOutOfStockItems ||
+                    hasItemsExceedingLimit
+                  }
                 >
                   Buy Now
                 </button>
@@ -1213,13 +1219,13 @@ function Cart({
             className="ps-cartConfirmCard"
             role="dialog"
             aria-modal="true"
-            aria-label="Confirm remove item"
+            aria-label="Confirm remove product"
             onClick={(event) => event.stopPropagation()}
           >
             <p className="ps-pill" style={{ margin: 0, width: "fit-content" }}>
               Confirm action
             </p>
-            <h2 className="ps-cartConfirmTitle">Remove item from cart?</h2>
+            <h2 className="ps-cartConfirmTitle">Remove product from cart?</h2>
             <p className="ps-cartConfirmText">
               You are about to remove
               <strong> {pendingRemoveItem.name || "this product"}</strong> from
@@ -1240,7 +1246,7 @@ function Cart({
                 onClick={handleConfirmRemove}
                 disabled={isRemoving}
               >
-                {isRemoving ? "Removing..." : "Delete item"}
+                {isRemoving ? "Removing..." : "Delete product"}
               </button>
             </div>
           </div>

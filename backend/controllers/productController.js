@@ -830,10 +830,19 @@ const deleteProduct = async (req, res) => {
     );
 
     if (!result.affectedRows) {
-      return res.status(404).json({ message: "Product not found" });
+      const [products] = await db.query(
+        "SELECT id FROM products WHERE id = ? LIMIT 1",
+        [productId],
+      );
+
+      if (!products.length) {
+        return res.status(404).json({ message: "Product not found" });
+      }
     }
 
-    return res.status(200).json({ message: "Product deactivated successfully" });
+    return res
+      .status(200)
+      .json({ message: "Product deactivated successfully" });
   } catch (error) {
     console.error("Delete product error:", error);
     return res.status(500).json({ message: error.message || "Server error" });
@@ -842,10 +851,41 @@ const deleteProduct = async (req, res) => {
 
 const updateProductStatus = async (req, res) => {
   try {
-    const isActive = req.body.is_active === true || Number(req.body.is_active) === 1;
+    const rawIsActive = req.body?.is_active ?? req.body?.isActive;
+    const normalizedIsActive =
+      typeof rawIsActive === "string"
+        ? rawIsActive.trim().toLowerCase()
+        : rawIsActive;
+    let isActive;
+
+    if (
+      normalizedIsActive === true ||
+      normalizedIsActive === 1 ||
+      normalizedIsActive === "1" ||
+      normalizedIsActive === "true"
+    ) {
+      isActive = true;
+    } else if (
+      normalizedIsActive === false ||
+      normalizedIsActive === 0 ||
+      normalizedIsActive === "0" ||
+      normalizedIsActive === "false"
+    ) {
+      isActive = false;
+    } else {
+      return res.status(400).json({
+        message: "is_active must be true or false",
+      });
+    }
+
+    const productId = Number(req.params.id);
+    if (!Number.isInteger(productId) || productId <= 0) {
+      return res.status(400).json({ message: "Invalid product id" });
+    }
+
     const [result] = await db.query(
       "UPDATE products SET is_active = ?, updated_at = NOW() WHERE id = ?",
-      [isActive ? 1 : 0, req.params.id],
+      [isActive ? 1 : 0, productId],
     );
 
     if (!result.affectedRows) {
