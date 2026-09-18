@@ -1,5 +1,6 @@
 import React, { useRef, useState } from "react";
 import axios from "axios";
+import { getMeasurementValidationError } from "../utils/measurements";
 
 function Header({
   user,
@@ -28,9 +29,8 @@ function Header({
   const [recommendationError, setRecommendationError] = useState("");
   const recommendationRequestIdRef = useRef(0);
 
-  const isValidMeasurement = (value) => {
-    const numericValue = Number(value);
-    return Number.isFinite(numericValue) && numericValue > 0;
+  const isValidMeasurement = (value, measurement) => {
+    return !getMeasurementValidationError(value, measurement);
   };
 
   const parseMeasurementValue = (value) => {
@@ -80,11 +80,26 @@ function Header({
     console.log("WEIGHT ACTUALLY SENT:", Number(resolvedInputs.weight));
 
     try {
-      const hasWeight = isValidMeasurement(resolvedInputs.weight);
-      const hasHeight = isValidMeasurement(resolvedInputs.height);
+      const weight = Number(resolvedInputs.weight);
+      const height = Number(resolvedInputs.height);
 
-      if (!hasWeight || !hasHeight) {
-        setRecommendationError("weight and height are required");
+      const weightError = getMeasurementValidationError(
+        resolvedInputs.weight,
+        "weight",
+      );
+      const heightError = getMeasurementValidationError(
+        resolvedInputs.height,
+        "height",
+      );
+
+      if (weightError) {
+        setRecommendationError(weightError);
+        setRecommendationLoading(false);
+        return;
+      }
+
+      if (heightError) {
+        setRecommendationError(heightError);
         setRecommendationLoading(false);
         return;
       }
@@ -92,7 +107,8 @@ function Header({
       const requestId = ++recommendationRequestIdRef.current;
 
       const response = await axios.post("/api/products/recommend-boards", {
-        weight: Number(resolvedInputs.weight),
+        weight,
+        height,
       });
 
       if (requestId !== recommendationRequestIdRef.current) {
@@ -179,8 +195,8 @@ function Header({
 
   const handleOpenBoardChooser = () => {
     const initialInputs = getInitialBoardInputs();
-    const hasWeight = isValidMeasurement(initialInputs.weight);
-    const hasHeight = isValidMeasurement(initialInputs.height);
+    const hasWeight = isValidMeasurement(initialInputs.weight, "weight");
+    const hasHeight = isValidMeasurement(initialInputs.height, "height");
     const hasSavedMeasurements = hasWeight && hasHeight;
 
     setBoardInputs(initialInputs);
@@ -575,7 +591,6 @@ function Header({
                       marginBottom: "20px",
                     }}
                   >
-                    {/* Weight and height are collected here, but only weight is sent to the recommendation endpoint. */}
                     <input
                       type="number"
                       placeholder="Weight (kg)"

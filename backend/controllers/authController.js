@@ -2,24 +2,9 @@ const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 const db = require("../db/connection");
 const { createMailTransporter } = require("../utils/mailer");
+const { validateMeasurement } = require("../utils/measurements");
 
 // Authentication and profile endpoints.
-
-const normalizeOptionalMeasurement = (value, fieldName) => {
-  if (value === undefined || value === null || value === "") {
-    return null;
-  }
-
-  const numericValue = Number(value);
-
-  if (!Number.isFinite(numericValue)) {
-    const error = new Error(`${fieldName} must be a valid number`);
-    error.statusCode = 400;
-    throw error;
-  }
-
-  return numericValue;
-};
 
 const formatUser = (user) => ({
   id: user.id,
@@ -76,8 +61,8 @@ const register = async (req, res) => {
 
     const normalizedUsername = username.trim();
     const normalizedEmail = email.toLowerCase().trim();
-    const normalizedWeight = normalizeOptionalMeasurement(weight, "Weight");
-    const normalizedHeight = normalizeOptionalMeasurement(height, "Height");
+    const normalizedWeight = validateMeasurement(weight, "weight");
+    const normalizedHeight = validateMeasurement(height, "height");
     const hashedPassword = await bcrypt.hash(password, 10);
 
     console.log("✅ NORMALIZED DATA:", {
@@ -261,8 +246,8 @@ const updateProfile = async (req, res) => {
     }
 
     const normalizedUsername = username.trim();
-    const normalizedWeight = normalizeOptionalMeasurement(weight, "Weight");
-    const normalizedHeight = normalizeOptionalMeasurement(height, "Height");
+    const normalizedWeight = validateMeasurement(weight, "weight");
+    const normalizedHeight = validateMeasurement(height, "height");
 
     console.log("✅ NORMALIZED UPDATE DATA:", {
       normalizedUsername,

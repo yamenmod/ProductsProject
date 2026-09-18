@@ -1,5 +1,4 @@
 const db = require("../db/connection");
-const jwt = require("jsonwebtoken");
 const {
   calculateVatPricing,
   roundMoney,
@@ -11,11 +10,11 @@ const {
   serializeSizeStock,
   normalizeSizeStockMap,
 } = require("../utils/sizeStock");
+const { validateMeasurement } = require("../utils/measurements");
 
 // Product catalogue, image normalization, and board recommendation logic.
 
 const PRODUCT_IMAGE_DIR = "/public/assets/img/products";
-
 const isDataOrBlobUrl = (value) => {
   // Detect values that are not safe to store as image paths.
   const normalized = (value || "").toString().trim().toLowerCase();
@@ -978,59 +977,9 @@ const syncImages = async (req, res) => {
 const recommendBoards = async (req, res) => {
   // Recommend surfboards based on user weight and board volume only.
   try {
-    const { weight } = req.body;
-    let resolvedWeight = weight;
-
-    if (
-      resolvedWeight === undefined ||
-      resolvedWeight === null ||
-      resolvedWeight === ""
-    ) {
-      const authorizationHeader = req.headers.authorization || "";
-
-      if (authorizationHeader.startsWith("Bearer ")) {
-        try {
-          const token = authorizationHeader.split(" ")[1];
-          const decoded = jwt.verify(
-            token,
-            process.env.JWT_SECRET || "secret123",
-          );
-
-          const [users] = await db.query(
-            "SELECT weight FROM users WHERE id = ? LIMIT 1",
-            [decoded.id],
-          );
-
-          const profile = users[0];
-
-          if (
-            (resolvedWeight === undefined ||
-              resolvedWeight === null ||
-              resolvedWeight === "") &&
-            profile?.weight !== undefined &&
-            profile?.weight !== null
-          ) {
-            resolvedWeight = profile.weight;
-          }
-        } catch (tokenError) {
-          // Continue with the request body if the token is missing or invalid.
-        }
-      }
-    }
-
-    if (!resolvedWeight) {
-      return res.status(400).json({
-        message: "weight is required",
-      });
-    }
-
-    const weightNum = Number(resolvedWeight);
-
-    if (Number.isNaN(weightNum)) {
-      return res.status(400).json({
-        message: "weight must be a valid number",
-      });
-    }
+    const { weight, height } = req.body || {};
+    const weightNum = validateMeasurement(weight, "weight");
+    validateMeasurement(height, "height");
 
     // Get all surfboards from database
     const [surfboards] = await db.query(
@@ -1138,6 +1087,10 @@ const recommendBoards = async (req, res) => {
     });
   } catch (error) {
     console.error("Board recommendation error:", error);
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ message: error.message });
+    }
+
     return res.status(500).json({ message: error.message || "Server error" });
   }
 };

@@ -7,6 +7,7 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
+import { getMeasurementValidationError } from "../utils/measurements";
 
 // Utility function to sanitize numeric input (weight/height)
 const sanitizeNumericInput = (value) => {
@@ -107,13 +108,16 @@ function Profile({
       return;
     }
 
-    if (trimmedWeight !== "" && Number.isNaN(parsedWeight)) {
-      setMessage("Weight must be a valid number.");
+    const weightError = getMeasurementValidationError(weight, "weight");
+    const heightError = getMeasurementValidationError(height, "height");
+
+    if (weightError) {
+      setMessage(weightError);
       return;
     }
 
-    if (trimmedHeight !== "" && Number.isNaN(parsedHeight)) {
-      setMessage("Height must be a valid number.");
+    if (heightError) {
+      setMessage(heightError);
       return;
     }
 
