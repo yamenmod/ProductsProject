@@ -19,10 +19,7 @@ export const getMeasurementValidationError = (value, measurement) => {
     return `${limits.label} must be a valid number.`;
   }
 
-  if (
-    numericValue < limits.minimum ||
-    numericValue > limits.maximum
-  ) {
+  if (numericValue < limits.minimum || numericValue > limits.maximum) {
     return `${limits.label} must be between ${limits.minimum} ${limits.unit} and ${limits.maximum} ${limits.unit}.`;
   }
 

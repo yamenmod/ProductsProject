@@ -214,13 +214,9 @@ function Login({ onLoginSuccess, onNavigate }) {
           </div>
         </div>
 
-        {message && (
-          <div className="login-message">
-            {message}
-          </div>
-        )}
-          
-        <div className="login-actions"> 
+        {message && <div className="login-message">{message}</div>}
+
+        <div className="login-actions">
           <button className="ps-btn ps-btn-primary" onClick={handleSubmit}>
             {isRegister ? "Create Account" : "Sign In"}
           </button>

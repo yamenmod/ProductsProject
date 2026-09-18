@@ -479,6 +479,8 @@ function ManageProducts({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialProductToEdit]);
 
+
+   // active
   const handleStatusChange = async (product, isActive) => {
     setSuccess("");
     setError("");
@@ -1577,7 +1579,7 @@ function ManageProducts({
                         Edit
                       </button>
                       <button
-                        onClick={() => handleStatusChange(product, true)}
+                        onClick={() => handleStatusChange(product, true)} // activebtn 
                         style={{
                           flex: 1,
                           padding: "8px 12px",
@@ -1600,7 +1602,7 @@ function ManageProducts({
                         Active
                       </button>
                       <button
-                        onClick={() => handleStatusChange(product, false)}
+                        onClick={() => handleStatusChange(product, false)} // unactivebtn
                         style={{
                           flex: 1,
                           padding: "8px 12px",

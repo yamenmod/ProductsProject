@@ -23,10 +23,7 @@ const validateMeasurement = (value, measurement) => {
     throw error;
   }
 
-  if (
-    numericValue < limits.minimum ||
-    numericValue > limits.maximum
-  ) {
+  if (numericValue < limits.minimum || numericValue > limits.maximum) {
     const error = new Error(
       `${limits.label} must be between ${limits.minimum} ${limits.unit} and ${limits.maximum} ${limits.unit}.`,
     );

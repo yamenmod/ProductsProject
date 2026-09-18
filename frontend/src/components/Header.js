@@ -236,9 +236,9 @@ function Header({
           >
             <img src="/PlageSurf_LOGO.png" alt="Plage Surf" />
             <div>
-              <p className="ps-brand-title">Plage Surf</p>
+              <p className="ps-brand-title">Plage Surf</p> 
               <p className="ps-brand-sub">
-                Welcome back {user?.username || "user"}!
+                Welcome back {user?.username || "user"}! 
               </p>
             </div>
           </button>

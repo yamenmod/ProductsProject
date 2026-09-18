@@ -565,7 +565,7 @@ function AdminDashboard({
                 key={item.key}
                 type="button"
                 className="ps-surface"
-                onClick={() => openOrders(item.filter)}
+                onClick={() => openOrders(item.filter)} // open cards btn
                 style={{
                   padding: "14px 18px",
                   border: `1px solid ${item.color}33`,
@@ -735,7 +735,7 @@ function AdminDashboard({
                           <button
                             type="button"
                             className="ps-btn ps-btn-secondary"
-                            onClick={() => openProductEdit(product)}
+                            onClick={() => openProductEdit(product)} // stock watch btn
                             style={{ padding: "8px 12px", fontSize: "12px" }}
                           >
                             Edit
