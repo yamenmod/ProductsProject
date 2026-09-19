@@ -68,6 +68,9 @@ const initDatabase = async () => {
       );
       console.log("✅ Weight column added");
     } else {
+      await db.query(
+        `ALTER TABLE users MODIFY COLUMN weight DECIMAL(6, 2) NULL DEFAULT NULL`,
+      );
       console.log("✅ Weight column exists");
     }
 
@@ -89,6 +92,9 @@ const initDatabase = async () => {
       );
       console.log("✅ Height column added");
     } else {
+      await db.query(
+        `ALTER TABLE users MODIFY COLUMN height DECIMAL(6, 2) NULL DEFAULT NULL`,
+      );
       console.log("✅ Height column exists");
     }
 
@@ -336,16 +342,28 @@ const initDatabase = async () => {
         AND CONSTRAINT_NAME != 'PRIMARY'
     `);
     for (const fk of fkConstraints) {
-      await db.query(`ALTER TABLE payments DROP FOREIGN KEY ${fk.CONSTRAINT_NAME}`);
-      console.log(`✅ Dropped foreign key '${fk.CONSTRAINT_NAME}' from payments table`);
+      await db.query(
+        `ALTER TABLE payments DROP FOREIGN KEY ${fk.CONSTRAINT_NAME}`,
+      );
+      console.log(
+        `✅ Dropped foreign key '${fk.CONSTRAINT_NAME}' from payments table`,
+      );
     }
 
     // Then drop old columns
-    const oldColumns = ['id', 'user_id', 'order_id', 'amount', 'currency', 'raw_response', 'created_at'];
+    const oldColumns = [
+      "id",
+      "user_id",
+      "order_id",
+      "amount",
+      "currency",
+      "raw_response",
+      "created_at",
+    ];
     for (const col of oldColumns) {
       const [colExists] = await db.query(
         `SELECT COUNT(*) AS total FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'payments' AND column_name = ?`,
-        [col]
+        [col],
       );
       if (colExists[0]?.total > 0) {
         await db.query(`ALTER TABLE payments DROP COLUMN ${col}`);
@@ -543,23 +561,23 @@ const initDatabase = async () => {
 
     // Insert default categories if they don't exist
     const defaultCategories = [
-      'Surfboards',
-      'Wetsuits',
-      'Leashes',
-      'Fins',
-      'Surfboard Cases',
-      'Clothing'
+      "Surfboards",
+      "Wetsuits",
+      "Leashes",
+      "Fins",
+      "Surfboard Cases",
+      "Clothing",
     ];
 
     for (const categoryName of defaultCategories) {
       const [existing] = await db.query(
         "SELECT id FROM categories WHERE name = ?",
-        [categoryName]
+        [categoryName],
       );
       if (existing.length === 0) {
         await db.query(
           "INSERT INTO categories (name, description) VALUES (?, ?)",
-          [categoryName, ""]
+          [categoryName, ""],
         );
         console.log(`➕ Added category: ${categoryName}`);
       }

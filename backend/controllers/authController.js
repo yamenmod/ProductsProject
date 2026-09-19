@@ -61,8 +61,12 @@ const register = async (req, res) => {
 
     const normalizedUsername = username.trim();
     const normalizedEmail = email.toLowerCase().trim();
-    const normalizedWeight = validateMeasurement(weight, "weight");
-    const normalizedHeight = validateMeasurement(height, "height");
+    const normalizedWeight = validateMeasurement(weight, "weight", {
+      optional: true,
+    });
+    const normalizedHeight = validateMeasurement(height, "height", {
+      optional: true,
+    });
     const hashedPassword = await bcrypt.hash(password, 10);
 
     console.log("✅ NORMALIZED DATA:", {
@@ -246,8 +250,12 @@ const updateProfile = async (req, res) => {
     }
 
     const normalizedUsername = username.trim();
-    const normalizedWeight = validateMeasurement(weight, "weight");
-    const normalizedHeight = validateMeasurement(height, "height");
+    const normalizedWeight = validateMeasurement(weight, "weight", {
+      optional: true,
+    });
+    const normalizedHeight = validateMeasurement(height, "height", {
+      optional: true,
+    });
 
     console.log("✅ NORMALIZED UPDATE DATA:", {
       normalizedUsername,

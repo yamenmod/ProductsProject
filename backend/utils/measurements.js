@@ -3,7 +3,7 @@ const MEASUREMENT_LIMITS = {
   height: { label: "Height", minimum: 120, maximum: 220, unit: "cm" },
 };
 
-const validateMeasurement = (value, measurement) => {
+const validateMeasurement = (value, measurement, { optional = false } = {}) => {
   const limits = MEASUREMENT_LIMITS[measurement];
 
   if (!limits) {
@@ -11,6 +11,10 @@ const validateMeasurement = (value, measurement) => {
   }
 
   if (value === undefined || value === null || String(value).trim() === "") {
+    if (optional) {
+      return null;
+    }
+
     const error = new Error(`${limits.label} is required.`);
     error.statusCode = 400;
     throw error;

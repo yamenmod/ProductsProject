@@ -55,8 +55,12 @@ function Login({ onLoginSuccess, onNavigate }) {
       const normalizedWeight = normalizeOptionalNumber(weight);
       const normalizedHeight = normalizeOptionalNumber(height);
 
-      const weightError = getMeasurementValidationError(weight, "weight");
-      const heightError = getMeasurementValidationError(height, "height");
+      const weightError = getMeasurementValidationError(weight, "weight", {
+        optional: true,
+      });
+      const heightError = getMeasurementValidationError(height, "height", {
+        optional: true,
+      });
 
       if (weightError) {
         setMessage(`⚠️ ${weightError}`);

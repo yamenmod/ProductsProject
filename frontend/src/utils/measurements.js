@@ -3,7 +3,11 @@ export const MEASUREMENT_LIMITS = {
   height: { label: "Height", minimum: 120, maximum: 220, unit: "cm" },
 };
 
-export const getMeasurementValidationError = (value, measurement) => {
+export const getMeasurementValidationError = (
+  value,
+  measurement,
+  { optional = false } = {},
+) => {
   const limits = MEASUREMENT_LIMITS[measurement];
 
   if (!limits) {
@@ -11,7 +15,7 @@ export const getMeasurementValidationError = (value, measurement) => {
   }
 
   if (value === undefined || value === null || String(value).trim() === "") {
-    return `${limits.label} is required.`;
+    return optional ? "" : `${limits.label} is required.`;
   }
 
   const numericValue = Number(value);
