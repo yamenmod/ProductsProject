@@ -247,6 +247,14 @@ function Cart({
       return;
     }
 
+    // Check if there are inactive items first, since they cannot be bought.
+    if (hasInactiveItems) {
+      setErrorMessage(
+        "One or more products in your cart are no longer available for purchase. Please remove them before checking out.",
+      );
+      return;
+    }
+
     // Check if there are out-of-stock items
     if (hasOutOfStockItems) {
       setErrorMessage(
@@ -564,6 +572,11 @@ function Cart({
 
   const hasOutOfStockItems = outOfStockItems.length > 0;
 
+  const inactiveItems = displayItems.filter(
+    (item) => Number(item?.is_active ?? item?.product?.is_active ?? 0) !== 1,
+  );
+  const hasInactiveItems = inactiveItems.length > 0;
+
   // Check for items exceeding max quantity limit
   const itemsExceedingLimit = displayItems.filter((item) => {
     const quantity = Number(item.quantity || 1);
@@ -648,6 +661,35 @@ function Cart({
             </div>
           ) : (
             <div style={{ display: "grid", gap: "24px" }}>
+              {hasInactiveItems && !errorMessage && (
+                <div
+                  style={{
+                    padding: "16px",
+                    background: "#fff3cd",
+                    border: "1px solid #ffc107",
+                    borderRadius: "8px",
+                    color: "#856404",
+                    fontSize: "14px",
+                    fontWeight: "500",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "12px",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "flex-start",
+                    }}
+                  >
+                    <span style={{ flex: 1 }}>
+                      One or more products in your cart are no longer available
+                      for purchase. Please remove them before checking out.
+                    </span>
+                  </div>
+                </div>
+              )}
               {errorMessage && (
                 <div
                   style={{
@@ -796,6 +838,25 @@ function Cart({
                         if (sizeStock && item.size) {
                           const sizeKey = item.size.toUpperCase();
                           available = Number(sizeStock[sizeKey] || 0);
+                        }
+
+                        const isInactive =
+                          Number(item?.is_active ?? item?.product?.is_active ?? 0) !== 1;
+
+                        if (isInactive) {
+                          return (
+                            <p
+                              style={{
+                                margin: "0 0 8px",
+                                color: "#b42318",
+                                fontSize: "13px",
+                                fontWeight: 700,
+                              }}
+                            >
+                              ⚠️ This product is no longer available for purchase.
+                              Please remove it from your cart.
+                            </p>
+                          );
                         }
 
                         if (quantity > available) {
@@ -1043,6 +1104,7 @@ function Cart({
                   style={{ padding: "10px 24px", whiteSpace: "nowrap" }}
                   disabled={
                     displayItems.length === 0 ||
+                    hasInactiveItems ||
                     hasOutOfStockItems ||
                     hasItemsExceedingLimit
                   }

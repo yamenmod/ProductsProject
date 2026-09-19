@@ -99,12 +99,30 @@ const getPayPalAccessToken = async () => {
   return response.data.access_token;
 };
 
+const findInactiveCartItems = (items = []) => {
+  if (!Array.isArray(items)) {
+    return [];
+  }
+
+  return items.filter((item) => {
+    const product = item?.product || item || {};
+    const isActiveValue =
+      item?.is_active ??
+      product?.is_active ??
+      item?.isActive ??
+      product?.isActive ??
+      0;
+
+    return Number(isActiveValue) !== 1;
+  });
+};
+
 const calculateCartTotal = async (userId) => {
   // Load the current cart and calculate the VAT-inclusive total.
   const vatRate = await getVatRateFromDb(db);
   const [cartRows] = await db.query(
     `
-      SELECT p.id, p.name, p.price, p.stock, p.size_stock, c.name AS category, ci.size, ci.quantity
+      SELECT p.id, p.name, p.price, p.stock, p.size_stock, p.is_active, c.name AS category, ci.size, ci.quantity
       FROM cart_items ci
       JOIN products p ON p.id = ci.product_id
       LEFT JOIN categories c ON c.id = p.category_id
@@ -250,7 +268,7 @@ const quickCheckout = async (req, res) => {
       await connection.beginTransaction();
 
       const [products] = await connection.query(
-        `SELECT p.id, p.name, p.price, p.stock, p.size_stock, c.name AS category
+        `SELECT p.id, p.name, p.price, p.stock, p.size_stock, p.is_active, c.name AS category
          FROM products p
          LEFT JOIN categories c ON c.id = p.category_id
          WHERE p.id = ? LIMIT 1 FOR UPDATE`,
@@ -264,6 +282,13 @@ const quickCheckout = async (req, res) => {
       }
 
       const product = products[0];
+      if (Number(product.is_active) !== 1) {
+        await connection.rollback();
+        connection.release();
+        return res.status(400).json({
+          message: "This product is no longer available for purchase.",
+        });
+      }
       const isClothing = isClothingProduct(product.category);
 
       if (isClothing && !normalizedSize) {
@@ -402,6 +427,7 @@ const mapCartRows = (rows, vatRate = 0) =>
       id: row.id,
       name: row.name,
       price: roundMoney(row.price),
+      is_active: Number(row.is_active) === 1,
       ...calculateVatPricing(row.price, vatRate),
       stock: Number(row.stock),
       size_stock: row.size_stock,
@@ -428,6 +454,7 @@ const getCart = async (req, res) => {
           p.price,
           p.stock,
           p.size_stock,
+          p.is_active,
           p.image_url,
           c.name AS category,
           ci.size,
@@ -476,7 +503,7 @@ const addToCart = async (req, res) => {
       await connection.beginTransaction();
 
       const [products] = await connection.query(
-        `SELECT p.id, p.stock, p.size_stock, p.max_quantity_per_user, c.name AS category
+        `SELECT p.id, p.stock, p.size_stock, p.max_quantity_per_user, p.is_active, c.name AS category
          FROM products p
          LEFT JOIN categories c ON c.id = p.category_id
          WHERE p.id = ?
@@ -491,6 +518,13 @@ const addToCart = async (req, res) => {
       }
 
       const product = products[0];
+      if (Number(product.is_active) !== 1) {
+        await connection.rollback();
+        connection.release();
+        return res.status(400).json({
+          message: "This product is no longer available for purchase.",
+        });
+      }
       const isClothing = isClothingProduct(product.category);
 
       if (isClothing && !normalizedSize) {
@@ -618,6 +652,7 @@ const addToCart = async (req, res) => {
           p.price,
           p.stock,
           p.size_stock,
+          p.is_active,
           p.image_url,
           c.name AS category,
           ci.size,
@@ -705,6 +740,7 @@ const removeFromCart = async (req, res) => {
           p.price,
           p.stock,
           p.size_stock,
+          p.is_active,
           p.image_url,
           c.name AS category,
           ci.size,
@@ -761,7 +797,7 @@ const updateCartQuantity = async (req, res) => {
         );
       } else {
         const [products] = await connection.query(
-          `SELECT p.id, p.stock, p.size_stock, p.max_quantity_per_user, c.name AS category
+          `SELECT p.id, p.stock, p.size_stock, p.is_active, p.max_quantity_per_user, c.name AS category
            FROM products p
            LEFT JOIN categories c ON c.id = p.category_id
            WHERE p.id = ? LIMIT 1 FOR UPDATE`,
@@ -775,6 +811,13 @@ const updateCartQuantity = async (req, res) => {
         }
 
         const product = products[0];
+        if (Number(product.is_active) !== 1) {
+          await connection.rollback();
+          connection.release();
+          return res.status(400).json({
+            message: "This product is no longer available for purchase.",
+          });
+        }
         const isClothing = isClothingProduct(product.category);
 
         if (isClothing && !normalizedSize) {
@@ -847,6 +890,7 @@ const updateCartQuantity = async (req, res) => {
           p.price,
           p.stock,
           p.size_stock,
+          p.is_active,
           p.image_url,
           c.name AS category,
           ci.size,
@@ -905,6 +949,7 @@ const checkout = async (req, res) => {
           p.price,
           p.stock,
           p.size_stock,
+          p.is_active,
           c.name AS category,
           ci.size,
           ci.quantity
@@ -918,6 +963,18 @@ const checkout = async (req, res) => {
 
     if (!cartRows.length) {
       return res.status(400).json({ message: "Cart is empty" });
+    }
+
+    const inactiveCartItems = findInactiveCartItems(cartRows);
+    if (inactiveCartItems.length) {
+      return res.status(400).json({
+        message:
+          "One or more products in your cart are no longer available for purchase. Please remove them before checking out.",
+        inactiveProducts: inactiveCartItems.map((item) => ({
+          id: item.id,
+          name: item.name,
+        })),
+      });
     }
 
     // Validate cart items against max_quantity_per_product setting
@@ -1097,6 +1154,18 @@ const createPaypalOrder = async (req, res) => {
       return res.status(400).json({ message: "Cart is empty" });
     }
 
+    const inactiveCartItems = findInactiveCartItems(items);
+    if (inactiveCartItems.length) {
+      return res.status(400).json({
+        message:
+          "One or more products in your cart are no longer available for purchase. Please remove them before checking out.",
+        inactiveProducts: inactiveCartItems.map((item) => ({
+          id: item.id,
+          name: item.name,
+        })),
+      });
+    }
+
     const accessToken = await getPayPalAccessToken();
 
     const response = await axios.post(
@@ -1144,6 +1213,7 @@ const createPaypalOrder = async (req, res) => {
             p.price,
             p.stock,
             p.size_stock,
+            p.is_active,
             c.name AS category,
             ci.size,
             ci.quantity
@@ -1154,6 +1224,20 @@ const createPaypalOrder = async (req, res) => {
         `,
         [req.user.id],
       );
+
+      const inactiveCartItems = findInactiveCartItems(cartRows);
+      if (inactiveCartItems.length) {
+        await connection.rollback();
+        connection.release();
+        return res.status(400).json({
+          message:
+            "One or more products in your cart are no longer available for purchase. Please remove them before checking out.",
+          inactiveProducts: inactiveCartItems.map((item) => ({
+            id: item.id,
+            name: item.name,
+          })),
+        });
+      }
 
       for (const item of cartRows) {
         const product = item;
@@ -1349,7 +1433,7 @@ const capturePaypalOrder = async (req, res) => {
         // Validate and reserve stock
         for (const item of items) {
           const [products] = await connection.query(
-            `SELECT p.id, p.name, p.stock, p.size_stock, c.name AS category
+            `SELECT p.id, p.name, p.stock, p.size_stock, p.is_active, c.name AS category
              FROM products p
              LEFT JOIN categories c ON c.id = p.category_id
              WHERE p.id = ? LIMIT 1 FOR UPDATE`,
@@ -1365,6 +1449,14 @@ const capturePaypalOrder = async (req, res) => {
           }
 
           const product = products[0];
+          if (Number(product.is_active) !== 1) {
+            await connection.rollback();
+            connection.release();
+            return res.status(400).json({
+              message:
+                "One or more products in your cart are no longer available for purchase. Please remove them before checking out.",
+            });
+          }
           const sizeStock = normalizeSizeStockMap(product.size_stock);
           const normalizedSize = (item.size || "")
             .toString()
@@ -1998,6 +2090,7 @@ const getOrderItems = async (req, res) => {
 };
 
 module.exports = {
+  findInactiveCartItems,
   getCart,
   addToCart,
   removeFromCart,
