@@ -5,7 +5,7 @@ const roundMoney = (value) => Number(Number(value || 0).toFixed(2));
 const calculateVatPricing = (basePrice, vatRate = DEFAULT_VAT_RATE) => {
   const safeBasePrice = roundMoney(basePrice);
   const safeVatRate = Math.min(Math.max(vatRate ?? DEFAULT_VAT_RATE, 0), 1); // Ensure between 0 and 1
-  const vatAmount = roundMoney(safeBasePrice * safeVatRate);
+  const vatAmount = roundMoney(safeBasePrice * safeVatRate); // vat calculation
   const finalPrice = roundMoney(safeBasePrice + vatAmount);
 
   return {

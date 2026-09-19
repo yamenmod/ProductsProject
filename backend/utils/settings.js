@@ -8,12 +8,17 @@ const getMaxQuantityPerCart = async () => {
 
     if (result.length > 0) {
       const val = Number(result[0].value);
-      return Number.isFinite(val) && val > 0 ? val : 12;
+
+      // Accept any positive whole number set by the admin
+      return Number.isInteger(val) && val > 0 ? val : 12;
     }
 
+    // Default value if the setting does not exist
     return 12;
   } catch (error) {
     console.error("[settings:getMaxQuantityPerCart]", error.message);
+
+    // Fallback if the database cannot be reached
     return 12;
   }
 };

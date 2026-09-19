@@ -325,12 +325,13 @@ function AdminDashboard({
       setSavingVat(false);
     }
   };
-//maxqty
+//maxqtynum
   const saveMaxQtyPerProduct = async () => {
     const parsed = Number(maxQtyInput);
 
-    if (!Number.isFinite(parsed) || parsed < 1 || parsed > 12) {
-      setMaxQtyMessage("Max quantity per cart must be between 1 and 12.");
+    // Allow any positive whole number
+    if (!Number.isInteger(parsed) || parsed < 1) {
+      setMaxQtyMessage("Max quantity per product must be at least 1.");
       return;
     }
 
@@ -347,13 +348,14 @@ function AdminDashboard({
       );
 
       const saved = Number(response.data?.value || parsed);
+
       setMaxQtyPerProduct(saved);
       setMaxQtyInput(String(saved));
       setMaxQtyMessage(`Max quantity per product updated to ${saved}.`);
     } catch (saveError) {
       setMaxQtyMessage(
         saveError.response?.data?.error ||
-          "Unable to update max quantity per cart.",
+          "Unable to update max quantity per product.",
       );
     } finally {
       setSavingMaxQty(false);
@@ -976,7 +978,7 @@ function AdminDashboard({
                   min="1"
                   max="99"
                   value={vatInput}
-                  onChange={(event) => setVatInput(event.target.value)}
+                  onChange={(event) => setVatInput(event.target.value)} // vat input
                   style={{
                     flex: 1,
                     padding: "11px 12px",
@@ -1033,7 +1035,7 @@ function AdminDashboard({
                   min="1"
                   max="1000"
                   value={maxQtyInput}
-                  onChange={(event) => setMaxQtyInput(event.target.value)}
+                  onChange={(event) => setMaxQtyInput(event.target.value)} // maxqty input
                   style={{
                     flex: 1,
                     padding: "11px 12px",

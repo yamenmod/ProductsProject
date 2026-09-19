@@ -35,6 +35,7 @@ const getAllSettings = async (req, res) => {
     const [rows] = await db.query("SELECT key_name, value FROM settings");
 
     const settings = {};
+
     rows.forEach((row) => {
       settings[row.key_name] = row.value;
     });
@@ -63,6 +64,7 @@ const updateSetting = async (req, res) => {
     // Validate VAT rate if updating it
     if (key === "vat_rate") {
       const numValue = parseFloat(value);
+
       if (isNaN(numValue)) {
         return res
           .status(400)
@@ -79,40 +81,50 @@ const updateSetting = async (req, res) => {
       }
 
       const storedRate = normalizedRate.toFixed(4);
+
       await db.query(
         "INSERT INTO settings (key_name, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value = ?",
         [key, storedRate, storedRate],
       );
 
-      console.log("[settings:update]", { key, value: storedRate });
+      console.log("[settings:update]", {
+        key,
+        value: storedRate,
+      });
 
-      return res.json({ key, value: storedRate });
+      return res.json({
+        key,
+        value: storedRate,
+      });
     }
 
     // Validate max_quantity_per_cart if updating it
     if (key === "max_quantity_per_cart") {
-      const numValue = parseInt(value, 10);
-      if (isNaN(numValue) || numValue < 1) {
-        return res
-          .status(400)
-          .json({ error: "Max quantity per cart must be a positive integer" });
-      }
+      const numValue = Number(value);
 
-      if (numValue > 12) {
-        return res
-          .status(400)
-          .json({ error: "Max quantity per cart cannot exceed 12" });
+      // Allow any positive whole number
+      if (!Number.isInteger(numValue) || numValue < 1) {
+        return res.status(400).json({
+          error: "Max quantity per cart must be a positive integer",
+        });
       }
 
       const storedValue = String(numValue);
+
       await db.query(
         "INSERT INTO settings (key_name, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value = ?",
         [key, storedValue, storedValue],
       );
 
-      console.log("[settings:update]", { key, value: storedValue });
+      console.log("[settings:update]", {
+        key,
+        value: storedValue,
+      });
 
-      return res.json({ key, value: storedValue });
+      return res.json({
+        key,
+        value: storedValue,
+      });
     }
 
     await db.query(
