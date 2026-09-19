@@ -300,21 +300,21 @@ function Products({
     await handleAddToCart(previewProduct, selectedSize);
   };
 
-  const categories = [
-    "All",
-    "Surfboards",
-    "Wetsuits",
-    "Clothing",
-    "Surfboard Accessories",
-  ];
+  const categories = ["All", "Surfboards", "Wetsuits", "Clothing"];
 
   const filteredProducts =
     activeCategory === "All"
-      ? products.filter((product) => canViewProduct(product))
+      ? products.filter(
+          (product) =>
+            normalizeCategoryValue(product.category) !== "accessories" &&
+            canViewProduct(product),
+        )
       : products.filter(
           (product) =>
+            normalizeCategoryValue(product.category) !== "accessories" &&
             normalizeCategoryValue(product.category) ===
-              normalizeCategoryValue(activeCategory) && canViewProduct(product),
+              normalizeCategoryValue(activeCategory) &&
+            canViewProduct(product),
         );
 
   const isAccessoriesCategory =
@@ -659,7 +659,10 @@ function Products({
                 const activeCardImageIndex = cardImageIndices[productId] || 0;
 
                 return (
-                  <div key={productId} className="ps-productCard surfspots-product-card">
+                  <div
+                    key={productId}
+                    className="ps-productCard surfspots-product-card"
+                  >
                     <div className="surfspots-product-media">
                       <button
                         type="button"

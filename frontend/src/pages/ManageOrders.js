@@ -121,6 +121,7 @@ function ManageOrders({
     loadOrderDetail(order.id);
   };
 
+  //mark order completed
   const handleMarkAsCompleted = async (orderId) => {
     try {
       await axios.patch(
@@ -686,10 +687,10 @@ function ManageOrders({
                             color: "#65574d",
                             fontSize: "13px",
                           }}
-                        >
-                          {formatDate(order.completedAt || order.completed_at)}
+                        > 
+                          {formatDate(order.completedAt || order.completed_at)} 
                         </td>
-                        <td style={{ padding: "14px 10px" }}>
+                        <td style={{ padding: "14px 10px" }}> 
                           {bucket === "success" && (
                             <button
                               type="button"
@@ -705,8 +706,8 @@ function ManageOrders({
                                 height: "auto",
                               }}
                             >
-                              Mark as Completed
-                            </button>
+                              Mark as Completed 
+                            </button> // mark order completed btn
                           )}
                         </td>
                       </tr>

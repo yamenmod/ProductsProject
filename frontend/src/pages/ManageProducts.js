@@ -8,6 +8,19 @@ import axios from "axios";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 
+const PRODUCT_CATEGORIES = ["Surfboards", "Wetsuits", "Clothing"];
+const PRODUCT_NAME_MAX_LENGTH = 120;
+
+const isValidProductName = (value) => {
+  const normalized = (value || "").trim();
+
+  return (
+    normalized.length > 0 &&
+    normalized.length <= PRODUCT_NAME_MAX_LENGTH &&
+    /[A-Za-z]{3,}/.test(normalized)
+  );
+};
+
 function ManageProducts({
   session,
   preferredGender,
@@ -318,8 +331,26 @@ function ManageProducts({
     setError("");
     setSuccess("");
 
-    if (!form.name.trim() || form.price === "") {
-      setError("Name and price are required.");
+    if (!isValidProductName(form.name)) {
+      setError(
+        "Product name must be 1-120 characters and include meaningful letters.",
+      );
+      return;
+    }
+
+    const price = Number(form.price);
+    if (
+      form.price === "" ||
+      !Number.isFinite(price) ||
+      price <= 0 ||
+      (typeof form.price === "string" && !form.price.trim())
+    ) {
+      setError("Product price must be a valid number greater than 0.");
+      return;
+    }
+
+    if (!PRODUCT_CATEGORIES.includes(form.category)) {
+      setError("Select Surfboards, Wetsuits, or Clothing as the category.");
       return;
     }
 
@@ -357,7 +388,7 @@ function ManageProducts({
     const payload = new FormData();
     payload.append("name", form.name.trim());
     payload.append("description", form.description.trim());
-    payload.append("price", Number(form.price));
+    payload.append("price", price);
     payload.append("category", form.category.trim());
     payload.append("gender", normalizeGenderValue(form.gender));
     payload.append("stock", String(form.stock === "" ? 0 : Number(form.stock)));
@@ -479,19 +510,22 @@ function ManageProducts({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialProductToEdit]);
 
-
-   // active
+  // active
   const handleStatusChange = async (product, isActive) => {
     setSuccess("");
     setError("");
     try {
-      await axios.patch(`/api/products/${product._id || product.id}/status`, {
-        is_active: isActive,
-      }, {
-        headers: {
-          Authorization: `Bearer ${session.token}`,
+      await axios.patch(
+        `/api/products/${product._id || product.id}/status`,
+        {
+          is_active: isActive,
         },
-      });
+        {
+          headers: {
+            Authorization: `Bearer ${session.token}`,
+          },
+        },
+      );
       loadProducts();
       setSuccess(`Product ${isActive ? "activated" : "deactivated"}`);
     } catch (requestError) {
@@ -626,13 +660,7 @@ function ManageProducts({
     });
   };
 
-  const categories = [
-    "All",
-    "Surfboards",
-    "Wetsuits",
-    "Clothing",
-    "Surfboard Accessories",
-  ];
+  const categories = ["All", ...PRODUCT_CATEGORIES];
 
   const visibleProducts = products.filter((product) => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
@@ -795,7 +823,6 @@ function ManageProducts({
                 </option>
               ))}
             </select>
-
           </div>
 
           <div
@@ -831,9 +858,12 @@ function ManageProducts({
                 fontSize: "12px",
                 padding: "8px 16px",
                 background:
-                  statusFilter === "active" ? "#16a34a" : "rgba(22, 163, 74, 0.1)",
+                  statusFilter === "active"
+                    ? "#16a34a"
+                    : "rgba(22, 163, 74, 0.1)",
                 color: statusFilter === "active" ? "#fff" : "#16a34a",
-                border: statusFilter === "active" ? "none" : "1px solid #16a34a",
+                border:
+                  statusFilter === "active" ? "none" : "1px solid #16a34a",
                 borderRadius: "8px",
                 cursor: "pointer",
                 fontWeight: statusFilter === "active" ? 600 : 400,
@@ -848,9 +878,12 @@ function ManageProducts({
                 fontSize: "12px",
                 padding: "8px 16px",
                 background:
-                  statusFilter === "inactive" ? "#dc2626" : "rgba(220, 38, 38, 0.1)",
+                  statusFilter === "inactive"
+                    ? "#dc2626"
+                    : "rgba(220, 38, 38, 0.1)",
                 color: statusFilter === "inactive" ? "#fff" : "#dc2626",
-                border: statusFilter === "inactive" ? "none" : "1px solid #dc2626",
+                border:
+                  statusFilter === "inactive" ? "none" : "1px solid #dc2626",
                 borderRadius: "8px",
                 cursor: "pointer",
                 fontWeight: statusFilter === "inactive" ? 600 : 400,
@@ -1559,7 +1592,10 @@ function ManageProducts({
                       style={{
                         margin: "0 0 8px 0",
                         fontSize: "14px",
-                        color: Number(product.is_active) === 0 ? "#c62828" : "#1f1813",
+                        color:
+                          Number(product.is_active) === 0
+                            ? "#c62828"
+                            : "#1f1813",
                       }}
                     >
                       {product.name}
@@ -1598,7 +1634,9 @@ function ManageProducts({
                         L
                       </p>
                     )}
-                    <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                    <div
+                      style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}
+                    >
                       <button
                         onClick={() => handleEdit(product)}
                         style={{
@@ -1623,7 +1661,7 @@ function ManageProducts({
                         Edit
                       </button>
                       <button
-                        onClick={() => handleStatusChange(product, true)} // activebtn 
+                        onClick={() => handleStatusChange(product, true)} // activebtn
                         style={{
                           flex: 1,
                           padding: "8px 12px",
@@ -1637,10 +1675,10 @@ function ManageProducts({
                           transition: "background 150ms ease",
                         }}
                         onMouseEnter={(e) => {
-                            e.target.style.background = "#2f633b";
+                          e.target.style.background = "#2f633b";
                         }}
                         onMouseLeave={(e) => {
-                            e.target.style.background = "#3d7a4b";
+                          e.target.style.background = "#3d7a4b";
                         }}
                       >
                         Active
@@ -1680,7 +1718,6 @@ function ManageProducts({
               No products match your search or selected filters.
             </p>
           )}
-
 
           {previewProduct && (
             <div className="ps-previewBackdrop" onClick={closePreview}>

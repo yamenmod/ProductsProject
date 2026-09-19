@@ -495,15 +495,7 @@ function SizeCharts({
             </p>
           </div>
 
-          <div className="ps-sizeChartsActions">
-            <button
-              type="button"
-              className="ps-btn ps-btn-secondary"
-              onClick={() => onNavigate("shop")}
-            >
-              Back to Shop
-            </button>
-          </div>
+        
         </section>
 
         <section className="ps-shell ps-sizeChartPanel">

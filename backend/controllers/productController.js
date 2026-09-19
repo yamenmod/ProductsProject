@@ -14,6 +14,34 @@ const { validateMeasurement } = require("../utils/measurements");
 
 // Product catalogue, image normalization, and board recommendation logic.
 
+const ALLOWED_PRODUCT_CATEGORIES = new Set([
+  "surfboards",
+  "wetsuits",
+  "clothing",
+]);
+
+const isAllowedProductCategory = (value) =>
+  ALLOWED_PRODUCT_CATEGORIES.has((value || "").trim().toLowerCase());
+
+const PRODUCT_NAME_MAX_LENGTH = 120;
+
+const normalizeProductName = (value) =>
+  typeof value === "string" ? value.trim() : "";
+
+const isValidProductName = (value) =>
+  value.length > 0 &&
+  value.length <= PRODUCT_NAME_MAX_LENGTH &&
+  /[A-Za-z]{3,}/.test(value);
+
+const parsePositivePrice = (value) => {
+  if (value === undefined || value === null || String(value).trim() === "") {
+    return null;
+  }
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+};
+
 const PRODUCT_IMAGE_DIR = "/public/assets/img/products";
 const isDataOrBlobUrl = (value) => {
   // Detect values that are not safe to store as image paths.
@@ -472,6 +500,22 @@ const createProduct = async (req, res) => {
       boardVolume,
       size,
     } = req.body;
+    const normalizedName = normalizeProductName(name);
+    const parsedPrice = parsePositivePrice(price);
+
+    if (!isValidProductName(normalizedName)) {
+      return res.status(400).json({
+        message:
+          "Product name must be 1-120 characters and include meaningful letters",
+      });
+    }
+
+    if (parsedPrice === null) {
+      return res.status(400).json({
+        message: "Product price must be a valid number greater than 0",
+      });
+    }
+
     const nextBoardHeight =
       boardHeight !== undefined
         ? boardHeight
@@ -512,8 +556,10 @@ const createProduct = async (req, res) => {
     const storedImageValue =
       nextImages.length > 1 ? JSON.stringify(nextImages) : nextImages[0] || "";
 
-    if (!name || price === undefined) {
-      return res.status(400).json({ message: "Name and price are required" });
+    if (!isAllowedProductCategory(category)) {
+      return res.status(400).json({
+        message: "Category must be Surfboards, Wetsuits, or Clothing",
+      });
     }
 
     const categoryId = await resolveCategoryId(category);
@@ -540,9 +586,9 @@ const createProduct = async (req, res) => {
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
       `,
       [
-        name.trim(),
+        normalizedName,
         description || "",
-        calculateVatPricing(price).basePrice,
+        calculateVatPricing(parsedPrice).basePrice,
         nextStock,
         categoryId,
         nextGender,
@@ -705,14 +751,32 @@ const updateProduct = async (req, res) => {
     const storedImageValue =
       nextImages.length > 1 ? JSON.stringify(nextImages) : nextImages[0] || "";
 
-    const nextName = name !== undefined ? name.trim() : existingProduct.name;
-    const nextPrice =
-      price !== undefined
-        ? calculateVatPricing(price).basePrice
-        : Number(existingProduct.price);
+    const nextName = normalizeProductName(
+      name !== undefined ? name : existingProduct.name,
+    );
+    const parsedPrice = parsePositivePrice(
+      price !== undefined ? price : existingProduct.price,
+    );
 
-    if (!nextName || Number.isNaN(nextPrice)) {
-      return res.status(400).json({ message: "Name and price are required" });
+    if (!isValidProductName(nextName)) {
+      return res.status(400).json({
+        message:
+          "Product name must be 1-120 characters and include meaningful letters",
+      });
+    }
+
+    if (parsedPrice === null) {
+      return res.status(400).json({
+        message: "Product price must be a valid number greater than 0",
+      });
+    }
+
+    const nextPrice = calculateVatPricing(parsedPrice).basePrice;
+
+    if (category !== undefined && !isAllowedProductCategory(category)) {
+      return res.status(400).json({
+        message: "Category must be Surfboards, Wetsuits, or Clothing",
+      });
     }
 
     const nextCategoryId =

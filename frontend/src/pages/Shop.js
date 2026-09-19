@@ -65,13 +65,6 @@ function Shop({
                 id: "clothing",
                 icon: "Wear",
               },
-              {
-                name: "Surfboard Accessories",
-                desc: "Premium accessories and gear",
-                color: "#c77a4a",
-                id: "surfboard accessories",
-                icon: "Add-on",
-              },
             ].map((item) => (
               <div
                 key={item.id}
@@ -80,18 +73,11 @@ function Shop({
                 className="ps-surface shop-card"
                 onClick={() => onNavigate("products", item.id)}
               >
-                <div
-                  className="shop-card-icon"
-                  style={{ color: item.color }}
-                >
+                <div className="shop-card-icon" style={{ color: item.color }}>
                   {item.icon}
                 </div>
-                <h3 className="shop-card-title">
-                  {item.name}
-                </h3>
-                <p className="shop-card-description">
-                  {item.desc}
-                </p>
+                <h3 className="shop-card-title">{item.name}</h3>
+                <p className="shop-card-description">{item.desc}</p>
 
                 {item.id === "wetsuits" && hoveredCardId === item.id && (
                   <div className="shop-card-extra">
@@ -122,9 +108,7 @@ function Shop({
           </div>
 
           <div className="ps-surface shop-cta-panel">
-            <h2 className="shop-cta-title">
-              Build your next setup
-            </h2>
+            <h2 className="shop-cta-title">Build your next setup</h2>
             <p className="shop-cta-description">
               Open any category or browse all products in the redesigned Plage
               Surf catalog view.
