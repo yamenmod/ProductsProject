@@ -349,7 +349,12 @@ function ManageProducts({
       return;
     }
 
-    if (!PRODUCT_CATEGORIES.includes(form.category)) {
+    const normalizedCategory = (form.category || "").trim().toLowerCase();
+    const category = PRODUCT_CATEGORIES.find(
+      (allowedCategory) => allowedCategory.toLowerCase() === normalizedCategory,
+    );
+
+    if (!category) {
       setError("Select Surfboards, Wetsuits, or Clothing as the category.");
       return;
     }
@@ -389,7 +394,7 @@ function ManageProducts({
     payload.append("name", form.name.trim());
     payload.append("description", form.description.trim());
     payload.append("price", price);
-    payload.append("category", form.category.trim());
+    payload.append("category", category);
     payload.append("gender", normalizeGenderValue(form.gender));
     payload.append("stock", String(form.stock === "" ? 0 : Number(form.stock)));
     payload.append(

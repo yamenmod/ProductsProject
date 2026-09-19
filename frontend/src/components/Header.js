@@ -299,10 +299,7 @@ function Header({
                       { name: "Surfboards", id: "surfboards" },
                       { name: "Wetsuits", id: "wetsuits" },
                       { name: "Clothing", id: "clothing" },
-                      {
-                        name: "Surfboard Accessories",
-                        id: "surfboard accessories",
-                      },
+                     
                     ].map((category) => (
                       <button
                         key={category.id}
