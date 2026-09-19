@@ -61,7 +61,10 @@ function AdminDashboard({
   const [selectedCategory, setSelectedCategory] = useState("");
   const [categories, setCategories] = useState([]);
   const statusColors = STATUS_COLORS;
-
+// FILTER ORDERS BY DATE
+// Converts the selected From/To dates to timestamps.
+// Goes through all orders and keeps only orders inside the selected range.
+// useMemo avoids recalculating unless orders/dateFrom/dateTo change.
   const filteredOrders = useMemo(() => {
     const fromTime = dateFrom
       ? new Date(`${dateFrom}T00:00:00`).getTime()
@@ -88,7 +91,7 @@ function AdminDashboard({
       return true;
     });
   }, [orders, dateFrom, dateTo]);
-
+//ספירת הזמנות 
   const filteredSummary = useMemo(() => {
     const summary = { success: 0, cancelled: 0, completed: 0 };
 
@@ -284,7 +287,7 @@ function AdminDashboard({
 
     loadMaxQtyPerProduct();
   }, [session?.token]);
-
+//vat
   const saveVatRate = async () => {
     const parsedPercent = Number(vatInput);
 
@@ -322,7 +325,7 @@ function AdminDashboard({
       setSavingVat(false);
     }
   };
-
+//maxqty
   const saveMaxQtyPerProduct = async () => {
     const parsed = Number(maxQtyInput);
 
@@ -346,7 +349,7 @@ function AdminDashboard({
       const saved = Number(response.data?.value || parsed);
       setMaxQtyPerProduct(saved);
       setMaxQtyInput(String(saved));
-      setMaxQtyMessage(`Max quantity per cart updated to ${saved}.`);
+      setMaxQtyMessage(`Max quantity per product updated to ${saved}.`);
     } catch (saveError) {
       setMaxQtyMessage(
         saveError.response?.data?.error ||

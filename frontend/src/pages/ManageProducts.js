@@ -796,24 +796,68 @@ function ManageProducts({
               ))}
             </select>
 
-            <select
-              value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value)}
-              aria-label="Filter products by status"
+          </div>
+
+          <div
+            style={{
+              marginBottom: "20px",
+              display: "flex",
+              gap: "10px",
+              flexWrap: "wrap",
+            }}
+            aria-label="Filter products by status"
+          >
+            <button
+              type="button"
+              onClick={() => setStatusFilter("all")}
               style={{
-                minWidth: "180px",
-                padding: "12px 14px",
-                border: "1px solid #d9c3ad",
-                borderRadius: "12px",
-                background: "#fffdf8",
-                fontSize: "13px",
+                fontSize: "12px",
+                padding: "8px 16px",
+                background:
+                  statusFilter === "all" ? "#245860" : "rgba(36, 88, 96, 0.1)",
+                color: statusFilter === "all" ? "#fff" : "#245860",
+                border: statusFilter === "all" ? "none" : "1px solid #245860",
+                borderRadius: "8px",
                 cursor: "pointer",
+                fontWeight: statusFilter === "all" ? 600 : 400,
               }}
             >
-              <option value="all">All products</option>
-              <option value="active">Active</option>
-              <option value="inactive">Unactive</option>
-            </select>
+              All
+            </button>
+            <button
+              type="button"
+              onClick={() => setStatusFilter("active")}
+              style={{
+                fontSize: "12px",
+                padding: "8px 16px",
+                background:
+                  statusFilter === "active" ? "#16a34a" : "rgba(22, 163, 74, 0.1)",
+                color: statusFilter === "active" ? "#fff" : "#16a34a",
+                border: statusFilter === "active" ? "none" : "1px solid #16a34a",
+                borderRadius: "8px",
+                cursor: "pointer",
+                fontWeight: statusFilter === "active" ? 600 : 400,
+              }}
+            >
+              Active
+            </button>
+            <button
+              type="button"
+              onClick={() => setStatusFilter("inactive")}
+              style={{
+                fontSize: "12px",
+                padding: "8px 16px",
+                background:
+                  statusFilter === "inactive" ? "#dc2626" : "rgba(220, 38, 38, 0.1)",
+                color: statusFilter === "inactive" ? "#fff" : "#dc2626",
+                border: statusFilter === "inactive" ? "none" : "1px solid #dc2626",
+                borderRadius: "8px",
+                cursor: "pointer",
+                fontWeight: statusFilter === "inactive" ? 600 : 400,
+              }}
+            >
+              Inactive
+            </button>
           </div>
 
           <button
