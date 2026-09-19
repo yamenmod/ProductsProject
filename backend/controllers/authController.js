@@ -61,8 +61,14 @@ const register = async (req, res) => {
 
     const normalizedUsername = username.trim();
     const normalizedEmail = email.toLowerCase().trim();
-    const normalizedWeight = validateMeasurement(weight, "weight");
-    const normalizedHeight = validateMeasurement(height, "height");
+    const normalizedWeight =
+      weight === undefined || weight === null || String(weight).trim() === ""
+        ? null
+        : validateMeasurement(weight, "weight");
+    const normalizedHeight =
+      height === undefined || height === null || String(height).trim() === ""
+        ? null
+        : validateMeasurement(height, "height");
     const hashedPassword = await bcrypt.hash(password, 10);
 
     console.log("✅ NORMALIZED DATA:", {
