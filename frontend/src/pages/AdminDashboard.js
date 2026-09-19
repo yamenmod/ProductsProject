@@ -7,6 +7,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
+//drpho
 import TopProductsChart from "../components/TopProductsChart";
 import CategorySalesChart from "../components/CategorySalesChart";
 import { STATUS_COLORS } from "../utils/statusColors";
@@ -145,6 +146,7 @@ function AdminDashboard({
       .toLowerCase();
 
     return [...products]
+    //מכינים מידע על כל מוצר.
       .map((product) => {
         const stock = Number(product?.stock ?? 0);
         const sizeStock = product?.sizeStock || product?.size_stock || null;
@@ -166,10 +168,12 @@ function AdminDashboard({
           stock,
         };
       })
+      //משאירים רק מוצרים עם מלאי נמוך.
       .filter(
         (entry) =>
           entry.overallLow || (entry.lowSizes && entry.lowSizes.length),
       )
+      //מסננים לפי מה שהאדמין חיפש.
       .filter((entry) => {
         if (!normalizedSearch) return true;
         return (entry.product?.name || "")
@@ -177,6 +181,7 @@ function AdminDashboard({
           .toLowerCase()
           .includes(normalizedSearch);
       })
+      //ממיינים לפי כמות המלאי.
       .sort((a, b) => a.stock - b.stock);
   }, [products, watchlistSearch]);
 
