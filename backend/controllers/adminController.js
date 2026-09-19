@@ -42,7 +42,7 @@ const getTopProducts = async (req, res) => {
       ORDER BY total_sold DESC
       LIMIT 3
       `,
-      params
+      params,
     );
 
     return res.status(200).json(rows);
@@ -56,7 +56,11 @@ const getCategorySales = async (req, res) => {
   try {
     const { category, fromDate, toDate } = req.query;
 
-    console.log("[admin:getCategorySales] Request:", { category, fromDate, toDate });
+    console.log("[admin:getCategorySales] Request:", {
+      category,
+      fromDate,
+      toDate,
+    });
 
     if (!category) {
       return res.status(400).json({ message: "Category is required" });
@@ -75,9 +79,8 @@ const getCategorySales = async (req, res) => {
       params.push(toDate);
     }
 
-    const dateFilter = dateConditions.length > 0 
-      ? " AND " + dateConditions.join(" AND ")
-      : "";
+    const dateFilter =
+      dateConditions.length > 0 ? " AND " + dateConditions.join(" AND ") : "";
 
     params.push(category);
 
@@ -104,7 +107,7 @@ const getCategorySales = async (req, res) => {
       GROUP BY p.id, p.name
       ORDER BY total_sold DESC, p.name ASC
       `,
-      params
+      params,
     );
 
     console.log("[admin:getCategorySales] Result count:", rows.length);
@@ -120,10 +123,19 @@ const getCategorySales = async (req, res) => {
 const getAllCategories = async (req, res) => {
   try {
     const [rows] = await db.query(
-      `SELECT id, name FROM categories 
-       WHERE name NOT IN ('Fins', 'Leashes', 'Surfboard Cases')
-       ORDER BY name ASC`
+      `
+      SELECT id, name 
+      FROM categories
+      WHERE name NOT IN (
+        'Fins',
+        'Leashes',
+        'Surfboard Cases',
+        'Surfboard Accessories'
+      )
+      ORDER BY name ASC
+      `,
     );
+
     return res.status(200).json(rows);
   } catch (error) {
     console.error("[admin:getAllCategories]", error);
@@ -135,8 +147,11 @@ const getAllUsers = async (req, res) => {
   try {
     // Fetch users newest first so the admin list stays readable.
     const [rows] = await db.query(
-      `SELECT id, username, email, role, created_at FROM users ORDER BY created_at DESC`,
+      `SELECT id, username, email, role, created_at 
+       FROM users 
+       ORDER BY created_at DESC`,
     );
+
     return res.status(200).json(rows);
   } catch (error) {
     return res.status(500).json({ message: "Server error" });
@@ -158,10 +173,9 @@ const deleteUser = async (req, res) => {
     }
 
     // Set user_id to NULL in all orders for this user to preserve order history
-    await db.query(
-      "UPDATE orders SET user_id = NULL WHERE user_id = ?",
-      [userId],
-    );
+    await db.query("UPDATE orders SET user_id = NULL WHERE user_id = ?", [
+      userId,
+    ]);
 
     // Now delete the user
     const [result] = await db.query("DELETE FROM users WHERE id = ?", [userId]);

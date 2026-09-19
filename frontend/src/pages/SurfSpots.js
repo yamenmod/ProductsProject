@@ -51,24 +51,6 @@ function Products({
       return "Surfboard Shop";
     }
 
-    if (
-      rawNormalized === "surfboard accessories" ||
-      rawNormalized === "surfboard accessory" ||
-      rawNormalized === "surfboard acessory" ||
-      rawNormalized === "surfboard acessories"
-    ) {
-      return "Surfboard Acessory Shop";
-    }
-
-    if (
-      rawNormalized === "accessories" ||
-      rawNormalized === "accessory" ||
-      rawNormalized === "acessory" ||
-      rawNormalized === "acessories"
-    ) {
-      return "Accessory Shop";
-    }
-
     if (normalized === "wetsuits") {
       return "Wetsuit Shop";
     }

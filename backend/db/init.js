@@ -548,7 +548,6 @@ const initDatabase = async () => {
       'Leashes',
       'Fins',
       'Surfboard Cases',
-      'Surfboard Accessories',
       'Clothing'
     ];
 
