@@ -6,6 +6,7 @@
 import React, { useState } from "react";
 import axios from "axios";
 import "./Login.css";
+import { getMeasurementValidationError } from "../utils/measurements";
 
 // Utility function to sanitize numeric input (weight/height)
 const sanitizeNumericInput = (value) => {
@@ -54,13 +55,16 @@ function Login({ onLoginSuccess, onNavigate }) {
       const normalizedWeight = normalizeOptionalNumber(weight);
       const normalizedHeight = normalizeOptionalNumber(height);
 
-      if (weight.trim() && Number.isNaN(normalizedWeight)) {
-        setMessage("⚠️ Weight must be a valid number!");
+      const weightError = getMeasurementValidationError(weight, "weight");
+      const heightError = getMeasurementValidationError(height, "height");
+
+      if (weightError) {
+        setMessage(`⚠️ ${weightError}`);
         return;
       }
 
-      if (height.trim() && Number.isNaN(normalizedHeight)) {
-        setMessage("⚠️ Height must be a valid number!");
+      if (heightError) {
+        setMessage(`⚠️ ${heightError}`);
         return;
       }
 
@@ -210,13 +214,9 @@ function Login({ onLoginSuccess, onNavigate }) {
           </div>
         </div>
 
-        {message && (
-          <div className="login-message">
-            {message}
-          </div>
-        )}
-          
-        <div className="login-actions"> 
+        {message && <div className="login-message">{message}</div>}
+
+        <div className="login-actions">
           <button className="ps-btn ps-btn-primary" onClick={handleSubmit}>
             {isRegister ? "Create Account" : "Sign In"}
           </button>
