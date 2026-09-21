@@ -413,7 +413,7 @@ function ManageProducts({
     // Add surfboard-specific fields if category is Surfboard
     if ((form.category || "").toLowerCase().includes("surfboard")) {
       if (form.boardHeight !== "") {
-        payload.append("boardHeight", Number(form.boardHeight));
+        payload.append("boardHeight", Number(form.boardHeight)); // volumeheight form
       }
       if (form.boardVolume !== "") {
         payload.append("boardVolume", Number(form.boardVolume));
@@ -1084,7 +1084,7 @@ function ManageProducts({
                         marginTop: "8px",
                       }}
                     >
-                      {sizeOptions.map((size) => (
+                      {sizeOptions.map((size) => ( // clothing form
                         <label
                           key={size}
                           style={{
