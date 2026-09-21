@@ -3,6 +3,7 @@
  * Main landing page displaying recent products with horizontal scrolling rails
  * Features product preview modal, size selection, and add to cart functionality
  */
+
 import React, { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import Header from "../components/Header";
@@ -10,7 +11,6 @@ import Footer from "../components/Footer";
 import "./Home.css";
 
 function Home({
-  // home
   user,
   session,
   preferredGender,
@@ -35,6 +35,7 @@ function Home({
   const [previewImageIndex, setPreviewImageIndex] = useState(0);
   const [previewSize, setPreviewSize] = useState("");
   const [cardImageIndices, setCardImageIndices] = useState({});
+
   const surfboardRailRef = useRef(null);
   const wetsuitRailRef = useRef(null);
   const swipeStartXRef = useRef(null);
@@ -47,6 +48,7 @@ function Home({
     } else {
       document.body.style.overflow = "";
     }
+
     return () => {
       document.body.style.overflow = "";
     };
@@ -70,6 +72,7 @@ function Home({
 
   const isClothingProduct = (product) => {
     const normalized = normalizeGenderValue(product?.category);
+
     return normalized.includes("clothing") || normalized.includes("wetsuit");
   };
 
@@ -95,6 +98,7 @@ function Home({
     if (trimmed.startsWith("[")) {
       try {
         const parsed = JSON.parse(trimmed);
+
         if (Array.isArray(parsed)) {
           return parsed.flatMap((item) => parseImageValue(item));
         }
@@ -156,6 +160,7 @@ function Home({
 
   const canViewProduct = (product) => {
     const gender = normalizeGenderValue(product?.gender || "unisex");
+
     const shopperGender = normalizeGenderValue(preferredGender || "all");
 
     if (!shopperGender || shopperGender === "all") {
@@ -195,7 +200,10 @@ function Home({
       return `http://localhost:5000/public${normalized}`;
     }
 
-    return `http://localhost:5000/public/assets/img/products/${normalized.replace(/^\/+/, "")}`;
+    return `http://localhost:5000/public/assets/img/products/${normalized.replace(
+      /^\/+/,
+      "",
+    )}`;
   };
 
   const getProductImages = (product) => {
@@ -215,15 +223,18 @@ function Home({
 
   const previewImages = getProductImages(previewProduct);
 
+  // Load all products and sort newest -> oldest.
   useEffect(() => {
     const loadRecentProducts = async () => {
       try {
         const response = await axios.get("/api/products");
+
         const sortedProducts = [...(response.data || [])].sort(
           (left, right) => {
             const leftDate = new Date(
-              left.createdAt || left.created_at || 0,
+              left.createdAt || left.created_at || 0, // recent product 3
             ).getTime();
+
             const rightDate = new Date(
               right.createdAt || right.created_at || 0,
             ).getTime();
@@ -232,7 +243,7 @@ function Home({
           },
         );
 
-        setRecentProducts(sortedProducts.slice(0, 12));
+        setRecentProducts(sortedProducts);
       } catch (error) {
         console.error("Unable to load recent products:", error.message);
       }
@@ -241,17 +252,23 @@ function Home({
     loadRecentProducts();
   }, []);
 
-  const surfboardProducts = recentProducts.filter(
-    (product) =>
-      normalizeCategoryValue(product.category) === "surfboards" &&
-      canViewProduct(product),
-  );
+  // 3 newest visible surfboards.
+  const surfboardProducts = recentProducts
+    .filter(
+      (product) =>
+        normalizeCategoryValue(product.category) === "surfboards" &&
+        canViewProduct(product),
+    )
+    .slice(0, 3);
 
-  const wetsuitProducts = recentProducts.filter(
-    (product) =>
-      normalizeCategoryValue(product.category) === "wetsuits" &&
-      canViewProduct(product),
-  );
+  // 3 newest visible wetsuits.
+  const wetsuitProducts = recentProducts
+    .filter(
+      (product) =>
+        normalizeCategoryValue(product.category) === "wetsuits" &&
+        canViewProduct(product),
+    )
+    .slice(0, 3);
 
   const scrollRail = (railElement, direction) => {
     if (!railElement?.current) {
@@ -282,6 +299,7 @@ function Home({
     }
 
     const safeIndex = (nextIndex + previewImages.length) % previewImages.length;
+
     setPreviewImageIndex(safeIndex);
   };
 
@@ -309,13 +327,14 @@ function Home({
     swipeStartXRef.current = null;
   };
 
-  const goToCardImage = (productId, imageCount, delta) => {
+  const goToCardImage = (productId, imageCount, delta) => { //products picture arrow
     if (!productId || imageCount < 2) {
       return;
     }
 
     setCardImageIndices((previous) => {
       const currentIndex = previous[productId] || 0;
+
       const nextIndex = (currentIndex + delta + imageCount) % imageCount;
 
       return {
@@ -330,7 +349,11 @@ function Home({
       return false;
     }
 
-    const productWithSize = { ...product, size: size || "" };
+    const productWithSize = {
+      ...product,
+      size: size || "",
+    };
+
     const added = await onAddToCart(productWithSize);
 
     return added;
@@ -342,6 +365,7 @@ function Home({
     }
 
     const selectedSize = isClothingProduct(previewProduct) ? previewSize : "";
+
     await addProductToCart(previewProduct, selectedSize);
   };
 
@@ -351,7 +375,9 @@ function Home({
     }
 
     const selectedSize = isClothingProduct(previewProduct) ? previewSize : "";
+
     const added = await addProductToCart(previewProduct, selectedSize);
+
     if (!added) {
       return;
     }
@@ -380,8 +406,11 @@ function Home({
       <div className="ps-shell ps-dropsLayout">
         <div className="ps-dropsIntro">
           <span className="ps-pill">{pill}</span>
+
           <h2 className="ps-dropsTitle">{title}</h2>
+
           <p className="ps-dropsText">{description}</p>
+
           <button
             type="button"
             className="ps-dropsLink"
@@ -405,14 +434,18 @@ function Home({
             {products.length > 0 ? (
               products.map((product) => {
                 const productImages = getProductImages(product);
+
                 const productId = product._id || product.id;
+
                 const activeCardImageIndex = cardImageIndices[productId] || 0;
 
                 return (
                   <article className="ps-dropCard" key={productId}>
                     <div
                       className="ps-dropImageWrap"
-                      style={{ position: "relative" }}
+                      style={{
+                        position: "relative",
+                      }}
                     >
                       <button
                         type="button"
@@ -420,6 +453,7 @@ function Home({
                         onClick={() => openPreview(product)}
                       >
                         <span className="ps-dropBadge">NEW</span>
+
                         <img
                           className="ps-dropImage"
                           src={productImages[activeCardImageIndex]}
@@ -431,7 +465,7 @@ function Home({
                         <>
                           <button
                             type="button"
-                            className="home-card-image-nav home-card-image-nav-left"
+                            className="home-card-image-nav home-card-image-nav-left" // products picture arrow ui
                             onClick={() =>
                               goToCardImage(productId, productImages.length, -1)
                             }
@@ -439,6 +473,7 @@ function Home({
                           >
                             ‹
                           </button>
+
                           <button
                             type="button"
                             className="home-card-image-nav home-card-image-nav-right"
@@ -456,6 +491,7 @@ function Home({
                     <div className="ps-dropBody">
                       <div className="ps-dropMetaRow">
                         <span className="ps-dropSwatch" />
+
                         <span className="ps-dropCategory">
                           {product.category || pill}
                         </span>
@@ -476,6 +512,7 @@ function Home({
                           ${(product.price ?? 0).toFixed(2)}
                         </span>
                       </div>
+
                       <button
                         type="button"
                         className="ps-btn ps-btn-primary home-card-button"
@@ -529,6 +566,7 @@ function Home({
           <span className="home-cart-success-message">
             {cartSuccessMessage}
           </span>
+
           <button
             className="home-cart-success-close"
             onClick={onClearCartSuccessMessage}
@@ -553,10 +591,12 @@ function Home({
             <h2 className="ps-cartConfirmTitle">
               Product added to cart successfully
             </h2>
+
             <p className="ps-cartConfirmText">
               The product has been added to your cart. You can continue shopping
               or proceed to checkout.
             </p>
+
             <div className="ps-cartConfirmActions">
               <button
                 type="button"
@@ -565,6 +605,7 @@ function Home({
               >
                 Continue Shopping
               </button>
+
               <button
                 type="button"
                 className="ps-btn ps-cartConfirmDelete"
@@ -589,13 +630,22 @@ function Home({
             aria-label="Error adding to cart"
             onClick={(event) => event.stopPropagation()}
           >
-            <p className="ps-pill" style={{ margin: 0, width: "fit-content" }}>
+            <p
+              className="ps-pill"
+              style={{
+                margin: 0,
+                width: "fit-content",
+              }}
+            >
               Error
             </p>
+
             <h2 className="ps-cartConfirmTitle">
               Unable to add product to cart
             </h2>
+
             <p className="ps-cartConfirmText">{cartErrorMessage}</p>
+
             <div className="ps-cartConfirmActions">
               <button
                 type="button"
@@ -647,10 +697,12 @@ function Home({
             alt="Wetsuit collection"
             className="ps-home-wetsuitImage"
           />
+
           <div className="ps-home-wetsuitOverlay" />
 
           <div className="ps-home-wetsuitContent">
             <p className="ps-home-heroKicker">New Collection</p>
+
             <button
               type="button"
               onClick={() => onNavigate("products", "wetsuits")}
@@ -711,6 +763,7 @@ function Home({
                     >
                       ‹
                     </button>
+
                     <button
                       type="button"
                       className="ps-previewArrow ps-previewArrowRight"
@@ -719,6 +772,7 @@ function Home({
                     >
                       ›
                     </button>
+
                     <div className="ps-previewCounter">
                       {previewImageIndex + 1} / {previewImages.length}
                     </div>
@@ -741,7 +795,9 @@ function Home({
                           : "ps-previewDot"
                       }
                       onClick={() => setPreviewImageIndex(index)}
-                      aria-label={`Show image ${index + 1} of ${previewImages.length}`}
+                      aria-label={`Show image ${index + 1} of ${
+                        previewImages.length
+                      }`}
                     />
                   ))}
                 </div>
@@ -750,12 +806,15 @@ function Home({
 
             <div className="ps-previewMeta">
               <span className="ps-previewBadge">NEW</span>
+
               <h3 className="ps-previewName">
                 {previewProduct.name || "New product"}
               </h3>
+
               <p className="ps-previewDescription">
                 {previewProduct.description || "No description available yet."}
               </p>
+
               <div
                 className="ps-previewPurchaseRow"
                 style={{
@@ -767,7 +826,10 @@ function Home({
                 <div>
                   <div
                     className="ps-previewPrice"
-                    style={{ display: "grid", gap: "2px" }}
+                    style={{
+                      display: "grid",
+                      gap: "2px",
+                    }}
                   >
                     <span
                       style={{
@@ -788,6 +850,7 @@ function Home({
                     className="home-preview-select"
                   >
                     <option value="">Select size</option>
+
                     {sizeOptions.map((size) => (
                       <option key={size} value={size}>
                         {size}
@@ -810,6 +873,7 @@ function Home({
                       ? "Out of Stock"
                       : "Add to Cart"}
                   </button>
+
                   <button
                     type="button"
                     className="ps-btn ps-btn-dark home-preview-action-button"

@@ -12,16 +12,23 @@ const {
 const createTransporter = () => {
   const user = (process.env.EMAIL_USER || "").trim();
   const pass = (process.env.EMAIL_PASS || "").trim();
+  const host = (process.env.EMAIL_HOST || "smtp.gmail.com").trim();
+  const port = Number(process.env.EMAIL_PORT || 587);
 
   if (!user || !pass) {
     console.error("[emailService] EMAIL_USER or EMAIL_PASS not configured");
     return null;
   }
 
+  if (!host || !Number.isInteger(port) || port < 1 || port > 65535) {
+    console.error("[emailService] EMAIL_HOST or EMAIL_PORT is invalid");
+    return null;
+  }
+
   return nodemailer.createTransport({
-    host: (process.env.EMAIL_HOST || "smtp.gmail.com").trim(),
-    port: Number(process.env.EMAIL_PORT || 587),
-    secure: Number(process.env.EMAIL_PORT || 587) === 465,
+    host,
+    port,
+    secure: port === 465,
     auth: { user, pass },
   });
 };
@@ -152,7 +159,9 @@ const sendOrderConfirmation = async ({
 
 const sendContactEmail = async ({ name, email, subject, message }) => {
   if (!name || !email || !subject || !message) {
-    console.error("[emailService] name, email, subject, and message are required");
+    console.error(
+      "[emailService] name, email, subject, and message are required",
+    );
     return { success: false, reason: "missing-parameters" };
   }
 
@@ -162,7 +171,18 @@ const sendContactEmail = async ({ name, email, subject, message }) => {
   }
 
   try {
-    const adminEmail = (process.env.CONTACT_EMAIL || "waseemyamen1@gmail.com").trim();
+    const adminEmail = (
+      process.env.CONTACT_EMAIL ||
+      process.env.EMAIL_USER ||
+      ""
+    ).trim();
+
+    if (!adminEmail) {
+      console.error(
+        "[emailService] CONTACT_EMAIL or EMAIL_USER is not configured",
+      );
+      return { success: false, reason: "recipient-missing" };
+    }
 
     const html = `
       <!DOCTYPE html>
@@ -224,7 +244,7 @@ const sendContactEmail = async ({ name, email, subject, message }) => {
     }
 
     const mailOptions = {
-      from: getFromAddress(),
+      from: `"Plage Surf" <${process.env.EMAIL_USER}>`,
       to: adminEmail,
       replyTo: email,
       subject: `Contact Form: ${subject}`,
@@ -235,7 +255,7 @@ const sendContactEmail = async ({ name, email, subject, message }) => {
     const info = await transporter.sendMail(mailOptions);
     console.log("[emailService] contact email sent", {
       to: adminEmail,
-      from: email,
+      from: process.env.EMAIL_USER,
       subject,
       messageId: info.messageId,
     });

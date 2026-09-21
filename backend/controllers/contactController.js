@@ -6,16 +6,16 @@ const submitContactForm = async (req, res) => {
 
     // Validate required fields
     if (!name || !email || !subject || !message) {
-      return res.status(400).json({ 
-        message: "All fields are required: name, email, subject, message" 
+      return res.status(400).json({
+        message: "All fields are required: name, email, subject, message",
       });
     }
 
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      return res.status(400).json({ 
-        message: "Invalid email address" 
+      return res.status(400).json({
+        message: "Invalid email address",
       });
     }
 
@@ -29,20 +29,20 @@ const submitContactForm = async (req, res) => {
 
     // Validate field lengths
     if (sanitizedData.name.length > 100) {
-      return res.status(400).json({ 
-        message: "Name is too long (max 100 characters)" 
+      return res.status(400).json({
+        message: "Name is too long (max 100 characters)",
       });
     }
 
     if (sanitizedData.subject.length > 200) {
-      return res.status(400).json({ 
-        message: "Subject is too long (max 200 characters)" 
+      return res.status(400).json({
+        message: "Subject is too long (max 200 characters)",
       });
     }
 
     if (sanitizedData.message.length > 5000) {
-      return res.status(400).json({ 
-        message: "Message is too long (max 5000 characters)" 
+      return res.status(400).json({
+        message: "Message is too long (max 5000 characters)",
       });
     }
 
@@ -51,9 +51,9 @@ const submitContactForm = async (req, res) => {
 
     if (!result.success) {
       console.error("[contactController] failed to send contact email", result);
-      return res.status(500).json({ 
+      return res.status(500).json({
         message: "Failed to send message. Please try again later.",
-        error: result.error || result.reason
+        error: result.error || result.reason,
       });
     }
 
@@ -63,14 +63,15 @@ const submitContactForm = async (req, res) => {
       subject: sanitizedData.subject,
     });
 
-    return res.status(200).json({ 
+    return res.status(200).json({
+      success: true,
       message: "Message sent successfully",
-      messageId: result.messageId
+      messageId: result.messageId,
     });
   } catch (error) {
     console.error("[contactController] error processing contact form", error);
-    return res.status(500).json({ 
-      message: "Server error. Please try again later." 
+    return res.status(500).json({
+      message: "Server error. Please try again later.",
     });
   }
 };

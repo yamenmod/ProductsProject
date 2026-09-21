@@ -159,14 +159,24 @@ function AdminDashboard({
             .map(([size, qty]) => ({ size, qty: Number(qty) }));
         }
 
+        const allSizesOutOfStock =
+          sizeStock &&
+          typeof sizeStock === "object" &&
+          Object.keys(sizeStock).length > 0 &&
+          Object.values(sizeStock).every((qty) => Number(qty) === 0);
+
+
+
+
         const overallLow = stock >= 0 && stock <= THRESHOLD;
 
-        return {
-          product,
-          overallLow,
-          lowSizes: lowSizes && lowSizes.length ? lowSizes : [],
-          stock,
-        };
+      return {
+        product,
+        overallLow,
+        allSizesOutOfStock,
+        lowSizes: lowSizes && lowSizes.length ? lowSizes : [],
+        stock,
+      };
       })
       //משאירים רק מוצרים עם מלאי נמוך.
       .filter(
@@ -682,12 +692,15 @@ function AdminDashboard({
                   const stock = Number(entry.stock ?? 0);
                   const hasLowSizes =
                     Array.isArray(entry.lowSizes) && entry.lowSizes.length;
-                  const statusLabel =
-                    stock === 0 && !hasLowSizes
-                      ? "Out of stock"
-                      : "Low stock";
-                  const statusColor =
-                    stock === 0 && !hasLowSizes ? "#a83f34" : "#245860";
+                const statusLabel =
+                  entry.allSizesOutOfStock || (stock === 0 && !hasLowSizes)
+                    ? "Out of stock"
+                    : "Low stock";
+
+                const statusColor =
+                  entry.allSizesOutOfStock || (stock === 0 && !hasLowSizes)
+                    ? "#a83f34"
+                    : "#245860";
 
                   return (
                     <div

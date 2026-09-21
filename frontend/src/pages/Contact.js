@@ -43,16 +43,21 @@ function Contact({
 
     try {
       const response = await axios.post("/api/contact/submit", formData);
-      
-      if (response.status === 200) {
+
+      if (response.status === 200 && response.data?.success === true) {
         setSubmitStatus("success");
         setFormData({ name: "", email: "", subject: "", message: "" });
+      } else {
+        setSubmitStatus("error");
+        setErrorMessage(
+          "The message was not confirmed as sent. Please try again.",
+        );
       }
     } catch (error) {
       setSubmitStatus("error");
       setErrorMessage(
-        error.response?.data?.message || 
-        "Failed to send message. Please try again later."
+        error.response?.data?.message ||
+          "Failed to send message. Please try again later.",
       );
     } finally {
       setIsSubmitting(false);
@@ -104,28 +109,17 @@ function Contact({
               },
             ].map((item) => (
               <div key={item.title} className="ps-surface contact-card">
-                <div className="contact-card-icon">
-                  {item.icon}
-                </div>
-                <h3 className="contact-card-title">
-                  {item.title}
-                </h3>
-                <p className="contact-card-value">
-                  {item.value}
-                </p>
+                <div className="contact-card-icon">{item.icon}</div>
+                <h3 className="contact-card-title">{item.title}</h3>
+                <p className="contact-card-value">{item.value}</p>
               </div>
             ))}
           </div>
 
           <div className="contact-panel">
-            <h2 className="contact-panel-title">
-              Send us a Message
-            </h2>
+            <h2 className="contact-panel-title">Send us a Message</h2>
 
-            <form
-              className="contact-form"
-              onSubmit={handleSubmit}
-            >
+            <form className="contact-form" onSubmit={handleSubmit}>
               <input
                 type="text"
                 name="name"
@@ -166,8 +160,8 @@ function Contact({
                 className="contact-textarea"
               />
 
-              <button 
-                type="submit" 
+              <button
+                type="submit"
                 className="ps-btn ps-btn-primary"
                 disabled={isSubmitting}
               >
@@ -175,13 +169,19 @@ function Contact({
               </button>
 
               {submitStatus === "success" && (
-                <p className="ps-lead" style={{ color: "#166534", marginTop: "16px" }}>
+                <p
+                  className="ps-lead"
+                  style={{ color: "#166534", marginTop: "16px" }}
+                >
                   Thank you for your message! We'll be in touch soon.
                 </p>
               )}
 
               {submitStatus === "error" && (
-                <p className="ps-lead" style={{ color: "#991b1b", marginTop: "16px" }}>
+                <p
+                  className="ps-lead"
+                  style={{ color: "#991b1b", marginTop: "16px" }}
+                >
                   {errorMessage}
                 </p>
               )}

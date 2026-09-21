@@ -1077,7 +1077,7 @@ const recommendBoards = async (req, res) => {
         message: "No surfboards available",
       });
     }
-    // target weight
+    // target weight 50 if 47 or 53 = perfect
     const targetVolume = weightNum / 2;
 
     const getBoardMatch = (boardVolume) => {
