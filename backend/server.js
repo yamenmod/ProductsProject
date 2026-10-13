@@ -109,4 +109,13 @@ app.listen(PORT, "0.0.0.0", () => {
   }
 };
 
+
+app.get("/", (req, res) => {
+  res.send("Choose My Board API is running!");
+});
+
+app.get("/health", (req, res) => {
+  res.status(200).json({ status: "ok" });
+});
+
 startServer();
