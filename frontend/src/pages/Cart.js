@@ -35,6 +35,7 @@ function Cart({
   cartItems = [],
   onRemoveFromCart,
   onUpdateCartQuantity,
+  onCartCleared,
   cartCount = 0,
   maxQuantityPerProduct,
 }) {
@@ -45,6 +46,9 @@ function Cart({
   const [isPayPalModalOpen, setIsPayPalModalOpen] = useState(false);
   const [paypalMessage, setPaypalMessage] = useState("");
   const [isPayPalLoading, setIsPayPalLoading] = useState(false);
+  const [isCashLoading, setIsCashLoading] = useState(false);
+  const [paypalUnavailable, setPaypalUnavailable] = useState(false);
+  const [cashSuccessMessage, setCashSuccessMessage] = useState("");
   const [vatRate, setVatRate] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [itemError, setItemError] = useState(null);
@@ -234,36 +238,68 @@ function Cart({
     }
   };
 
-  const openPayPalModal = () => {
+  const getCheckoutValidationError = () => {
     if (!session?.token) {
-      setErrorMessage("Please sign in to complete purchases.");
-      return;
+      return "Please sign in to complete purchases.";
     }
 
-    if (!paypalConfig) {
-      setErrorMessage(
-        "PayPal is not configured for this environment. Contact support.",
-      );
-      return;
-    }
-
-    // Check if there are inactive items first, since they cannot be bought.
     if (hasInactiveItems) {
-      setErrorMessage(
-        "One or more products in your cart are no longer available for purchase. Please remove them before checking out.",
-      );
-      return;
+      return "One or more products in your cart are no longer available for purchase. Please remove them before checking out.";
     }
 
-    // Check if there are out-of-stock items
     if (hasOutOfStockItems) {
-      setErrorMessage(
-        "Some products in your cart are out of stock. You've reached the stock limit. We apologize for the inconvenience. Please remove out-of-stock products or check back later for availability updates.",
-      );
+      return "Some products in your cart are out of stock. You've reached the stock limit. We apologize for the inconvenience. Please remove out-of-stock products or check back later for availability updates.";
+    }
+
+    if (hasItemsExceedingLimit) {
+      return "One or more products exceed the maximum quantity limit.";
+    }
+
+    return "";
+  };
+
+  const openPayPalModal = () => {
+    const validationError = getCheckoutValidationError();
+    if (validationError) {
+      setErrorMessage(validationError);
       return;
     }
 
+    setPaypalUnavailable(false);
     setIsPayPalModalOpen(true);
+  };
+
+  const handleCashCheckout = async () => {
+    const validationError = getCheckoutValidationError();
+    if (validationError) {
+      setErrorMessage(validationError);
+      return;
+    }
+
+    try {
+      setIsCashLoading(true);
+      setErrorMessage("");
+      const response = await axios.post(
+        "/api/cart/checkout",
+        {},
+        { headers: { Authorization: `Bearer ${session.token}` } },
+      );
+
+      setDisplayItems([]);
+      onCartCleared?.();
+      setIsPayPalModalOpen(false);
+      setCashSuccessMessage(
+        response.data?.message ||
+          "Your cash order has been placed successfully.",
+      );
+    } catch (error) {
+      setErrorMessage(
+        error.response?.data?.message ||
+          "Unable to place the cash order. Please try again.",
+      );
+    } finally {
+      setIsCashLoading(false);
+    }
   };
 
   // Initiate PayPal checkout by creating an order server-side and redirecting
@@ -271,12 +307,21 @@ function Cart({
   // fulfillment without payment.
   const handleBuyNow = async () => {
     if (!session?.token) {
-      alert("Please sign in to complete purchases.");
+      setErrorMessage(
+        "Please log in or create an account to complete purchases.",
+      );
+      return;
+    }
+
+    if (paypalConfig?.enabled === false) {
+      setPaypalUnavailable(true);
       return;
     }
 
     if (!paypalConfig) {
-      alert("PayPal is not configured for this environment. Contact support.");
+      setErrorMessage(
+        "PayPal is not configured for this environment. Contact support.",
+      );
       return;
     }
 
@@ -323,6 +368,11 @@ function Cart({
       });
 
       if (!response.data?.clientId) {
+        if (response.data?.enabled === false) {
+          setPaypalConfig(response.data);
+          return;
+        }
+
         setPaypalMessage("PayPal is not configured for this environment.");
         return;
       }
@@ -651,14 +701,32 @@ function Cart({
           </div>
 
           {displayItems.length === 0 ? (
-            <div
-              className="ps-surface"
-              style={{ padding: "40px", textAlign: "center" }}
-            >
-              <p style={{ margin: 0, fontSize: "18px", color: "#65574d" }}>
-                Your cart is empty. Add products from the home page or the shop.
-              </p>
-            </div>
+            <>
+              {cashSuccessMessage && (
+                <div
+                  className="ps-surface"
+                  style={{
+                    marginBottom: "20px",
+                    padding: "18px",
+                    border: "1px solid rgba(36, 88, 96, 0.2)",
+                    background: "rgba(124, 201, 205, 0.14)",
+                    color: "#245860",
+                    fontWeight: 700,
+                  }}
+                >
+                  {cashSuccessMessage}
+                </div>
+              )}
+              <div
+                className="ps-surface"
+                style={{ padding: "40px", textAlign: "center" }}
+              >
+                <p style={{ margin: 0, fontSize: "18px", color: "#65574d" }}>
+                  Your cart is empty. Add products from the home page or the
+                  shop.
+                </p>
+              </div>
+            </>
           ) : (
             <div style={{ display: "grid", gap: "24px" }}>
               {hasInactiveItems && !errorMessage && (
@@ -841,7 +909,9 @@ function Cart({
                         }
 
                         const isInactive =
-                          Number(item?.is_active ?? item?.product?.is_active ?? 0) !== 1;
+                          Number(
+                            item?.is_active ?? item?.product?.is_active ?? 0,
+                          ) !== 1;
 
                         if (isInactive) {
                           return (
@@ -853,8 +923,8 @@ function Cart({
                                 fontWeight: 700,
                               }}
                             >
-                              ⚠️ This product is no longer available for purchase.
-                              Please remove it from your cart.
+                              ⚠️ This product is no longer available for
+                              purchase. Please remove it from your cart.
                             </p>
                           );
                         }
@@ -1126,7 +1196,7 @@ function Cart({
             className="ps-cartConfirmCard"
             role="dialog"
             aria-modal="true"
-            aria-label="Pay with PayPal"
+            aria-label="Choose payment method"
             onClick={(event) => event.stopPropagation()}
             style={{
               maxWidth: "460px",
@@ -1148,7 +1218,7 @@ function Cart({
                   className="ps-cartConfirmTitle"
                   style={{ marginBottom: "8px" }}
                 >
-                  Pay with PayPal
+                  Choose payment method
                 </h2>
               </div>
               <button
@@ -1172,9 +1242,42 @@ function Cart({
             <p
               style={{ margin: "0 0 18px", color: "#65574d", lineHeight: 1.6 }}
             >
-              Your payment will open in PayPal's secure checkout window so you
-              can complete the purchase safely.
+              Select Cash or PayPal to continue with your order.
             </p>
+
+            {paypalUnavailable && (
+              <div
+                style={{
+                  display: "grid",
+                  gap: "14px",
+                  padding: "16px",
+                  marginBottom: "16px",
+                  borderRadius: "14px",
+                  background: "#fff3cd",
+                  border: "1px solid #e1b866",
+                  color: "#5f4b1f",
+                }}
+              >
+                <div>
+                  <h3 style={{ margin: "0 0 8px", color: "#3f3218" }}>
+                    PayPal Payments Temporarily Unavailable
+                  </h3>
+                  <p style={{ margin: 0, lineHeight: 1.6 }}>
+                    We're sorry, PayPal payments are currently unavailable. For
+                    now, we're accepting cash payments only. Thank you for your
+                    understanding.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="ps-btn ps-btn-primary"
+                  onClick={() => setPaypalUnavailable(false)}
+                  style={{ justifySelf: "start", padding: "10px 22px" }}
+                >
+                  OK
+                </button>
+              </div>
+            )}
 
             {paypalMessage && (
               <p
@@ -1189,6 +1292,15 @@ function Cart({
             )}
 
             <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+              <button
+                type="button"
+                className="ps-btn ps-btn-primary"
+                onClick={handleCashCheckout}
+                disabled={isCashLoading || isPayPalLoading}
+                style={{ padding: "12px 20px", minWidth: "180px" }}
+              >
+                {isCashLoading ? "Placing order..." : "Pay with Cash"}
+              </button>
               <button
                 type="button"
                 className="ps-btn"

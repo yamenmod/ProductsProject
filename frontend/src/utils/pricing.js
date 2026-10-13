@@ -58,7 +58,7 @@ const getVatAmount = (product) => {
   }
 
   return roundMoney(
-    getBasePrice(product) * (getCurrentVatRate() || DEFAULT_VAT_RATE),
+    getBasePrice(product) * (getCurrentVatRate() || DEFAULT_VAT_RATE), // vat rate
   );
 };
 

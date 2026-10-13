@@ -64,7 +64,7 @@ app.use((error, req, res, next) => {
 
   if (error.code === "LIMIT_FILE_SIZE") {
     return res.status(400).json({
-      message: "One of the images is too large. Max size is 20MB per file.",
+      message: "One of the images is too large. Max size is 30MB per file.",
     });
   }
 

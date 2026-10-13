@@ -21,6 +21,9 @@ const { syncOrderStatusFields } = require("../utils/orderStatus");
 
 const PAYPAL_CLIENT_ID = (process.env.PAYPAL_CLIENT_ID || "").trim();
 const PAYPAL_CLIENT_SECRET = (process.env.PAYPAL_CLIENT_SECRET || "").trim();
+const PAYPAL_ENABLED = !["false", "0", "off", "no"].includes(
+  (process.env.PAYPAL_ENABLED || "true").trim().toLowerCase(),
+);
 const PAYPAL_BASE_URL = (
   process.env.PAYPAL_BASE_URL || "https://api-m.sandbox.paypal.com"
 ).trim();
@@ -65,6 +68,12 @@ const isPayerNotApprovedError = (error) => {
     "payer has not yet approved the order for payment",
   );
 };
+
+const paypalUnavailableResponse = (res) =>
+  res.status(503).json({
+    message:
+      "PayPal Payments Temporarily Unavailable. We're sorry, PayPal payments are currently unavailable. For now, we're accepting cash payments only. Thank you for your understanding.",
+  });
 
 const logPayPalFlow = (step, details = {}) => {
   console.log(`[paypal:flow] ${step}`, details);
@@ -250,16 +259,15 @@ const quickCheckout = async (req, res) => {
 
     // Fetch max_quantity_per_cart setting
     const [settingRows] = await db.query(
-      "SELECT value FROM settings WHERE key_name = 'max_quantity_per_cart' LIMIT 1"
+      "SELECT value FROM settings WHERE key_name = 'max_quantity_per_cart' LIMIT 1",
     );
-    const maxQuantityPerProduct = settingRows.length > 0 
-      ? parseInt(settingRows[0].value, 10) 
-      : 12; // Default to 12 if not set
+    const maxQuantityPerProduct =
+      settingRows.length > 0 ? parseInt(settingRows[0].value, 10) : 12; // Default to 12 if not set
 
     // Validate quantity against max_quantity_per_product setting
     if (qty > maxQuantityPerProduct) {
       return res.status(400).json({
-        message: `Quantity exceeds the maximum limit of ${maxQuantityPerProduct} per product.`
+        message: `Quantity exceeds the maximum limit of ${maxQuantityPerProduct} per product.`,
       });
     }
 
@@ -856,7 +864,8 @@ const updateCartQuantity = async (req, res) => {
         const maxQtyPerCart = await getMaxQuantityPerCart();
         const validation = validateProductQuantityLimit({
           currentQuantity: existingItems[0].quantity || 0,
-          requestedQuantity: nextQuantity - Number(existingItems[0].quantity || 0),
+          requestedQuantity:
+            nextQuantity - Number(existingItems[0].quantity || 0),
           maxQuantityPerProduct: maxQtyPerCart,
         });
 
@@ -935,11 +944,10 @@ const checkout = async (req, res) => {
 
     // Fetch max_quantity_per_cart setting
     const [settingRows] = await db.query(
-      "SELECT value FROM settings WHERE key_name = 'max_quantity_per_cart' LIMIT 1"
+      "SELECT value FROM settings WHERE key_name = 'max_quantity_per_cart' LIMIT 1",
     );
-    const maxQuantityPerProduct = settingRows.length > 0 
-      ? parseInt(settingRows[0].value, 10) 
-      : 12; // Default to 12 if not set
+    const maxQuantityPerProduct =
+      settingRows.length > 0 ? parseInt(settingRows[0].value, 10) : 12; // Default to 12 if not set
 
     const [cartRows] = await db.query(
       `
@@ -982,7 +990,7 @@ const checkout = async (req, res) => {
       const qty = Number(row.quantity || 0);
       if (qty > maxQuantityPerProduct) {
         return res.status(400).json({
-          message: `Quantity for '${row.name}' exceeds the maximum limit of ${maxQuantityPerProduct}. Please update your cart.`
+          message: `Quantity for '${row.name}' exceeds the maximum limit of ${maxQuantityPerProduct}. Please update your cart.`,
         });
       }
     }
@@ -1010,7 +1018,9 @@ const checkout = async (req, res) => {
         if (!products.length) {
           await connection.rollback();
           connection.release();
-          return res.status(404).json({ message: `Product ${row.id} not found` });
+          return res
+            .status(404)
+            .json({ message: `Product ${row.id} not found` });
         }
 
         const product = products[0];
@@ -1085,11 +1095,19 @@ const checkout = async (req, res) => {
       for (const item of items) {
         await connection.query(
           "INSERT INTO order_items (order_id, product_id, name, price, quantity) VALUES (?, ?, ?, ?, ?)",
-          [orderId, item.product, item.displayName || item.name, item.finalPrice, item.quantity],
+          [
+            orderId,
+            item.product,
+            item.displayName || item.name,
+            item.finalPrice,
+            item.quantity,
+          ],
         );
       }
 
-      await connection.query("DELETE FROM cart_items WHERE user_id = ?", [req.user.id]);
+      await connection.query("DELETE FROM cart_items WHERE user_id = ?", [
+        req.user.id,
+      ]);
       await connection.commit();
       connection.release();
 
@@ -1115,6 +1133,13 @@ const checkout = async (req, res) => {
 // Exposes PayPal client-side configuration required by frontend checkout.
 const createPaypalConfig = async (req, res) => {
   try {
+    if (!PAYPAL_ENABLED) {
+      return res.status(200).json({
+        enabled: false,
+        message: "PayPal Payments Temporarily Unavailable",
+      });
+    }
+
     if (!PAYPAL_CLIENT_ID) {
       return res.status(500).json({
         message: "PayPal client ID is not configured",
@@ -1123,6 +1148,7 @@ const createPaypalConfig = async (req, res) => {
 
     return res.status(200).json({
       clientId: PAYPAL_CLIENT_ID,
+      enabled: true,
       currency: PAYPAL_CURRENCY,
       environment: "sandbox",
       baseUrl: PAYPAL_BASE_URL,
@@ -1135,6 +1161,10 @@ const createPaypalConfig = async (req, res) => {
 // Starts a PayPal order from the current cart and reserves stock via DB checks.
 const createPaypalOrder = async (req, res) => {
   try {
+    if (!PAYPAL_ENABLED) {
+      return paypalUnavailableResponse(res);
+    }
+
     logPayPalFlow("checkout-start", {
       userId: req.user?.id || null,
     });
@@ -1304,6 +1334,10 @@ const createPaypalOrder = async (req, res) => {
 // Captures approved PayPal checkout and persists order + payment atomically.
 const capturePaypalOrder = async (req, res) => {
   try {
+    if (!PAYPAL_ENABLED) {
+      return paypalUnavailableResponse(res);
+    }
+
     const { orderID } = req.body;
 
     if (!orderID) {
@@ -1341,7 +1375,7 @@ const capturePaypalOrder = async (req, res) => {
     ) {
       const [order] = await connection.query(
         "SELECT id FROM orders WHERE paypal_order_id = ? LIMIT 1",
-        [orderID]
+        [orderID],
       );
       connection.release();
       return res.status(200).json({
@@ -1422,7 +1456,7 @@ const capturePaypalOrder = async (req, res) => {
       if (existingPayments.length) {
         const [order] = await connection.query(
           "SELECT id FROM orders WHERE paypal_order_id = ? LIMIT 1",
-          [orderID]
+          [orderID],
         );
         orderId = order[0]?.id || null;
       }
@@ -1533,10 +1567,7 @@ const capturePaypalOrder = async (req, res) => {
 
         await connection.query(
           "INSERT INTO payments (paypal_order_id, status) VALUES (?, ?)",
-          [
-            orderID,
-            synced.status,
-          ],
+          [orderID, synced.status],
         );
       }
 
@@ -1558,10 +1589,7 @@ const capturePaypalOrder = async (req, res) => {
 
       await connection.query(
         "UPDATE payments SET status = ? WHERE paypal_order_id = ?",
-        [
-          finalSynced.status,
-          orderID,
-        ],
+        [finalSynced.status, orderID],
       );
 
       if (finalOrderStatus === ORDER_STATUS.SUCCESS) {
@@ -1736,7 +1764,7 @@ const markPaypalOrderAsUnsuccessful = async ({
 
   const [orderRows] = await db.query(
     "SELECT id FROM orders WHERE paypal_order_id = ? LIMIT 1",
-    [orderID]
+    [orderID],
   );
 
   return {
@@ -1876,6 +1904,10 @@ const handlePaypalCancelReturn = async (req, res) => {
 // Called by frontend when user cancels checkout before capture completes.
 const cancelPaypalOrder = async (req, res) => {
   try {
+    if (!PAYPAL_ENABLED) {
+      return paypalUnavailableResponse(res);
+    }
+
     const { orderID } = req.body;
 
     if (!orderID) {

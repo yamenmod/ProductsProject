@@ -32,8 +32,8 @@ const normalizeOptionalNumber = (value) => {
   return Number.isFinite(numericValue) ? numericValue : NaN;
 };
 
-function Login({ onLoginSuccess, onNavigate }) {
-  const [isRegister, setIsRegister] = useState(false);
+function Login({ onLoginSuccess, onNavigate, initialMode = false }) {
+  const [isRegister, setIsRegister] = useState(initialMode);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [email, setEmail] = useState("");
@@ -151,9 +151,15 @@ function Login({ onLoginSuccess, onNavigate }) {
 
         <div className="login-form">
           <div className="login-field">
-            <label className="login-label">Username</label>
+            <label className="login-label">
+              {isRegister ? "Username" : "Email or username"}
+            </label>
             <input
-              placeholder="Enter your username"
+              placeholder={
+                isRegister
+                  ? "Enter your username"
+                  : "Enter your email or username"
+              }
               value={username}
               onChange={(e) => setUsername(e.target.value)}
             />
@@ -228,7 +234,16 @@ function Login({ onLoginSuccess, onNavigate }) {
             className="ps-btn ps-btn-secondary login-toggle-button"
             onClick={() => setIsRegister(!isRegister)}
           >
-            {isRegister ? "Already registered? Sign In" : "Create an Account"}
+            {isRegister
+              ? "Already have an account? Login"
+              : "Create an Account"}
+          </button>
+          <button
+            type="button"
+            className="ps-btn ps-btn-primary login-home-button"
+            onClick={() => onNavigate("home")}
+          >
+            <span aria-hidden="true">←</span> Back to Home
           </button>
         </div>
       </div>

@@ -972,6 +972,11 @@ textarea {
   box-shadow: 0 12px 28px rgba(36, 88, 96, 0.24);
 }
 
+.ps-header-auth-button {
+  padding: 8px 14px;
+  font-size: 12px;
+}
+
 .ps-btn-secondary {
   padding: 8px 14px;
   font-size: 12px;

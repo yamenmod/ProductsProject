@@ -11,6 +11,7 @@ import { getBasePrice } from "../utils/pricing";
 import "./SurfSpots.css";
 
 function Products({
+  user,
   session,
   preferredGender,
   onPreferredGenderChange,
@@ -259,7 +260,10 @@ function Products({
     }
 
     const added = await handleAddToCart(product, size);
+
     if (added) {
+      onCloseCartSuccessModal();
+      onClearCartSuccessMessage();
       onNavigate("cart");
     }
   };
@@ -270,7 +274,12 @@ function Products({
     }
 
     const selectedSize = isClothingProduct(previewProduct) ? previewSize : "";
-    await handleAddToCart(previewProduct, selectedSize);
+
+    const added = await handleAddToCart(previewProduct, selectedSize);
+
+    if (added) {
+      closePreview();
+    }
   };
 
   const handlePreviewBuyNow = async () => {
@@ -279,7 +288,7 @@ function Products({
     }
 
     const selectedSize = isClothingProduct(previewProduct) ? previewSize : "";
-    await handleAddToCart(previewProduct, selectedSize);
+    await handleBuyNow(previewProduct, selectedSize);
   };
 
   const categories = ["All", "Surfboards", "Wetsuits", "Clothing"];
@@ -459,7 +468,7 @@ function Products({
   return (
     <div className="ps-page">
       <Header
-        user={session.user}
+        user={user}
         preferredGender={preferredGender}
         onPreferredGenderChange={onPreferredGenderChange}
         currentPage={currentPage}

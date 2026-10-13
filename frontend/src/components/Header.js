@@ -236,9 +236,9 @@ function Header({
           >
             <img src="/PlageSurf_LOGO.png" alt="Plage Surf" />
             <div>
-              <p className="ps-brand-title">Plage Surf</p> 
+              <p className="ps-brand-title">Plage Surf</p>
               <p className="ps-brand-sub">
-                Welcome back {user?.username || "user"}! 
+                Welcome back {user?.username || "user"}!
               </p>
             </div>
           </button>
@@ -299,7 +299,6 @@ function Header({
                       { name: "Surfboards", id: "surfboards" },
                       { name: "Wetsuits", id: "wetsuits" },
                       { name: "Clothing", id: "clothing" },
-                     
                     ].map((category) => (
                       <button
                         key={category.id}
@@ -424,7 +423,7 @@ function Header({
             </button>
           )}
 
-          {user && isCustomer && (
+          {(isCustomer || !user) && (
             <button
               type="button"
               className="ps-nav-link"
@@ -435,13 +434,23 @@ function Header({
             </button>
           )}
 
-          <button
-            type="button"
-            className="ps-btn ps-btn-secondary"
-            onClick={handleLogoutClick}
-          >
-            Logout
-          </button>
+          {user ? (
+            <button
+              type="button"
+              className="ps-btn ps-btn-primary ps-header-auth-button"
+              onClick={handleLogoutClick}
+            >
+              Logout
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="ps-btn ps-btn-primary ps-header-auth-button"
+              onClick={() => onNavigate("login")}
+            >
+              Login
+            </button>
+          )}
         </div>
       </div>
 

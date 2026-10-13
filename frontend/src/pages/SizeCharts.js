@@ -198,9 +198,9 @@ function SizeCharts({
     .filter(
       (product) =>
         (product.category || "").toString().trim().toLowerCase() ===
-          "wetsuits" && canViewProduct(product),
+          "wetsuits" && canViewProduct(product), 
     )
-    .slice(0, 4);
+    .slice(0, 3); // first 3 products
 
   const resolveImageSrc = (imagePath) => {
     if (!imagePath) return "https://via.placeholder.com/420x520?text=Wetsuit";

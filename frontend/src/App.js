@@ -28,8 +28,6 @@ import Profile from "./pages/Profile";
 
 import MyOrders from "./pages/MyOrders";
 
-
-
 const normalizeCartItems = (payload = []) => {
   const items = Array.isArray(payload)
     ? payload
@@ -63,8 +61,6 @@ const normalizeCartItems = (payload = []) => {
   });
 };
 
-
-
 const extractProductId = (value) => {
   const rawId =
     value?.id ||
@@ -82,13 +78,16 @@ const extractProductId = (value) => {
   return Number.isFinite(numericId) ? numericId : rawId;
 };
 
-
+const protectedPages = new Set(["cart", "my-orders", "profile"]);
 
 function App() {
-
   const [session, setSession] = useState(null);
 
-  const [currentPage, setCurrentPage] = useState("login");
+  const [currentPage, setCurrentPage] = useState("home");
+  const [loginReturnPage, setLoginReturnPage] = useState("home");
+  const [guestPreferredGender, setGuestPreferredGender] = useState(() =>
+    localStorage.getItem("preferredGender") === "female" ? "female" : "male",
+  );
 
   const [selectedCategory, setSelectedCategory] = useState("");
 
@@ -101,56 +100,42 @@ function App() {
   const [cartErrorMessage, setCartErrorMessage] = useState("");
   const [showCartSuccessModal, setShowCartSuccessModal] = useState(false);
   const [showCartErrorModal, setShowCartErrorModal] = useState(false);
+  const [showAuthPrompt, setShowAuthPrompt] = useState(false);
+  const [startAuthInRegister, setStartAuthInRegister] = useState(false);
   const [maxQuantityPerProduct, setMaxQuantityPerProduct] = useState(10);
 
   const [paymentSuccess, setPaymentSuccess] = useState(null);
 
-
-
   const handleSessionUpdate = useCallback((nextUser) => {
-
     setSession((previousSession) => {
-
       if (!previousSession) {
-
         return previousSession;
-
       }
 
-
-
       const updatedSession = {
-
         ...previousSession,
 
         user: {
-
           ...previousSession.user,
 
           ...nextUser,
-
         },
-
       };
-
-
 
       localStorage.setItem("session", JSON.stringify(updatedSession));
 
       return updatedSession;
-
     });
-
   }, []);
-
-
 
   // Restore the saved session so refreshes keep the user logged in.
   // If a session exists, admin users are taken to the admin dashboard.
   useEffect(() => {
     const loadMaxQuantityPerProduct = async () => {
       try {
-        const response = await axios.get("/api/admin/settings/max_quantity_per_cart");
+        const response = await axios.get(
+          "/api/admin/settings/max_quantity_per_cart",
+        );
         const value = Number(response.data?.value || 10);
         console.log("[App] Loaded maxQuantityPerCart from API:", value);
         setMaxQuantityPerProduct(value);
@@ -165,7 +150,8 @@ function App() {
 
     if (savedSession) {
       const parsedSession = JSON.parse(savedSession);
-      const normalizedGender = parsedSession.preferredGender === "female" ? "female" : "male";
+      const normalizedGender =
+        parsedSession.preferredGender === "female" ? "female" : "male";
       const restoredSession = {
         ...parsedSession,
         user: parsedSession.user
@@ -191,10 +177,13 @@ function App() {
             handleSessionUpdate(profileUser);
           })
           .catch((error) => {
-            if (error.response?.status === 401 || error.response?.status === 403) {
+            if (
+              error.response?.status === 401 ||
+              error.response?.status === 403
+            ) {
               localStorage.removeItem("session");
               setSession(null);
-              setCurrentPage("login");
+              setCurrentPage("home");
             }
           });
       }
@@ -202,12 +191,17 @@ function App() {
       // Restore saved page from localStorage, or use default based on role
       const savedPage = localStorage.getItem("currentPage");
       const isAdmin = parsedSession.user?.role === "admin";
-      
+
       if (savedPage) {
         // Check if the saved page is appropriate for the user's role
-        const adminPages = ["manage-orders", "manage-products", "manage-customers", "admin-dashboard"];
+        const adminPages = [
+          "manage-orders",
+          "manage-products",
+          "manage-customers",
+          "admin-dashboard",
+        ];
         const isSavedPageAdmin = adminPages.includes(savedPage);
-        
+
         if (isAdmin || !isSavedPageAdmin) {
           setCurrentPage(savedPage);
         } else {
@@ -249,7 +243,8 @@ function App() {
         const saved = sessionStr ? JSON.parse(sessionStr) : null;
 
         if (!saved || !saved.token) {
-          alert("Please sign in to complete PayPal payment.");
+          setShowAuthPrompt(true);
+          setLoginReturnPage("home");
         } else {
           (async () => {
             try {
@@ -287,9 +282,14 @@ function App() {
                 setCartItems(normalizeCartItems(refreshed.data));
               }
             } catch (err) {
-              console.error("PayPal return handling error:", err?.response || err);
+              console.error(
+                "PayPal return handling error:",
+                err?.response || err,
+              );
               setPaymentSuccess({
-                title: isPaypalCancel ? "Checkout cancelled" : "Payment could not be completed",
+                title: isPaypalCancel
+                  ? "Checkout cancelled"
+                  : "Payment could not be completed",
                 message:
                   err?.response?.data?.message ||
                   "Please try again or contact support if the issue continues.",
@@ -337,7 +337,7 @@ function App() {
         if (error.response?.status === 401 || error.response?.status === 403) {
           localStorage.removeItem("session");
           setSession(null);
-          setCurrentPage("login");
+          setCurrentPage("home");
         }
       });
 
@@ -376,20 +376,29 @@ function App() {
     };
   }, [session?.token, session?.user?.role]);
 
- // save refresh/savef5
- 
+  // save refresh/savef5
+
   const handleNavigate = (page, categoryOrData) => {
+    if (page === "login") {
+      setLoginReturnPage(currentPage === "login" ? "home" : currentPage);
+      setCurrentPage("login");
+      return;
+    }
+
+    if (protectedPages.has(page) && !session) {
+      setLoginReturnPage(currentPage === "login" ? "home" : currentPage);
+      setStartAuthInRegister(false);
+      setCurrentPage("login");
+      return;
+    }
+
     // Save current page to localStorage for persistence on refresh
     localStorage.setItem("currentPage", page);
 
     const isAdmin = session?.user?.role === "admin";
 
-
-
     if (
-
       [
-
         "manage-orders",
 
         "manage-products",
@@ -397,370 +406,232 @@ function App() {
         "manage-customers",
 
         "admin-dashboard",
-
       ].includes(page) &&
-
       !isAdmin
-
     ) {
-
       setCurrentPage("home");
 
       return;
-
     }
 
-
-
     if (page === "manage-products") {
-
       if (categoryOrData && typeof categoryOrData === "object") {
-
         setSelectedProductToEdit(categoryOrData);
 
         setCurrentPage(page);
 
         return;
-
       }
 
       setSelectedProductToEdit(null);
-
     } else {
-
       setSelectedProductToEdit(null);
-
     }
 
- ////////
+    ////////
 
     if (
-
       isAdmin &&
-
       ["home", "shop", "size-charts", "contact", "products", "cart"].includes(
-
         page,
-
       )
-
     ) {
-
       setCurrentPage("admin-dashboard");
 
       return;
-
     }
-
-
 
     setCurrentPage(page);
 
     if (page === "manage-orders" && typeof categoryOrData === "string") {
-
       setSelectedOrderFilter(categoryOrData);
-
     }
-
-
 
     if (page !== "manage-orders" && typeof categoryOrData !== "undefined") {
-
       setSelectedCategory(categoryOrData);
-
     }
-
   };
-
-
 
   // Adds cart items through the backend API so every cart action is persisted.
 
   // If an API cart array is passed in, we only sync state without another request.
 
   const handleAddToCart = async (productOrCart) => {
+    if (!session?.token) {
+      setLoginReturnPage(currentPage === "login" ? "home" : currentPage);
+      setStartAuthInRegister(false);
+      setShowAuthPrompt(true);
+      return false;
+    }
 
     if (Array.isArray(productOrCart)) {
-
       setCartItems(normalizeCartItems(productOrCart));
 
       return true;
-
     }
-
-
 
     if (!session?.token) {
-
       return false;
-
     }
-
-
 
     const productId = extractProductId(productOrCart);
 
-
-
     if (productId === null) {
-
       return false;
-
     }
 
-
     try {
-
       await axios.post(
-
         "/api/cart",
 
         { productId, quantity: 1, size: productOrCart?.size || "" },
 
         {
-
           headers: {
-
             Authorization: `Bearer ${session.token}`,
-
           },
-
         },
-
       );
 
-
-
       const refreshedCart = await axios.get("/api/cart", {
-
         headers: {
-
           Authorization: `Bearer ${session.token}`,
-
         },
-
       });
-
-
 
       setCartItems(normalizeCartItems(refreshedCart.data));
       setShowCartSuccessModal(true);
       return true;
-
     } catch (error) {
-
       console.error("Add to cart failed:", error.message);
       const errorMsg = error.response?.data?.message || error.message;
       setCartErrorMessage(errorMsg);
       setShowCartErrorModal(true);
       return false;
-
     }
-
   };
 
-
-
   const handleRemoveFromCart = async (productId, size = "") => {
-
     if (!productId || !session?.token) {
-
       return;
-
     }
 
-
-
     try {
-
       const response = await axios.delete(`/api/cart/${productId}`, {
-
         headers: {
-
           Authorization: `Bearer ${session.token}`,
-
         },
 
         params: size ? { size } : undefined,
-
       });
-
-
 
       const updatedCart = normalizeCartItems(response.data);
 
       setCartItems(updatedCart);
-
     } catch (error) {
-
       console.error("Remove from cart failed:", error.message);
-
     }
-
   };
 
-
-
   const handleUpdateCartQuantity = async (productId, quantity, size = "") => {
-
     if (!productId || !session?.token) {
-
       return;
-
     }
 
-
-
     try {
-
       const response = await axios.patch(
-
         `/api/cart/${productId}`,
 
         { quantity },
 
         {
-
           headers: {
-
             Authorization: `Bearer ${session.token}`,
-
           },
 
           params: size ? { size } : undefined,
-
         },
-
       );
 
-
-
       setCartItems(normalizeCartItems(response.data));
-
     } catch (error) {
-
       console.error("Update cart quantity failed:", error.message);
-
     }
-
   };
 
-
-
   const handlePreferredGenderChange = (nextGender) => {
-
     const normalizedGender = nextGender === "female" ? "female" : "male";
 
-
+    setGuestPreferredGender(normalizedGender);
+    localStorage.setItem("preferredGender", normalizedGender);
 
     setSession((previousSession) => {
-
       if (!previousSession) {
-
         return previousSession;
-
       }
 
-
-
       const updatedSession = {
-
         ...previousSession,
 
         preferredGender: normalizedGender,
-
       };
-
-
 
       localStorage.setItem("session", JSON.stringify(updatedSession));
 
       return updatedSession;
-
     });
-
   };
 
-
-
   const preferredGender =
-
-    session?.preferredGender === "female" ? "female" : "male";
-
-
+    session?.preferredGender === "female"
+      ? "female"
+      : session?.preferredGender === "male"
+        ? "male"
+        : guestPreferredGender;
 
   const cartCount = cartItems.reduce(
-
     (total, item) => total + (Number(item.quantity) || 0),
 
     0,
-
   );
 
-
-
   function logout() {
-
     localStorage.removeItem("session");
+    localStorage.setItem("currentPage", "home");
 
     setCartItems([]);
 
     setSession(null);
-
+    setCurrentPage("home");
   }
 
-
-
   const dismissPaymentSuccess = () => {
-
     setPaymentSuccess(null);
-
   };
 
-
-
   const paymentSuccessModal = paymentSuccess ? (
-
     <div
-
       className="ps-cartConfirmBackdrop"
-
       onClick={dismissPaymentSuccess}
-
       role="presentation"
-
     >
-
       <div
-
         className="ps-cartConfirmCard"
-
         role="dialog"
-
         aria-modal="true"
-
         aria-label="Payment confirmation"
-
         onClick={(event) => event.stopPropagation()}
-
         style={{
-
           maxWidth: "520px",
 
           width: "calc(100% - 32px)",
 
           padding: "28px",
-
         }}
-
       >
-
         <div style={{ display: "flex", gap: "14px", alignItems: "flex-start" }}>
-
           <div
-
             style={{
-
               width: "44px",
 
               height: "44px",
@@ -784,59 +655,40 @@ function App() {
               flexShrink: 0,
 
               boxShadow: "0 10px 18px rgba(0, 48, 135, 0.18)",
-
             }}
-
           >
-
             ✓
-
           </div>
 
-
-
           <div style={{ flex: 1 }}>
-
             <h2 className="ps-cartConfirmTitle" style={{ marginBottom: "8px" }}>
-
               {paymentSuccess.title}
-
             </h2>
 
             {paymentSuccess.title !== "Payment could not be completed" && (
               <p className="ps-cartConfirmText" style={{ marginBottom: "8px" }}>
-
                 {paymentSuccess.message}
-
               </p>
             )}
 
             {paymentSuccess.title !== "Payment could not be completed" && (
               <p
-
-                style={{ margin: "0 0 18px", color: "#65574d", fontSize: "13px" }}
-
+                style={{
+                  margin: "0 0 18px",
+                  color: "#65574d",
+                  fontSize: "13px",
+                }}
               >
-
                 Order reference: {paymentSuccess.orderId}
-
               </p>
             )}
-
           </div>
 
-
-
           <button
-
             type="button"
-
             onClick={dismissPaymentSuccess}
-
             aria-label="Close payment confirmation"
-
             style={{
-
               border: "none",
 
               background: "transparent",
@@ -850,23 +702,14 @@ function App() {
               cursor: "pointer",
 
               padding: 0,
-
             }}
-
           >
-
             ×
-
           </button>
-
         </div>
 
-
-
         <div
-
           style={{
-
             display: "flex",
 
             gap: "12px",
@@ -874,117 +717,126 @@ function App() {
             flexWrap: "wrap",
 
             marginTop: "8px",
-
           }}
-
         >
-
           <button
-
             type="button"
-
             className="ps-btn ps-btn-primary"
-
             onClick={() => {
-
               dismissPaymentSuccess();
 
               setCurrentPage("home");
-
             }}
-
             style={{ padding: "12px 18px", background: "#000000" }}
-
           >
-
             Continue shopping
-
           </button>
 
           {paymentSuccess.title !== "Payment could not be completed" && (
             <button
-
               type="button"
-
               className="ps-btn ps-btn-primary"
-
               onClick={() => {
-
                 dismissPaymentSuccess();
 
                 setCurrentPage("my-orders");
-
               }}
-
               style={{ padding: "12px 18px", background: "#245860" }}
-
             >
-
               View Order
-
             </button>
           )}
 
           <button
-
             type="button"
-
             className="ps-btn ps-btn-secondary"
-
             onClick={dismissPaymentSuccess}
-
             style={{ padding: "12px 18px" }}
-
           >
-
             Close
-
           </button>
-
         </div>
-
       </div>
-
     </div>
-
   ) : null;
 
-
+  const authPromptModal = showAuthPrompt ? (
+    <div
+      className="ps-cartConfirmBackdrop"
+      onClick={() => setShowAuthPrompt(false)}
+      role="presentation"
+    >
+      <div
+        className="ps-cartConfirmCard"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="auth-prompt-title"
+        onClick={(event) => event.stopPropagation()}
+        style={{ maxWidth: "460px", width: "calc(100% - 32px)" }}
+      >
+        <h2 id="auth-prompt-title" className="ps-cartConfirmTitle">
+          Sign in to continue
+        </h2>
+        <p className="ps-cartConfirmText">
+          Please log in or create an account to add products to your cart.
+        </p>
+        <div className="ps-cartConfirmActions">
+          <button
+            type="button"
+            className="ps-btn ps-btn-primary"
+            onClick={() => {
+              setShowAuthPrompt(false);
+              setStartAuthInRegister(false);
+              setCurrentPage("login");
+            }}
+          >
+            Login
+          </button>
+          <button
+            type="button"
+            className="ps-btn ps-btn-secondary"
+            onClick={() => {
+              setShowAuthPrompt(false);
+              setStartAuthInRegister(true);
+              setCurrentPage("login");
+            }}
+          >
+            Create Account
+          </button>
+          <button
+            type="button"
+            className="ps-btn ps-cartConfirmCancel"
+            onClick={() => setShowAuthPrompt(false)}
+          >
+            Continue browsing
+          </button>
+        </div>
+      </div>
+    </div>
+  ) : null;
 
   const withPaymentSuccessModal = (content) => (
-
     <>
-
       {content}
 
       {paymentSuccessModal}
-
+      {authPromptModal}
     </>
-
   );
 
-
-
-  if (!session) {
-
+  if (currentPage === "login") {
     return withPaymentSuccessModal(
-
       <Login
-
+        initialMode={startAuthInRegister}
         onLoginSuccess={(authSession) => {
-
           const nextSession = {
-
             ...authSession,
             user: {
               ...(authSession?.user || {}),
               role: authSession?.user?.role ?? authSession?.role ?? null,
             },
-            preferredGender: "male",
-
+            preferredGender: guestPreferredGender,
           };
-
-
 
           console.log("LOGIN RESPONSE:", authSession);
           console.log("NEXT SESSION:", nextSession);
@@ -992,456 +844,238 @@ function App() {
           localStorage.setItem("session", JSON.stringify(nextSession));
 
           setSession(nextSession);
+          setStartAuthInRegister(false);
 
           setCurrentPage(
-
-            nextSession.user?.role === "admin" ? "admin-dashboard" : "home",
-
+            nextSession.user?.role === "admin"
+              ? "admin-dashboard"
+              : loginReturnPage || "home",
           );
-
         }}
-
-        onNavigate={setCurrentPage}
-
+        onNavigate={handleNavigate}
       />,
-
     );
-
   }
-
-
 
   // Each page is rendered manually because the app uses role-aware shell logic.
 
   // The admin pages are only reachable when the user role is admin.
 
   if (currentPage === "home") {
-
     return withPaymentSuccessModal(
-
       <Home
-
-        user={session.user}
-
+        user={session?.user}
         session={session}
-
         preferredGender={preferredGender}
-
         currentPage={currentPage}
-
         onNavigate={handleNavigate}
-
         onAddToCart={handleAddToCart}
-
         onPreferredGenderChange={handlePreferredGenderChange}
-
         onLogout={logout}
-
         cartCount={cartCount}
-
         cartSuccessMessage={cartSuccessMessage}
-
         cartErrorMessage={cartErrorMessage}
-
         onClearCartSuccessMessage={() => setCartSuccessMessage("")}
-
         onClearCartErrorMessage={() => setCartErrorMessage("")}
-
         showCartSuccessModal={showCartSuccessModal}
-
         onCloseCartSuccessModal={() => setShowCartSuccessModal(false)}
-
         showCartErrorModal={showCartErrorModal}
-
         onCloseCartErrorModal={() => setShowCartErrorModal(false)}
-
         maxQuantityPerProduct={maxQuantityPerProduct}
-
       />,
-
     );
-
   }
-
-
 
   if (currentPage === "shop") {
-
     return withPaymentSuccessModal(
-
       <Shop
-
-        user={session.user}
-
+        user={session?.user}
         preferredGender={preferredGender}
-
         currentPage={currentPage}
-
         onNavigate={handleNavigate}
-
         onPreferredGenderChange={handlePreferredGenderChange}
-
         onLogout={logout}
-
         cartCount={cartCount}
-
       />,
-
     );
-
   }
-
-
 
   if (currentPage === "contact") {
-
     return withPaymentSuccessModal(
-
       <Contact
-
-        user={session.user}
-
+        user={session?.user}
         preferredGender={preferredGender}
-
         currentPage={currentPage}
-
         onNavigate={handleNavigate}
-
         onPreferredGenderChange={handlePreferredGenderChange}
-
         onLogout={logout}
-
         cartCount={cartCount}
-
       />,
-
     );
-
   }
-
-
 
   if (currentPage === "profile") {
-
     return withPaymentSuccessModal(
-
       <Profile
-
         session={session}
-
-        user={session.user}
-
+        user={session?.user}
         preferredGender={preferredGender}
-
         currentPage={currentPage}
-
         onNavigate={handleNavigate}
-
         onPreferredGenderChange={handlePreferredGenderChange}
-
         onLogout={logout}
-
         cartCount={cartCount}
-
         onSessionUpdate={handleSessionUpdate}
-
       />,
-
     );
-
   }
-
-
 
   if (currentPage === "size-charts") {
-
     return withPaymentSuccessModal(
-
       <SizeCharts
-
-        user={session.user}
-
+        user={session?.user}
         session={session}
-
         preferredGender={preferredGender}
-
         currentPage={currentPage}
-
         onNavigate={handleNavigate}
-
         onAddToCart={handleAddToCart}
-
         onPreferredGenderChange={handlePreferredGenderChange}
-
         onLogout={logout}
-
         cartCount={cartCount}
-
         cartSuccessMessage={cartSuccessMessage}
-
         cartErrorMessage={cartErrorMessage}
-
         onClearCartSuccessMessage={() => setCartSuccessMessage("")}
-
         onClearCartErrorMessage={() => setCartErrorMessage("")}
-
         showCartSuccessModal={showCartSuccessModal}
-
         onCloseCartSuccessModal={() => setShowCartSuccessModal(false)}
-
         showCartErrorModal={showCartErrorModal}
-
         onCloseCartErrorModal={() => setShowCartErrorModal(false)}
-
         maxQuantityPerProduct={maxQuantityPerProduct}
-
       />,
-
     );
-
   }
-
-
 
   if (currentPage === "products") {
-
     return withPaymentSuccessModal(
-
       <Products
-
+        user={session?.user}
         session={session}
-
         preferredGender={preferredGender}
-
         currentPage={currentPage}
-
         selectedCategory={selectedCategory}
-
         cartItems={cartItems}
-
         onAddToCart={handleAddToCart}
-
         onNavigate={handleNavigate}
-
         onPreferredGenderChange={handlePreferredGenderChange}
-
         onLogout={logout}
-
         cartCount={cartCount}
-
         cartSuccessMessage={cartSuccessMessage}
-
         cartErrorMessage={cartErrorMessage}
-
         onClearCartSuccessMessage={() => setCartSuccessMessage("")}
-
         onClearCartErrorMessage={() => setCartErrorMessage("")}
-
         showCartSuccessModal={showCartSuccessModal}
-
         onCloseCartSuccessModal={() => setShowCartSuccessModal(false)}
-
         showCartErrorModal={showCartErrorModal}
-
         onCloseCartErrorModal={() => setShowCartErrorModal(false)}
-
         maxQuantityPerProduct={maxQuantityPerProduct}
-
       />,
-
     );
-
   }
-
-
 
   if (currentPage === "cart") {
-
     return withPaymentSuccessModal(
-
       <Cart
-
         session={session}
-
         user={session.user}
-
         preferredGender={preferredGender}
-
         currentPage={currentPage}
-
         onNavigate={handleNavigate}
-
         onPreferredGenderChange={handlePreferredGenderChange}
-
         onLogout={logout}
-
         cartItems={cartItems}
-
         onRemoveFromCart={handleRemoveFromCart}
-
         onUpdateCartQuantity={handleUpdateCartQuantity}
-
+        onCartCleared={() => setCartItems([])}
         cartCount={cartCount}
-
         maxQuantityPerProduct={maxQuantityPerProduct}
-
       />,
-
     );
-
   }
-
-
 
   if (currentPage === "my-orders") {
-
     return withPaymentSuccessModal(
-
       <MyOrders
-
         session={session}
-
         user={session.user}
-
         onNavigate={handleNavigate}
-
       />,
-
     );
-
   }
-
-
 
   if (currentPage === "manage-orders") {
-
     return withPaymentSuccessModal(
-
       <ManageOrders
-
         session={session}
-
         currentPage={currentPage}
-
         onNavigate={handleNavigate}
-
         preferredGender={preferredGender}
-
         onPreferredGenderChange={handlePreferredGenderChange}
-
         onLogout={logout}
-
         cartCount={cartCount}
-
         initialFilter={selectedOrderFilter}
-
       />,
-
     );
-
   }
-
-
 
   if (currentPage === "manage-products") {
-
     return withPaymentSuccessModal(
-
       <ManageProducts
-
         session={session}
-
         currentPage={currentPage}
-
         onNavigate={handleNavigate}
-
         preferredGender={preferredGender}
-
         onPreferredGenderChange={handlePreferredGenderChange}
-
         onLogout={logout}
-
         cartCount={cartCount}
-
         initialProductToEdit={selectedProductToEdit}
-
       />,
-
     );
-
   }
-
-
 
   if (currentPage === "manage-customers") {
-
     return withPaymentSuccessModal(
-
       <ManageCustomers
-
         session={session}
-
         currentPage={currentPage}
-
         onNavigate={handleNavigate}
-
         preferredGender={preferredGender}
-
         onPreferredGenderChange={handlePreferredGenderChange}
-
         onLogout={logout}
-
         cartCount={cartCount}
-
       />,
-
     );
-
   }
 
-
-
   if (currentPage === "admin-dashboard") {
-
     return withPaymentSuccessModal(
-
       <AdminDashboard
-
         session={session}
-
         currentPage={currentPage}
-
         onNavigate={handleNavigate}
-
         preferredGender={preferredGender}
-
         onPreferredGenderChange={handlePreferredGenderChange}
-
         onLogout={logout}
-
         cartCount={cartCount}
-
         onOpenOrders={(filter) => {
-
           setSelectedOrderFilter(filter);
 
           setCurrentPage("manage-orders");
-
         }}
-
       />,
-
     );
-
   }
 
-
-
   return null;
-
 }
 
-
-
 export default App;
-

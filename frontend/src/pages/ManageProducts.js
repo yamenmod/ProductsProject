@@ -75,7 +75,7 @@ function ManageProducts({
   for (let feet = 4; feet <= 10; feet++) {
     for (let inches = 0; inches <= 11; inches++) {
       if (inches === 0) {
-        heightOptions.push(`${feet}.0`);
+        heightOptions.push(`${feet}.0`); //generate height
       } else {
         heightOptions.push(`${feet}.${inches}`);
       }

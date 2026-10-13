@@ -145,19 +145,20 @@ const register = async (req, res) => {
 // Validates credentials and returns the authenticated session payload.
 const login = async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { username, email, password } = req.body;
+    const identifier = (email || username || "").trim();
 
-    console.log("🔐 LOGIN REQUEST:", { username });
+    console.log("🔐 LOGIN REQUEST:", { identifier });
 
-    if (!username || !password) {
+    if (!identifier || !password) {
       return res
         .status(400)
         .json({ message: "Username and password are required" });
     }
 
     const [users] = await db.query(
-      "SELECT id, username, email, password, role, is_active, weight, height FROM users WHERE username = ? LIMIT 1",
-      [username.trim()],
+      "SELECT id, username, email, password, role, is_active, weight, height FROM users WHERE username = ? OR email = ? LIMIT 1",
+      [identifier, identifier.toLowerCase()],
     );
 
     const user = users[0];

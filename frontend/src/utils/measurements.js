@@ -1,6 +1,6 @@
 export const MEASUREMENT_LIMITS = {
-  weight: { label: "Weight", minimum: 30, maximum: 150, unit: "kg" },
-  height: { label: "Height", minimum: 120, maximum: 220, unit: "cm" },
+  weight: { label: "Weight", minimum: 30, maximum: 150, unit: "kg" }, // measurement
+  height: { label: "Height", minimum: 120, maximum: 220, unit: "cm" }, 
 };
 
 export const getMeasurementValidationError = (

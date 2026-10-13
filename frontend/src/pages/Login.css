@@ -59,3 +59,12 @@
 .login-toggle-button:hover {
   background-color: #8a441d;
 }
+
+.login-home-button {
+  gap: 8px;
+}
+
+.login-home-button span {
+  font-size: 18px;
+  line-height: 1;
+}

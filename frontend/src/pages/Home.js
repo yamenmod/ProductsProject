@@ -36,6 +36,7 @@ function Home({
   const [previewSize, setPreviewSize] = useState("");
   const [cardImageIndices, setCardImageIndices] = useState({});
 
+  const clothingRailRef = useRef(null);
   const surfboardRailRef = useRef(null);
   const wetsuitRailRef = useRef(null);
   const swipeStartXRef = useRef(null);
@@ -261,6 +262,15 @@ function Home({
     )
     .slice(0, 3);
 
+  // 3 newest visible clothing products.
+  const clothingProducts = recentProducts
+    .filter(
+      (product) =>
+        normalizeCategoryValue(product.category) === "clothing" &&
+        canViewProduct(product),
+    )
+    .slice(0, 3);
+
   // 3 newest visible wetsuits.
   const wetsuitProducts = recentProducts
     .filter(
@@ -327,7 +337,8 @@ function Home({
     swipeStartXRef.current = null;
   };
 
-  const goToCardImage = (productId, imageCount, delta) => { //products picture arrow
+  const goToCardImage = (productId, imageCount, delta) => {
+    //products picture arrow
     if (!productId || imageCount < 2) {
       return;
     }
@@ -394,14 +405,9 @@ function Home({
     await addProductToCart(product);
   };
 
-  const renderRecentSection = ({
-    title,
-    pill,
-    description,
-    products,
-    categorySlug,
-    railRef,
-  }) => (
+  const renderRecentSection = (
+    { title, pill, description, products, categorySlug, railRef }, // scroll right/left
+  ) => (
     <section className="ps-dropsSection">
       <div className="ps-shell ps-dropsLayout">
         <div className="ps-dropsIntro">
@@ -550,6 +556,7 @@ function Home({
   );
 
   return (
+    // scroll left/right
     <div className="ps-page">
       <Header
         user={user}
@@ -684,6 +691,15 @@ function Home({
 
         {renderRecentSection({
           title: "Just Dropped",
+          pill: "Clothing",
+          description: "Fresh beachwear for every session.",
+          products: clothingProducts,
+          categorySlug: "clothing",
+          railRef: clothingRailRef,
+        })}
+
+        {renderRecentSection({
+          title: "Just Dropped",
           pill: "New arrivals",
           description: "Check the latest.",
           products: surfboardProducts,
@@ -753,7 +769,7 @@ function Home({
                   alt={previewProduct.name || "Product preview"}
                 />
 
-                {previewImages.length > 1 && (
+                {previewImages.length > 1 && ( // products picture arrow
                   <>
                     <button
                       type="button"

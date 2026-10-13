@@ -660,7 +660,7 @@ function AdminDashboard({
                 <input
                   type="search"
                   value={watchlistSearch}
-                  onChange={(event) => setWatchlistSearch(event.target.value)}
+                  onChange={(event) => setWatchlistSearch(event.target.value)} // stock watch search/ search stock
                   placeholder="Search watchlist by product name"
                   style={{
                     width: "100%",

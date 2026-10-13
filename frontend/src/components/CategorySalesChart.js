@@ -2,6 +2,7 @@
  * CategorySalesChart Component
  * Displays a vertical bar chart of sales by product within a category
  * Uses actual sales data from successful orders
+ * Displays a maximum of 5 products
  */
 import React, { useEffect, useState } from "react";
 import axios from "axios";
@@ -26,17 +27,27 @@ function CategorySalesChart({ session, category, fromDate, toDate }) {
 
       try {
         const params = { category };
+
         if (fromDate) params.fromDate = fromDate;
         if (toDate) params.toDate = toDate;
 
         const response = await axios.get("/api/admin/category-sales", {
-          headers: { Authorization: `Bearer ${session.token}` },
+          headers: {
+            Authorization: `Bearer ${session.token}`,
+          },
           params,
         });
-        setCategoryProducts(Array.isArray(response.data) ? response.data : []);
+
+        const products = Array.isArray(response.data) ? response.data : [];
+
+        // Show a maximum of 5 products in the graph
+        setCategoryProducts(products.slice(0, 5)); // category 5
       } catch (err) {
         console.error("Failed to load category sales:", err);
-        setError(err.response?.data?.message || "Unable to load category sales");
+
+        setError(
+          err.response?.data?.message || "Unable to load category sales",
+        );
       } finally {
         setLoading(false);
       }
@@ -52,10 +63,14 @@ function CategorySalesChart({ session, category, fromDate, toDate }) {
       STATUS_COLORS.completed,
       STATUS_COLORS.cancelled,
     ];
+
     return colors[index % colors.length];
   };
 
-  const maxQuantity = Math.max(...categoryProducts.map((p) => p.total_sold || 0), 1);
+  const maxQuantity = Math.max(
+    ...categoryProducts.map((p) => p.total_sold || 0),
+    1,
+  );
 
   if (!category) {
     return (
@@ -63,9 +78,11 @@ function CategorySalesChart({ session, category, fromDate, toDate }) {
         <h2 style={{ margin: "0 0 10px", fontSize: "24px" }}>
           Sales by Category
         </h2>
+
         <p style={{ margin: "0 0 18px", color: "#5e5148" }}>
           Select a category to view product sales.
         </p>
+
         <p className="ps-lead">Please select a category above.</p>
       </div>
     );
@@ -77,9 +94,12 @@ function CategorySalesChart({ session, category, fromDate, toDate }) {
         <h2 style={{ margin: "0 0 10px", fontSize: "24px" }}>
           Sales by Category: {category}
         </h2>
+
         <p style={{ margin: "0 0 18px", color: "#5e5148" }}>
-          Products in this category ranked by units sold from successful orders.
+          Top products in this category ranked by units sold from successful
+          orders.
         </p>
+
         <p className="ps-lead">Loading category sales...</p>
       </div>
     );
@@ -91,9 +111,12 @@ function CategorySalesChart({ session, category, fromDate, toDate }) {
         <h2 style={{ margin: "0 0 10px", fontSize: "24px" }}>
           Sales by Category: {category}
         </h2>
+
         <p style={{ margin: "0 0 18px", color: "#5e5148" }}>
-          Products in this category ranked by units sold from successful orders.
+          Top products in this category ranked by units sold from successful
+          orders.
         </p>
+
         <p className="ps-lead" style={{ color: "#991b1b" }}>
           {error}
         </p>
@@ -107,17 +130,18 @@ function CategorySalesChart({ session, category, fromDate, toDate }) {
         <h2 style={{ margin: "0 0 10px", fontSize: "24px" }}>
           Sales by Category: {category}
         </h2>
+
         <p style={{ margin: "0 0 18px", color: "#5e5148" }}>
-          Products in this category ranked by units sold from successful orders.
+          Top products in this category ranked by units sold from successful
+          orders.
         </p>
-        <p className="ps-lead">
-          No products found in this category.
-        </p>
+
+        <p className="ps-lead">No products found in this category.</p>
       </div>
     );
   }
 
-  // Check if all products have 0 sales
+  // Check if all displayed products have 0 sales
   const allZeroSales = categoryProducts.every((p) => (p.total_sold || 0) === 0);
 
   if (allZeroSales) {
@@ -126,11 +150,15 @@ function CategorySalesChart({ session, category, fromDate, toDate }) {
         <h2 style={{ margin: "0 0 10px", fontSize: "24px" }}>
           Sales by Category: {category}
         </h2>
+
         <p style={{ margin: "0 0 18px", color: "#5e5148" }}>
-          Products in this category ranked by units sold from successful orders.
+          Top products in this category ranked by units sold from successful
+          orders.
         </p>
+
         <p className="ps-lead">
-          No sales recorded for products in this category during the selected date range.
+          No sales recorded for products in this category during the selected
+          date range.
         </p>
       </div>
     );
@@ -141,8 +169,10 @@ function CategorySalesChart({ session, category, fromDate, toDate }) {
       <h2 style={{ margin: "0 0 10px", fontSize: "24px" }}>
         Sales by Category: {category}
       </h2>
+
       <p style={{ margin: "0 0 18px", color: "#5e5148" }}>
-        Products in this category ranked by units sold from successful orders.
+        Top 5 products in this category ranked by units sold from successful
+        orders.
       </p>
 
       <div
@@ -159,7 +189,9 @@ function CategorySalesChart({ session, category, fromDate, toDate }) {
       >
         {categoryProducts.map((product, index) => {
           const quantity = product.total_sold || 0;
+
           const barHeight = (quantity / maxQuantity) * 100;
+
           const color = getBarColor(index);
 
           return (
@@ -184,6 +216,7 @@ function CategorySalesChart({ session, category, fromDate, toDate }) {
               >
                 {quantity}
               </div>
+
               <div
                 style={{
                   width: "60px",
@@ -206,6 +239,7 @@ function CategorySalesChart({ session, category, fromDate, toDate }) {
                   }}
                 />
               </div>
+
               <div
                 style={{
                   marginTop: "12px",
