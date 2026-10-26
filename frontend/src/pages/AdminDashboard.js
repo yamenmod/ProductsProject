@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Admin Dashboard Page
  * Main admin interface showing order statistics, stock watchlist, and settings
  * Features date filtering, order status cards, and VAT/max quantity configuration
