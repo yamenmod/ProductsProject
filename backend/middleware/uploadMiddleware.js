@@ -5,7 +5,6 @@ const multer = require("multer");
 const uploadDir = path.join(
   __dirname,
   "..",
-  "..",
   "public",
   "assets",
   "img",
