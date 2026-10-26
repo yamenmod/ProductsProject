@@ -171,41 +171,43 @@ function Home({
     return gender === "unisex" || gender === shopperGender;
   };
 
-  const resolveImageSrc = (imagePath) => {
-    if (!imagePath) {
-      return "https://via.placeholder.com/520x640?text=New+Drop";
-    }
+  
+const API_BASE_URL = (
+  process.env.REACT_APP_API_BASE_URL || "http://localhost:5000"
+).replace(/\/+$/, "");
 
-    const normalized = imagePath.replace(/\\/g, "/").trim();
+const resolveImageSrc = (imagePath) => {
+  if (!imagePath) {
+    return "https://placehold.co/520x640?text=New+Drop";
+  }
 
-    if (normalized.startsWith("http://") || normalized.startsWith("https://")) {
-      return normalized;
-    }
+  const normalized = String(imagePath).replace(/\\/g, "/").trim();
 
-    if (
-      normalized.startsWith("/uploads/") ||
-      normalized.startsWith("/public/")
-    ) {
-      return `http://localhost:5000${normalized}`;
-    }
+  // Images already using a complete URL
+  if (/^https?:\/\//i.test(normalized)) {
+    return normalized;
+  }
 
-    if (normalized.startsWith("uploads/") || normalized.startsWith("public/")) {
-      return `http://localhost:5000/${normalized}`;
-    }
+  // Images stored in the backend
+  if (normalized.startsWith("/uploads/") || normalized.startsWith("/public/")) {
+    return `${API_BASE_URL}${normalized}`;
+  }
 
-    if (normalized.startsWith("assets/img/products/")) {
-      return `http://localhost:5000/public/${normalized}`;
-    }
+  if (normalized.startsWith("uploads/") || normalized.startsWith("public/")) {
+    return `${API_BASE_URL}/${normalized}`;
+  }
 
-    if (normalized.startsWith("/assets/img/products/")) {
-      return `http://localhost:5000/public${normalized}`;
-    }
+  if (normalized.startsWith("assets/img/products/")) {
+    return `${API_BASE_URL}/public/${normalized}`;
+  }
 
-    return `http://localhost:5000/public/assets/img/products/${normalized.replace(
-      /^\/+/,
-      "",
-    )}`;
-  };
+  if (normalized.startsWith("/assets/img/products/")) {
+    return `${API_BASE_URL}/public${normalized}`;
+  }
+
+  return `${API_BASE_URL}/public/assets/img/products/${normalized.replace(/^\/+/, "")}`;
+};
+
 
   const getProductImages = (product) => {
     const rawImages = [
