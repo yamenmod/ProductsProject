@@ -497,6 +497,7 @@ function AdminDashboard({
             </div>
 
             <div
+              className="ps-dateRange"
               style={{
                 display: "flex",
                 gap: "12px",
@@ -788,6 +789,7 @@ function AdminDashboard({
           </div>
 
           <div
+            className="ps-adminChartsGrid"
             style={{
               display: "grid",
               gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
@@ -810,6 +812,7 @@ function AdminDashboard({
 
               {statusChartData.some((item) => item.value > 0) ? (
                 <div
+                  className="ps-statusChartGrid"
                   style={{
                     display: "grid",
                     gridTemplateColumns: "minmax(220px, 280px) 1fr",

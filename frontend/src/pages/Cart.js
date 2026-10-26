@@ -678,6 +678,7 @@ function Cart({
           style={{ maxWidth: "1080px", margin: "0 auto" }}
         >
           <div
+            className="ps-cartHeader"
             style={{
               display: "flex",
               justifyContent: "space-between",
@@ -822,7 +823,7 @@ function Cart({
                 return (
                   <div
                     key={`${item.id}-${item.size || "default"}`}
-                    className="ps-surface"
+                    className="ps-surface ps-cartItem"
                     style={{
                       padding: "24px",
                       display: "grid",
@@ -1073,7 +1074,7 @@ function Cart({
               })}
 
               <div
-                className="ps-surface"
+                className="ps-surface ps-cartSummary"
                 style={{
                   padding: "28px 24px",
                   display: "flex",
@@ -1099,6 +1100,7 @@ function Cart({
                 </div>
 
                 <div
+                  className="ps-cartTotals"
                   style={{
                     flex: 1,
                     display: "flex",
@@ -1197,6 +1199,7 @@ function Cart({
             role="dialog"
             aria-modal="true"
             aria-label="Choose payment method"
+            data-modal="payment"
             onClick={(event) => event.stopPropagation()}
             style={{
               maxWidth: "460px",

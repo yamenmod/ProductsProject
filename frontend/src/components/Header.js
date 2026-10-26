@@ -12,6 +12,7 @@ function Header({
   cartCount = 0,
 }) {
   const [shopMenuOpen, setShopMenuOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [logoutPromptOpen, setLogoutPromptOpen] = useState(false);
   const [chooseBoardOpen, setChooseBoardOpen] = useState(false);
   const [boardInputs, setBoardInputs] = useState({
@@ -226,7 +227,7 @@ function Header({
 
   // shop scrolldown
   return (
-    <header className="ps-header">
+    <header className={`ps-header${mobileMenuOpen ? " is-menu-open" : ""}`}>
       <div className="ps-header-inner">
         <div className="ps-brand-cluster">
           <button
@@ -266,7 +267,54 @@ function Header({
           )}
         </div>
 
-        <nav className="ps-nav">
+        <div className="ps-header-mobileActions">
+          {isCustomer && (
+            <button
+              type="button"
+              className="ps-cart-button ps-cart-button-mobile"
+              onClick={() => {
+                setMobileMenuOpen(false);
+                onNavigate("cart");
+              }}
+              aria-label={`Cart with ${cartCount} product${cartCount === 1 ? "" : "s"}`}
+            >
+              <img
+                src="/CartLogo/cartlogo.png"
+                alt="Cart"
+                className="ps-cart-icon"
+              />
+              <span className="ps-cart-count">
+                {cartCount === 0 ? "0" : cartCount > 99 ? "99+" : cartCount}
+              </span>
+            </button>
+          )}
+
+          <button
+            type="button"
+            className="ps-menu-toggle"
+            onClick={() => setMobileMenuOpen((prev) => !prev)}
+            aria-expanded={mobileMenuOpen}
+            aria-controls="ps-header-nav"
+            aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+          >
+            <span className="ps-menu-toggle-bar" />
+            <span className="ps-menu-toggle-bar" />
+            <span className="ps-menu-toggle-bar" />
+          </button>
+        </div>
+
+        <nav
+          className="ps-nav"
+          id="ps-header-nav"
+          onClick={(event) => {
+            if (
+              event.target.closest("button") &&
+              !event.target.closest("[data-keep-menu]")
+            ) {
+              setMobileMenuOpen(false);
+            }
+          }}
+        >
           {!isAdmin && (
             <>
               <button
@@ -279,13 +327,18 @@ function Header({
 
               <div
                 style={{ position: "relative" }}
-                onMouseEnter={() => setShopMenuOpen(true)}
-                onMouseLeave={() => setShopMenuOpen(false)}
+                onPointerEnter={(event) => {
+                  if (event.pointerType === "mouse") setShopMenuOpen(true);
+                }}
+                onPointerLeave={(event) => {
+                  if (event.pointerType === "mouse") setShopMenuOpen(false);
+                }}
               >
                 <button
                   type="button"
                   className={`ps-nav-link ${shopActive ? "active" : ""}`}
                   onClick={() => setShopMenuOpen((prev) => !prev)}
+                  data-keep-menu
                   aria-expanded={shopMenuOpen}
                   aria-haspopup="menu"
                 >
@@ -375,7 +428,14 @@ function Header({
           )}
         </nav>
 
-        <div className="ps-user-row">
+        <div
+          className="ps-user-row"
+          onClick={(event) => {
+            if (event.target.closest("button")) {
+              setMobileMenuOpen(false);
+            }
+          }}
+        >
           {/* Show the signed-in username so the header always reflects the session. */}
           {/* Cart is hidden for admins because the admin flow is dashboard-only. */}
           <div

@@ -394,6 +394,7 @@ function ManageOrders({
             </div>
 
             <div
+              className="ps-dateRange"
               style={{
                 display: "flex",
                 gap: "12px",
@@ -548,6 +549,7 @@ function ManageOrders({
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
               placeholder="Search by order number or customer name"
+              className="ps-searchInput"
               style={{
                 minWidth: "280px",
                 flex: "1 1 280px",

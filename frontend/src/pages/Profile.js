@@ -187,6 +187,7 @@ function Profile({
           </div>
 
           <div
+            className="ps-profileGrid"
             style={{
               display: "grid",
               gridTemplateColumns: "minmax(0, 1.1fr) minmax(280px, 0.9fr)",

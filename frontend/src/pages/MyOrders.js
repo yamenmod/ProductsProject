@@ -117,7 +117,10 @@ function MyOrders({ session, user, onNavigate }) {
   };
 
   return (
-    <div style={{ padding: "40px 20px", minHeight: "100vh" }}>
+    <div
+      className="ps-myOrdersPage"
+      style={{ padding: "40px 20px", minHeight: "100vh" }}
+    >
       <div style={{ maxWidth: "900px", margin: "0 auto" }}>
         <h2
           style={{ marginBottom: "30px", color: "#1f1813", fontSize: "32px" }}
