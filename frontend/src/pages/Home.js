@@ -5,7 +5,7 @@
  */
 
 import React, { useEffect, useRef, useState } from "react";
-import axios from "axios";
+import api from "../api";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import "./Home.css";
@@ -228,7 +228,7 @@ function Home({
   useEffect(() => {
     const loadRecentProducts = async () => {
       try {
-        const response = await axios.get("/api/products");
+        const response = await api.get("/api/products");
 
         const sortedProducts = [...(response.data || [])].sort(
           (left, right) => {

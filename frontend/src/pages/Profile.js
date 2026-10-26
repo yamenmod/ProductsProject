@@ -4,7 +4,7 @@
  * Features weight/height management and profile information updates
  */
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../api";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { getMeasurementValidationError } from "../utils/measurements";
@@ -53,7 +53,7 @@ function Profile({
 
     const loadProfile = async () => {
       try {
-        const response = await axios.get("/api/auth/profile", {
+        const response = await api.get("/api/auth/profile", {
           headers: {
             Authorization: `Bearer ${session.token}`,
           },
@@ -128,7 +128,7 @@ function Profile({
     setSaving(true);
 
     try {
-      const response = await axios.put(
+      const response = await api.put(
         "/api/auth/profile",
         {
           username: trimmedUsername,

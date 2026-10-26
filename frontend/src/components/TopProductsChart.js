@@ -4,7 +4,7 @@
  * Uses actual sales data from completed/successful orders
  */
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../api";
 import { STATUS_COLORS } from "../utils/statusColors";
 
 function TopProductsChart({ session, fromDate, toDate }) {
@@ -24,7 +24,7 @@ function TopProductsChart({ session, fromDate, toDate }) {
         if (fromDate) params.fromDate = fromDate;
         if (toDate) params.toDate = toDate;
 
-        const response = await axios.get("/api/admin/top-products", {
+        const response = await api.get("/api/admin/top-products", {
           headers: { Authorization: `Bearer ${session.token}` },
           params,
         });
@@ -89,9 +89,7 @@ function TopProductsChart({ session, fromDate, toDate }) {
         <p style={{ margin: "0 0 18px", color: "#5e5148" }}>
           Products ranked by total units sold from successful orders.
         </p>
-        <p className="ps-lead">
-          No products have been purchased yet.
-        </p>
+        <p className="ps-lead">No products have been purchased yet.</p>
       </div>
     );
   }

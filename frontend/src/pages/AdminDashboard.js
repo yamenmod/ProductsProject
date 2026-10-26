@@ -4,7 +4,7 @@
  * Features date filtering, order status cards, and VAT/max quantity configuration
  */
 import React, { useEffect, useMemo, useState } from "react";
-import axios from "axios";
+import api from "../api";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 //drpho
@@ -62,10 +62,10 @@ function AdminDashboard({
   const [selectedCategory, setSelectedCategory] = useState("");
   const [categories, setCategories] = useState([]);
   const statusColors = STATUS_COLORS;
-// FILTER ORDERS BY DATE
-// Converts the selected From/To dates to timestamps.
-// Goes through all orders and keeps only orders inside the selected range.
-// useMemo avoids recalculating unless orders/dateFrom/dateTo change.
+  // FILTER ORDERS BY DATE
+  // Converts the selected From/To dates to timestamps.
+  // Goes through all orders and keeps only orders inside the selected range.
+  // useMemo avoids recalculating unless orders/dateFrom/dateTo change.
   const filteredOrders = useMemo(() => {
     const fromTime = dateFrom
       ? new Date(`${dateFrom}T00:00:00`).getTime()
@@ -92,7 +92,7 @@ function AdminDashboard({
       return true;
     });
   }, [orders, dateFrom, dateTo]);
-//ספירת הזמנות 
+  //ספירת הזמנות
   const filteredSummary = useMemo(() => {
     const summary = { success: 0, cancelled: 0, completed: 0 };
 
@@ -136,7 +136,7 @@ function AdminDashboard({
     ],
   );
 
-// stock watch/4
+  // stock watch/4
 
   const lowStockProducts = useMemo(() => {
     const THRESHOLD = 4;
@@ -145,54 +145,53 @@ function AdminDashboard({
       .trim()
       .toLowerCase();
 
-    return [...products]
-    //מכינים מידע על כל מוצר.
-      .map((product) => {
-        const stock = Number(product?.stock ?? 0);
-        const sizeStock = product?.sizeStock || product?.size_stock || null;
+    return (
+      [...products]
+        //מכינים מידע על כל מוצר.
+        .map((product) => {
+          const stock = Number(product?.stock ?? 0);
+          const sizeStock = product?.sizeStock || product?.size_stock || null;
 
-        let lowSizes = null;
+          let lowSizes = null;
 
-        if (sizeStock && typeof sizeStock === "object") {
-          lowSizes = Object.entries(sizeStock)
-            .filter(([, qty]) => Number(qty) >= 0 && Number(qty) <= THRESHOLD) // if lower than 4
-            .map(([size, qty]) => ({ size, qty: Number(qty) }));
-        }
+          if (sizeStock && typeof sizeStock === "object") {
+            lowSizes = Object.entries(sizeStock)
+              .filter(([, qty]) => Number(qty) >= 0 && Number(qty) <= THRESHOLD) // if lower than 4
+              .map(([size, qty]) => ({ size, qty: Number(qty) }));
+          }
 
-        const allSizesOutOfStock =
-          sizeStock &&
-          typeof sizeStock === "object" &&
-          Object.keys(sizeStock).length > 0 &&
-          Object.values(sizeStock).every((qty) => Number(qty) === 0);
+          const allSizesOutOfStock =
+            sizeStock &&
+            typeof sizeStock === "object" &&
+            Object.keys(sizeStock).length > 0 &&
+            Object.values(sizeStock).every((qty) => Number(qty) === 0);
 
+          const overallLow = stock >= 0 && stock <= THRESHOLD;
 
-
-
-        const overallLow = stock >= 0 && stock <= THRESHOLD;
-
-      return {
-        product,
-        overallLow,
-        allSizesOutOfStock,
-        lowSizes: lowSizes && lowSizes.length ? lowSizes : [],
-        stock,
-      };
-      })
-      //משאירים רק מוצרים עם מלאי נמוך.
-      .filter(
-        (entry) =>
-          entry.overallLow || (entry.lowSizes && entry.lowSizes.length),
-      )
-      //מסננים לפי מה שהאדמין חיפש.
-      .filter((entry) => {
-        if (!normalizedSearch) return true;
-        return (entry.product?.name || "")
-          .toString()
-          .toLowerCase()
-          .includes(normalizedSearch);
-      })
-      //ממיינים לפי כמות המלאי.
-      .sort((a, b) => a.stock - b.stock);
+          return {
+            product,
+            overallLow,
+            allSizesOutOfStock,
+            lowSizes: lowSizes && lowSizes.length ? lowSizes : [],
+            stock,
+          };
+        })
+        //משאירים רק מוצרים עם מלאי נמוך.
+        .filter(
+          (entry) =>
+            entry.overallLow || (entry.lowSizes && entry.lowSizes.length),
+        )
+        //מסננים לפי מה שהאדמין חיפש.
+        .filter((entry) => {
+          if (!normalizedSearch) return true;
+          return (entry.product?.name || "")
+            .toString()
+            .toLowerCase()
+            .includes(normalizedSearch);
+        })
+        //ממיינים לפי כמות המלאי.
+        .sort((a, b) => a.stock - b.stock)
+    );
   }, [products, watchlistSearch]);
 
   useEffect(() => {
@@ -202,12 +201,12 @@ function AdminDashboard({
       }
 
       try {
-        const response = await axios.get("/api/admin/categories", {
+        const response = await api.get("/api/admin/categories", {
           headers: { Authorization: `Bearer ${session.token}` },
         });
-        const categoryNames = response.data.map((cat) => cat.name).sort((a, b) => 
-          a.toLowerCase().localeCompare(b.toLowerCase())
-        );
+        const categoryNames = response.data
+          .map((cat) => cat.name)
+          .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
         console.log("Categories loaded from database:", categoryNames);
         setCategories(categoryNames);
       } catch (error) {
@@ -226,8 +225,8 @@ function AdminDashboard({
       try {
         const token = session?.token;
         const [productsRes, ordersRes] = await Promise.all([
-          axios.get("/api/products"),
-          axios.get("/api/cart/admin/orders", {
+          api.get("/api/products"),
+          api.get("/api/cart/admin/orders", {
             headers: { Authorization: `Bearer ${token}` },
           }),
         ]);
@@ -255,7 +254,7 @@ function AdminDashboard({
       }
 
       try {
-        const response = await axios.get("/api/admin/settings/vat_rate", {
+        const response = await api.get("/api/admin/settings/vat_rate", {
           headers: { Authorization: `Bearer ${session.token}` },
         });
 
@@ -281,7 +280,7 @@ function AdminDashboard({
       }
 
       try {
-        const response = await axios.get(
+        const response = await api.get(
           "/api/admin/settings/max_quantity_per_cart",
           {
             headers: { Authorization: `Bearer ${session.token}` },
@@ -302,7 +301,7 @@ function AdminDashboard({
 
     loadMaxQtyPerProduct();
   }, [session?.token]);
-//vat
+  //vat
   const saveVatRate = async () => {
     const parsedPercent = Number(vatInput);
 
@@ -319,7 +318,7 @@ function AdminDashboard({
       setSavingVat(true);
       setVatMessage("");
 
-      const response = await axios.put(
+      const response = await api.put(
         "/api/admin/settings/vat_rate",
         { value: parsedPercent },
         {
@@ -340,7 +339,7 @@ function AdminDashboard({
       setSavingVat(false);
     }
   };
-//maxqtynum
+  //maxqtynum
   const saveMaxQtyPerProduct = async () => {
     const parsed = Number(maxQtyInput);
 
@@ -354,7 +353,7 @@ function AdminDashboard({
       setSavingMaxQty(true);
       setMaxQtyMessage("");
 
-      const response = await axios.put(
+      const response = await api.put(
         "/api/admin/settings/max_quantity_per_cart",
         { value: parsed },
         {
@@ -377,9 +376,9 @@ function AdminDashboard({
     }
   };
 
-   // open cards
+  // open cards
 
-   //הפילטר אומר איזה סוג הזמנות אנחנו רוצים לפתוח
+  //הפילטר אומר איזה סוג הזמנות אנחנו רוצים לפתוח
   const openOrders = (filter) => {
     if (typeof onOpenOrders === "function") {
       onOpenOrders(filter);
@@ -392,7 +391,7 @@ function AdminDashboard({
   const openProductEdit = async (product) => {
     try {
       const productId = product._id || product.id;
-      const res = await axios.get(`/api/products/${productId}`);
+      const res = await api.get(`/api/products/${productId}`);
       onNavigate("manage-products", res.data);
     } catch (error) {
       console.error("Failed to fetch product for editing:", error);
@@ -488,7 +487,10 @@ function AdminDashboard({
               >
                 Welcome, admin
               </h1>
-              <p className="ps-lead" style={{ maxWidth: "760px", marginBottom: "0" }}>
+              <p
+                className="ps-lead"
+                style={{ maxWidth: "760px", marginBottom: "0" }}
+              >
                 Track order health at a glance and watch products that are close
                 to running out of stock.
               </p>
@@ -692,15 +694,15 @@ function AdminDashboard({
                   const stock = Number(entry.stock ?? 0);
                   const hasLowSizes =
                     Array.isArray(entry.lowSizes) && entry.lowSizes.length;
-                const statusLabel =
-                  entry.allSizesOutOfStock || (stock === 0 && !hasLowSizes)
-                    ? "Out of stock"
-                    : "Low stock";
+                  const statusLabel =
+                    entry.allSizesOutOfStock || (stock === 0 && !hasLowSizes)
+                      ? "Out of stock"
+                      : "Low stock";
 
-                const statusColor =
-                  entry.allSizesOutOfStock || (stock === 0 && !hasLowSizes)
-                    ? "#a83f34"
-                    : "#245860";
+                  const statusColor =
+                    entry.allSizesOutOfStock || (stock === 0 && !hasLowSizes)
+                      ? "#a83f34"
+                      : "#245860";
 
                   return (
                     <div
@@ -742,7 +744,10 @@ function AdminDashboard({
                                 Low sizes:
                               </strong>{" "}
                               {entry.lowSizes
-                                .map((s) => `${s.size}(${s.qty === 0 ? 'Out of stock' : s.qty})`)
+                                .map(
+                                  (s) =>
+                                    `${s.size}(${s.qty === 0 ? "Out of stock" : s.qty})`,
+                                )
                                 .join(", ")}
                             </div>
                           ) : null}
@@ -764,9 +769,7 @@ function AdminDashboard({
                             Edit
                           </button>
                           {!hasLowSizes ? (
-                            <span
-                              style={{ color: "#245860", fontWeight: 700 }}
-                            >
+                            <span style={{ color: "#245860", fontWeight: 700 }}>
                               Stock {stock}
                             </span>
                           ) : null}
@@ -791,7 +794,11 @@ function AdminDashboard({
               gap: "16px",
             }}
           >
-            <TopProductsChart session={session} fromDate={dateFrom} toDate={dateTo} />
+            <TopProductsChart
+              session={session}
+              fromDate={dateFrom}
+              toDate={dateTo}
+            />
 
             <div className="ps-surface" style={{ padding: "22px" }}>
               <h2 style={{ margin: "0 0 10px", fontSize: "24px" }}>

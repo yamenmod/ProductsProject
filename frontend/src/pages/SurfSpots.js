@@ -4,7 +4,7 @@
  * Features product preview modal, size selection, and add to cart functionality
  */
 import React, { useEffect, useRef, useState } from "react";
-import axios from "axios";
+import api from "../api";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { getBasePrice } from "../utils/pricing";
@@ -224,7 +224,7 @@ function Products({
 
   useEffect(() => {
     const loadData = async () => {
-      const productsRes = await axios.get("/api/products");
+      const productsRes = await api.get("/api/products");
 
       setProducts(productsRes.data);
     };

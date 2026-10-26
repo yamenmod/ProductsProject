@@ -4,7 +4,7 @@
  * Features date filtering, search, order details modal, and mark as completed functionality
  */
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import axios from "axios";
+import api from "../api";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { STATUS_COLORS, getStatusTone } from "../utils/statusColors";
@@ -73,7 +73,7 @@ function ManageOrders({
       setError("");
 
       try {
-        const response = await axios.get("/api/cart/admin/orders", {
+        const response = await api.get("/api/cart/admin/orders", {
           headers: {
             Authorization: `Bearer ${session.token}`,
           },
@@ -97,7 +97,7 @@ function ManageOrders({
       setLoadingOrderDetail(true);
 
       try {
-        const response = await axios.get(
+        const response = await api.get(
           `/api/cart/admin/orders/${orderId}/items`,
           {
             headers: {
@@ -124,7 +124,7 @@ function ManageOrders({
   //mark order completed
   const handleMarkAsCompleted = async (orderId) => {
     try {
-      await axios.patch(
+      await api.patch(
         `/api/admin/orders/${orderId}/complete`,
         {},
         {
@@ -139,7 +139,7 @@ function ManageOrders({
       setPendingOrderId(null);
       setSelectedOrderDetail(null);
       // Refresh orders
-      const response = await axios.get("/api/cart/admin/orders", {
+      const response = await api.get("/api/cart/admin/orders", {
         headers: {
           Authorization: `Bearer ${session.token}`,
         },
@@ -384,7 +384,10 @@ function ManageOrders({
               >
                 Manage orders
               </h1>
-              <p className="ps-lead" style={{ maxWidth: "760px", marginBottom: "0" }}>
+              <p
+                className="ps-lead"
+                style={{ maxWidth: "760px", marginBottom: "0" }}
+              >
                 Review every checkout and quickly spot whether the payment ended
                 up successful or cancelled.
               </p>
@@ -687,10 +690,10 @@ function ManageOrders({
                             color: "#65574d",
                             fontSize: "13px",
                           }}
-                        > 
-                          {formatDate(order.completedAt || order.completed_at)} 
+                        >
+                          {formatDate(order.completedAt || order.completed_at)}
                         </td>
-                        <td style={{ padding: "14px 10px" }}> 
+                        <td style={{ padding: "14px 10px" }}>
                           {bucket === "success" && (
                             <button
                               type="button"
@@ -706,7 +709,7 @@ function ManageOrders({
                                 height: "auto",
                               }}
                             >
-                              Mark as Completed 
+                              Mark as Completed
                             </button> // mark order completed btn
                           )}
                         </td>

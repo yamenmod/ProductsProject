@@ -4,7 +4,7 @@
  * Helps customers choose the right size based on height, weight, and measurements
  */
 import React, { useEffect, useRef, useState } from "react";
-import axios from "axios";
+import api from "../api";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 
@@ -184,7 +184,7 @@ function SizeCharts({
   useEffect(() => {
     const loadProducts = async () => {
       try {
-        const response = await axios.get("/api/products");
+        const response = await api.get("/api/products");
         setProducts(response.data || []);
       } catch (error) {
         setProducts([]);
@@ -198,7 +198,7 @@ function SizeCharts({
     .filter(
       (product) =>
         (product.category || "").toString().trim().toLowerCase() ===
-          "wetsuits" && canViewProduct(product), 
+          "wetsuits" && canViewProduct(product),
     )
     .slice(0, 3); // first 3 products
 
@@ -422,9 +422,12 @@ function SizeCharts({
             aria-label="Product added to cart"
             onClick={(event) => event.stopPropagation()}
           >
-            <h2 className="ps-cartConfirmTitle">Product added to cart successfully</h2>
+            <h2 className="ps-cartConfirmTitle">
+              Product added to cart successfully
+            </h2>
             <p className="ps-cartConfirmText">
-              The product has been added to your cart. You can continue shopping or proceed to checkout.
+              The product has been added to your cart. You can continue shopping
+              or proceed to checkout.
             </p>
             <div className="ps-cartConfirmActions">
               <button
@@ -450,10 +453,7 @@ function SizeCharts({
       )}
 
       {showCartErrorModal && (
-        <div
-          className="ps-cartConfirmBackdrop"
-          onClick={onCloseCartErrorModal}
-        >
+        <div className="ps-cartConfirmBackdrop" onClick={onCloseCartErrorModal}>
           <div
             className="ps-cartConfirmCard"
             role="dialog"
@@ -464,10 +464,10 @@ function SizeCharts({
             <p className="ps-pill" style={{ margin: 0, width: "fit-content" }}>
               Error
             </p>
-            <h2 className="ps-cartConfirmTitle">Unable to add product to cart</h2>
-            <p className="ps-cartConfirmText">
-              {cartErrorMessage}
-            </p>
+            <h2 className="ps-cartConfirmTitle">
+              Unable to add product to cart
+            </h2>
+            <p className="ps-cartConfirmText">{cartErrorMessage}</p>
             <div className="ps-cartConfirmActions">
               <button
                 type="button"
@@ -494,8 +494,6 @@ function SizeCharts({
               the suit seals correctly at the ankles and wrists.
             </p>
           </div>
-
-        
         </section>
 
         <section className="ps-shell ps-sizeChartPanel">

@@ -1,4 +1,4 @@
-import axios from "axios";
+import api from "../api";
 
 const DEFAULT_VAT_RATE = Number(process.env.REACT_APP_DEFAULT_VAT_RATE || 0);
 
@@ -20,7 +20,7 @@ const fetchVatRate = async () => {
 
   vatRateFetchPromise = (async () => {
     try {
-      const response = await axios.get("/api/admin/settings/vat_rate");
+      const response = await api.get("/api/admin/settings/vat_rate");
       console.log("[vat:settings-response]", response.data);
       if (response.data && response.data.value) {
         const rate = parseFloat(response.data.value);

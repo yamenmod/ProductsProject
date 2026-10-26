@@ -4,7 +4,7 @@
  * Features order status display, cancellation functionality, and countdown timer
  */
 import React, { useCallback, useEffect, useState } from "react";
-import axios from "axios";
+import api from "../api";
 import { getStatusColor, getStatusTone } from "../utils/statusColors";
 import {
   getOrderBucket,
@@ -22,7 +22,7 @@ function MyOrders({ session, user, onNavigate }) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const resp = await axios.get("/api/orders/my-orders", {
+      const resp = await api.get("/api/orders/my-orders", {
         headers: { Authorization: `Bearer ${session.token}` },
       });
       setOrders(resp.data || []);
@@ -78,7 +78,7 @@ function MyOrders({ session, user, onNavigate }) {
 
     setCancelling(true);
     try {
-      await axios.post(`/api/orders/${cancelTargetId}/cancel`, null, {
+      await api.post(`/api/orders/${cancelTargetId}/cancel`, null, {
         headers: { Authorization: `Bearer ${session.token}` },
       });
       setCancelTargetId(null);

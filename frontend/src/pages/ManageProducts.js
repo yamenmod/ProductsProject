@@ -4,7 +4,7 @@
  * Features form validation, size stock management, and image handling
  */
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../api";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 
@@ -278,7 +278,7 @@ function ManageProducts({
 
   const loadProducts = async () => {
     try {
-      const res = await axios.get("/api/products/admin", {
+      const res = await api.get("/api/products/admin", {
         headers: { Authorization: `Bearer ${session.token}` },
       });
       setProducts(res.data);
@@ -440,7 +440,7 @@ function ManageProducts({
 
     try {
       if (editId) {
-        await axios.put(`/api/products/${editId}`, payload, {
+        await api.put(`/api/products/${editId}`, payload, {
           headers: {
             Authorization: `Bearer ${session.token}`,
           },
@@ -448,7 +448,7 @@ function ManageProducts({
         });
         setSuccess("Product updated");
       } else {
-        await axios.post("/api/products", payload, {
+        await api.post("/api/products", payload, {
           headers: {
             Authorization: `Bearer ${session.token}`,
           },
@@ -520,7 +520,7 @@ function ManageProducts({
     setSuccess("");
     setError("");
     try {
-      await axios.patch(
+      await api.patch(
         `/api/products/${product._id || product.id}/status`,
         {
           is_active: isActive,
@@ -1084,51 +1084,56 @@ function ManageProducts({
                         marginTop: "8px",
                       }}
                     >
-                      {sizeOptions.map((size) => ( // clothing form
-                        <label
-                          key={size}
-                          style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: "6px",
-                            background: "#fffdf8",
-                            border: "1px solid #d9c3ad",
-                            borderRadius: "10px",
-                            padding: "12px",
-                            fontSize: "13px",
-                            color: "#1f1813",
-                          }}
-                        >
-                          <span style={{ fontWeight: 700 }}>{size}</span>
-                          <input
-                            type="number"
-                            min="0"
-                            step="1"
-                            value={form.sizeStock[size] ?? 0}
-                            onChange={(e) => {
-                              const nextValue = Number(e.target.value);
-                              setForm({
-                                ...form,
-                                sizeStock: {
-                                  ...form.sizeStock,
-                                  [size]:
-                                    Number.isFinite(nextValue) && nextValue >= 0
-                                      ? Math.floor(nextValue)
-                                      : 0,
-                                },
-                              });
-                            }}
+                      {sizeOptions.map(
+                        (
+                          size, // clothing form
+                        ) => (
+                          <label
+                            key={size}
                             style={{
-                              padding: "10px 12px",
-                              border: "1px solid #d9c3ad",
-                              borderRadius: "8px",
-                              fontSize: "13px",
-                              fontFamily: "inherit",
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: "6px",
                               background: "#fffdf8",
+                              border: "1px solid #d9c3ad",
+                              borderRadius: "10px",
+                              padding: "12px",
+                              fontSize: "13px",
+                              color: "#1f1813",
                             }}
-                          />
-                        </label>
-                      ))}
+                          >
+                            <span style={{ fontWeight: 700 }}>{size}</span>
+                            <input
+                              type="number"
+                              min="0"
+                              step="1"
+                              value={form.sizeStock[size] ?? 0}
+                              onChange={(e) => {
+                                const nextValue = Number(e.target.value);
+                                setForm({
+                                  ...form,
+                                  sizeStock: {
+                                    ...form.sizeStock,
+                                    [size]:
+                                      Number.isFinite(nextValue) &&
+                                      nextValue >= 0
+                                        ? Math.floor(nextValue)
+                                        : 0,
+                                  },
+                                });
+                              }}
+                              style={{
+                                padding: "10px 12px",
+                                border: "1px solid #d9c3ad",
+                                borderRadius: "8px",
+                                fontSize: "13px",
+                                fontFamily: "inherit",
+                                background: "#fffdf8",
+                              }}
+                            />
+                          </label>
+                        ),
+                      )}
                     </div>
                   )}
 

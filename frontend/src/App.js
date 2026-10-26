@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 
-import axios from "axios";
+import api from "./api";
 
 import Login from "./pages/Login";
 
@@ -133,7 +133,7 @@ function App() {
   useEffect(() => {
     const loadMaxQuantityPerProduct = async () => {
       try {
-        const response = await axios.get(
+        const response = await api.get(
           "/api/admin/settings/max_quantity_per_cart",
         );
         const value = Number(response.data?.value || 10);
@@ -166,7 +166,7 @@ function App() {
       setSession(restoredSession);
 
       if (parsedSession.token && parsedSession.user?.role !== "admin") {
-        axios
+        api
           .get("/api/auth/profile", {
             headers: {
               Authorization: `Bearer ${parsedSession.token}`,
@@ -249,7 +249,7 @@ function App() {
           (async () => {
             try {
               if (isPaypalCancel) {
-                await axios.post(
+                await api.post(
                   "/api/cart/paypal/cancel",
                   { orderID: token },
                   { headers: { Authorization: `Bearer ${saved.token}` } },
@@ -262,7 +262,7 @@ function App() {
                   orderId: token,
                 });
               } else {
-                const resp = await axios.post(
+                const resp = await api.post(
                   "/api/cart/paypal/capture",
                   { orderID: token },
                   { headers: { Authorization: `Bearer ${saved.token}` } },
@@ -275,7 +275,7 @@ function App() {
                   orderId: resp.data?.order?.id || token,
                 });
 
-                const refreshed = await axios.get("/api/cart", {
+                const refreshed = await api.get("/api/cart", {
                   headers: { Authorization: `Bearer ${saved.token}` },
                 });
 
@@ -315,7 +315,7 @@ function App() {
 
     let isMounted = true;
 
-    axios
+    api
       .get("/api/auth/profile", {
         headers: {
           Authorization: `Bearer ${session.token}`,
@@ -354,7 +354,7 @@ function App() {
 
     let isMounted = true;
 
-    axios
+    api
       .get("/api/cart", {
         headers: {
           Authorization: `Bearer ${session.token}`,
@@ -481,7 +481,7 @@ function App() {
     }
 
     try {
-      await axios.post(
+      await api.post(
         "/api/cart",
 
         { productId, quantity: 1, size: productOrCart?.size || "" },
@@ -493,7 +493,7 @@ function App() {
         },
       );
 
-      const refreshedCart = await axios.get("/api/cart", {
+      const refreshedCart = await api.get("/api/cart", {
         headers: {
           Authorization: `Bearer ${session.token}`,
         },
@@ -517,7 +517,7 @@ function App() {
     }
 
     try {
-      const response = await axios.delete(`/api/cart/${productId}`, {
+      const response = await api.delete(`/api/cart/${productId}`, {
         headers: {
           Authorization: `Bearer ${session.token}`,
         },
@@ -539,7 +539,7 @@ function App() {
     }
 
     try {
-      const response = await axios.patch(
+      const response = await api.patch(
         `/api/cart/${productId}`,
 
         { quantity },

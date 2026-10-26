@@ -1,5 +1,5 @@
 import React, { useRef, useState } from "react";
-import axios from "axios";
+import api from "../api";
 import { getMeasurementValidationError } from "../utils/measurements";
 
 function Header({
@@ -106,7 +106,7 @@ function Header({
 
       const requestId = ++recommendationRequestIdRef.current;
 
-      const response = await axios.post("/api/products/recommend-boards", {
+      const response = await api.post("/api/products/recommend-boards", {
         weight,
         height,
       });

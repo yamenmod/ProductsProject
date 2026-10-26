@@ -4,7 +4,7 @@
  * Features PayPal checkout, quantity management, and VAT calculation
  */
 import React, { useCallback, useEffect, useState } from "react";
-import axios from "axios";
+import api from "../api";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import {
@@ -71,7 +71,7 @@ function Cart({
 
     const loadMaxQuantityLimit = async () => {
       try {
-        const response = await axios.get(
+        const response = await api.get(
           "/api/admin/settings/max_quantity_per_cart",
         );
         const value = Number(response.data?.value);
@@ -279,7 +279,7 @@ function Cart({
     try {
       setIsCashLoading(true);
       setErrorMessage("");
-      const response = await axios.post(
+      const response = await api.post(
         "/api/cart/checkout",
         {},
         { headers: { Authorization: `Bearer ${session.token}` } },
@@ -328,7 +328,7 @@ function Cart({
     try {
       setIsPayPalLoading(true);
       setPaypalMessage("");
-      const resp = await axios.post(
+      const resp = await api.post(
         "/api/cart/paypal/create-order",
         {},
         { headers: { Authorization: `Bearer ${session.token}` } },
@@ -361,7 +361,7 @@ function Cart({
     try {
       setIsPayPalLoading(true);
       setPaypalMessage("");
-      const response = await axios.get("/api/cart/paypal/config", {
+      const response = await api.get("/api/cart/paypal/config", {
         headers: {
           Authorization: `Bearer ${session.token}`,
         },
@@ -572,7 +572,7 @@ function Cart({
         const currentVatRate = await fetchVatRate();
         console.log("[vat:cart-state]", { currentVatRate });
         setVatRate(currentVatRate);
-        const response = await axios.get("/api/cart", {
+        const response = await api.get("/api/cart", {
           headers: {
             Authorization: `Bearer ${session.token}`,
           },

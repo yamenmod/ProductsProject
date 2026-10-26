@@ -4,7 +4,7 @@
  * Displays contact details for users who need to place large orders
  */
 import React, { useState } from "react";
-import axios from "axios";
+import api from "../api";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import "./Contact.css";
@@ -42,7 +42,7 @@ function Contact({
     setErrorMessage("");
 
     try {
-      const response = await axios.post("/api/contact/submit", formData);
+      const response = await api.post("/api/contact/submit", formData);
 
       if (response.status === 200 && response.data?.success === true) {
         setSubmitStatus("success");

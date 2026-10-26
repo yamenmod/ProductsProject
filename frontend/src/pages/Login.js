@@ -4,7 +4,7 @@
  * Supports both login and new user registration with optional profile details
  */
 import React, { useState } from "react";
-import axios from "axios";
+import api from "../api";
 import "./Login.css";
 import { getMeasurementValidationError } from "../utils/measurements";
 
@@ -86,7 +86,7 @@ function Login({ onLoginSuccess, onNavigate, initialMode = false }) {
       }
 
       try {
-        const res = await axios.post("/api/auth/register", {
+        const res = await api.post("/api/auth/register", {
           username,
           password,
           email,
@@ -112,7 +112,7 @@ function Login({ onLoginSuccess, onNavigate, initialMode = false }) {
     }
 
     try {
-      const res = await axios.post("/api/auth/login", {
+      const res = await api.post("/api/auth/login", {
         username,
         password,
       });

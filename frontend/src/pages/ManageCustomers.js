@@ -4,7 +4,7 @@
  * Features search functionality and customer activation status management
  */
 import React, { useCallback, useEffect, useState } from "react";
-import axios from "axios";
+import api from "../api";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { STATUS_COLORS } from "../utils/statusColors";
@@ -26,7 +26,7 @@ function ManageCustomers({
   const [statusFilter, setStatusFilter] = useState("all");
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [pendingUserId, setPendingUserId] = useState(null);
-  const [pendingUsername, setPendingUsername] = useState("");
+  const [, setPendingUsername] = useState("");
   const [pendingNextIsActive, setPendingNextIsActive] = useState(null);
 
   // getting users
@@ -34,7 +34,7 @@ function ManageCustomers({
     setLoading(true);
     setError("");
     try {
-      const response = await axios.get("/api/admin/users", {
+      const response = await api.get("/api/admin/users", {
         headers: {
           Authorization: `Bearer ${session.token}`,
         },
@@ -103,7 +103,7 @@ function ManageCustomers({
 
   const handleConfirmStatusChange = async () => {
     try {
-      const response = await axios.put(
+      const response = await api.put(
         `/api/users/${pendingUserId}/status`,
         {
           is_active: pendingNextIsActive === 1,
@@ -171,7 +171,10 @@ function ManageCustomers({
             >
               Manage customers
             </h1>
-            <p className="ps-lead" style={{ maxWidth: "760px", marginBottom: "0" }}>
+            <p
+              className="ps-lead"
+              style={{ maxWidth: "760px", marginBottom: "0" }}
+            >
               View every registered customer and control whether an account is
               active.
             </p>
@@ -195,14 +198,22 @@ function ManageCustomers({
             />
           </div>
 
-          <div style={{ marginBottom: "18px", display: "flex", gap: "10px", flexWrap: "wrap" }}>
+          <div
+            style={{
+              marginBottom: "18px",
+              display: "flex",
+              gap: "10px",
+              flexWrap: "wrap",
+            }}
+          >
             <button
               type="button"
               onClick={() => setStatusFilter("all")}
               style={{
                 fontSize: "12px",
                 padding: "8px 16px",
-                background: statusFilter === "all" ? "#245860" : "rgba(36, 88, 96, 0.1)",
+                background:
+                  statusFilter === "all" ? "#245860" : "rgba(36, 88, 96, 0.1)",
                 color: statusFilter === "all" ? "#fff" : "#245860",
                 border: statusFilter === "all" ? "none" : "1px solid #245860",
                 borderRadius: "8px",
@@ -218,9 +229,13 @@ function ManageCustomers({
               style={{
                 fontSize: "12px",
                 padding: "8px 16px",
-                background: statusFilter === "active" ? "#16a34a" : "rgba(22, 163, 74, 0.1)",
+                background:
+                  statusFilter === "active"
+                    ? "#16a34a"
+                    : "rgba(22, 163, 74, 0.1)",
                 color: statusFilter === "active" ? "#fff" : "#16a34a",
-                border: statusFilter === "active" ? "none" : "1px solid #16a34a",
+                border:
+                  statusFilter === "active" ? "none" : "1px solid #16a34a",
                 borderRadius: "8px",
                 cursor: "pointer",
                 fontWeight: statusFilter === "active" ? 600 : 400,
@@ -234,9 +249,13 @@ function ManageCustomers({
               style={{
                 fontSize: "12px",
                 padding: "8px 16px",
-                background: statusFilter === "inactive" ? "#dc2626" : "rgba(220, 38, 38, 0.1)",
+                background:
+                  statusFilter === "inactive"
+                    ? "#dc2626"
+                    : "rgba(220, 38, 38, 0.1)",
                 color: statusFilter === "inactive" ? "#fff" : "#dc2626",
-                border: statusFilter === "inactive" ? "none" : "1px solid #dc2626",
+                border:
+                  statusFilter === "inactive" ? "none" : "1px solid #dc2626",
                 borderRadius: "8px",
                 cursor: "pointer",
                 fontWeight: statusFilter === "inactive" ? 600 : 400,
@@ -328,7 +347,7 @@ function ManageCustomers({
                 <tbody>
                   {filteredUsers.map((user) => {
                     const isActive = Number(user.is_active) === 1;
-                    
+
                     return (
                       <tr
                         key={user.id}
@@ -359,16 +378,20 @@ function ManageCustomers({
                               background: isActive
                                 ? `${STATUS_COLORS.success}1f`
                                 : "rgba(153, 27, 27, 0.12)",
-                              color: isActive ? STATUS_COLORS.success : "#991b1b",
+                              color: isActive
+                                ? STATUS_COLORS.success
+                                : "#991b1b",
                             }}
                           >
-                            {isActive ? "Active" : "Inactive"} 
+                            {isActive ? "Active" : "Inactive"}
                           </span>
                         </td>
                         <td style={{ padding: "14px 10px", color: "#65574d" }}>
                           {formatJoinedDate(user.createdAt || user.created_at)}
                         </td>
-                        <td style={{ padding: "14px 10px", textAlign: "right" }}>
+                        <td
+                          style={{ padding: "14px 10px", textAlign: "right" }}
+                        >
                           <button
                             type="button"
                             className="ps-btn ps-btn-secondary"
@@ -436,9 +459,13 @@ function ManageCustomers({
                 onClick={handleConfirmStatusChange}
                 style={{
                   background:
-                    pendingNextIsActive === 0 ? STATUS_COLORS.success : undefined,
+                    pendingNextIsActive === 0
+                      ? STATUS_COLORS.success
+                      : undefined,
                   borderColor:
-                    pendingNextIsActive === 0 ? STATUS_COLORS.success : undefined,
+                    pendingNextIsActive === 0
+                      ? STATUS_COLORS.success
+                      : undefined,
                 }}
               >
                 Confirm

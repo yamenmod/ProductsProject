@@ -5,7 +5,7 @@
  * Displays a maximum of 5 products
  */
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../api";
 import { STATUS_COLORS } from "../utils/statusColors";
 
 function CategorySalesChart({ session, category, fromDate, toDate }) {
@@ -31,7 +31,7 @@ function CategorySalesChart({ session, category, fromDate, toDate }) {
         if (fromDate) params.fromDate = fromDate;
         if (toDate) params.toDate = toDate;
 
-        const response = await axios.get("/api/admin/category-sales", {
+        const response = await api.get("/api/admin/category-sales", {
           headers: {
             Authorization: `Bearer ${session.token}`,
           },
